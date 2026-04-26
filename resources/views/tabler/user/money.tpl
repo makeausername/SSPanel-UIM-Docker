@@ -6,10 +6,10 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <span class="home-title">余额记录</span>
+                        <span class="home-title">{trans key='money.title'}</span>
                     </h2>
                     <div class="page-pretitle my-3">
-                        <span class="home-subtitle">查看账户余额变动记录</span>
+                        <span class="home-subtitle">{trans key='money.subtitle'}</span>
                     </div>
                 </div>
                 <div class="col-auto">
@@ -17,12 +17,12 @@
                         <a href="#" class="btn btn-primary" data-bs-toggle="modal"
                            data-bs-target="#topup">
                             <i class="icon ti ti-plus"></i>
-                            余额充值
+                            {trans key='money.recharge'}
                         </a>
                         <a href="#" class="btn btn-primary" data-bs-toggle="modal"
                            data-bs-target="#apply-giftcard-dialog">
                             <i class="icon ti ti-cash-banknote"></i>
-                            兑换礼品卡
+                            {trans key='money.apply_giftcard'}
                         </a>
                     </div>
                 </div>
@@ -38,12 +38,12 @@
                             <table class="table card-table table-vcenter text-nowrap datatable">
                                 <thead>
                                 <tr>
-                                    <th>事件ID</th>
-                                    <th>变动前余额</th>
-                                    <th>变动后余额</th>
-                                    <th>变动金额</th>
-                                    <th>备注</th>
-                                    <th>变动时间</th>
+                                    <th>{trans key='money.event_id'}</th>
+                                    <th>{trans key='money.before_balance'}</th>
+                                    <th>{trans key='money.after_balance'}</th>
+                                    <th>{trans key='money.amount_changed'}</th>
+                                    <th>{trans key='money.remark'}</th>
+                                    <th>{trans key='money.changed_at'}</th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -70,23 +70,23 @@
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">兑换礼品卡</h5>
+                    <h5 class="modal-title">{trans key='money.apply_giftcard'}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group mb-3 row">
                         <div class="col">
                             <input id="giftcard" type="text" class="form-control"
-                                   placeholder="输入礼品卡卡号并点击兑换">
+                                   placeholder="{trans key='money.giftcard_placeholder'}">
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">{trans key='common.cancel'}</button>
                     <button id="apply-giftcard" class="btn btn-primary" data-bs-dismiss="modal"
                             hx-post="/user/giftcard" hx-swap="none"
                             hx-vals='js:{ giftcard: document.getElementById("giftcard").value }'>
-                        兑换
+                        {trans key='money.redeem'}
                     </button>
                 </div>
             </div>
@@ -97,26 +97,26 @@
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">余额充值</h5>
+                    <h5 class="modal-title">{trans key='money.recharge'}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group mb-3 row">
                         <div class="col">
                             <input id="topup_amount" type="number" step="10" class="form-control"
-                                   placeholder="请输入要充值的金额">
+                                   placeholder="{trans key='money.topup_amount_placeholder'}">
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">{trans key='common.cancel'}</button>
                     <button id="apply-topup" class="btn btn-primary" data-bs-dismiss="modal"
                             hx-post="/user/order/create" hx-swap="none"
                             hx-vals='js:{
                                 amount: document.getElementById("topup_amount").value,
                                 type: "topup"
                             }'>
-                        充值
+                        {trans key='money.topup'}
                     </button>
                 </div>
             </div>
