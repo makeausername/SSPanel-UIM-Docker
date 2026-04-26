@@ -125,10 +125,10 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <span class="home-title">用户中心</span>
+                        <span class="home-title">{trans key='user.dashboard.title'}</span>
                     </h2>
                     <div class="page-pretitle my-3">
-                        <span class="home-subtitle">在这里查看账户信息和最新公告</span>
+                        <span class="home-subtitle">{trans key='user.dashboard.subtitle'}</span>
                     </div>
                 </div>
             </div>
@@ -175,28 +175,28 @@
                 <div class="col-lg-6 col-sm-12">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">快速配置</h3>
+                            <h3 class="card-title">{trans key='user.dashboard.quick_config'}</h3>
                         </div>
                         <div class="card-body">
                             <div class="mb-4">
                                 <h4 class="mb-3">
-                                    <i class="ti ti-link"></i> 您的专属订阅地址
+                                    <i class="ti ti-link"></i> {trans key='user.dashboard.subscription_address'}
                                 </h4>
                                 <div class="input-group mb-2">
                                     <input type="text" class="form-control" value="{$UniversalSub}" readonly id="universal-sub-link">
                                     <button class="btn btn-primary copy" data-clipboard-text="{$UniversalSub}">
-                                        <i class="ti ti-copy"></i> 复制
+                                        <i class="ti ti-copy"></i> {trans key='common.copy'}
                                     </button>
                                 </div>
                                 <p class="text-muted mb-0">
-                                    <small>此订阅地址适用于所有客户端，请妥善保管</small>
+                                    <small>{trans key='user.dashboard.subscription_hint'}</small>
                                 </p>
                             </div>
 
                             <div class="recommended-section p-3 bg-primary-lt rounded mb-3">
                                 <h4 class="mb-3">
                                     <i class="ti ti-rocket"></i> 
-                                    为您推荐的 <span id="detected-os" class="text-primary">Windows</span> 客户端
+                                    {trans key='user.dashboard.recommended_client_prefix'} <span id="detected-os" class="text-primary">Windows</span> {trans key='user.dashboard.recommended_client_suffix'}
                                 </h4>
                                 <div class="row g-3" id="recommended-clients">
                                 </div>
@@ -206,7 +206,7 @@
                                 <button class="btn btn-ghost-primary" type="button" data-bs-toggle="collapse" 
                                         data-bs-target="#all-platforms" aria-expanded="false">
                                     <i class="ti ti-package"></i> 
-                                    查看其他平台客户端
+                                    {trans key='user.dashboard.view_other_clients'}
                                     <i class="ti ti-chevron-down ms-1"></i>
                                 </button>
                             </div>
@@ -216,11 +216,11 @@
                                 </div>
                                 
                                 <div class="mt-3 p-3 bg-secondary-lt rounded">
-                                    <h5 class="mb-2">高级订阅格式</h5>
-                                    <div class="small text-muted mb-2">如果您需要特定格式的订阅链接：</div>
+                                    <h5 class="mb-2">{trans key='user.dashboard.advanced_subscription_formats'}</h5>
+                                    <div class="small text-muted mb-2">{trans key='user.dashboard.advanced_subscription_hint'}</div>
                                     <div class="btn-group btn-group-sm flex-wrap">
                                         <button class="btn btn-outline-secondary copy" data-clipboard-text="{$UniversalSub}/json">
-                                            JSON 格式
+                                            {trans key='user.dashboard.json_format'}
                                         </button>
                                         <button class="btn btn-outline-secondary copy" data-clipboard-text="{$UniversalSub}/v2rayjson">
                                             V2Ray JSON
@@ -250,7 +250,7 @@
                                     <button class="btn btn-ghost-secondary w-100" type="button" data-bs-toggle="collapse" 
                                             data-bs-target="#connection-info" aria-expanded="false">
                                         <i class="ti ti-info-circle"></i> 
-                                        查看连接信息
+                                        {trans key='user.dashboard.connection_info'}
                                         <i class="ti ti-chevron-down ms-1"></i>
                                     </button>
                                     <div class="collapse mt-2" id="connection-info">
@@ -259,11 +259,11 @@
                                                 <table class="table table-sm mb-0">
                                                     <tbody>
                                                     <tr>
-                                                        <td class="text-muted" style="width: 100px;">端口</td>
+                                                        <td class="text-muted" style="width: 100px;">{trans key='user.dashboard.port'}</td>
                                                         <td><code>{$user->port}</code></td>
                                                     </tr>
                                                     <tr>
-                                                        <td class="text-muted">连接密码</td>
+                                                        <td class="text-muted">{trans key='user.dashboard.connection_password'}</td>
                                                         <td><code class="spoiler">{$user->passwd}</code></td>
                                                     </tr>
                                                     <tr>
@@ -271,7 +271,7 @@
                                                         <td><code class="spoiler" style="font-size: 0.8em;">{$user->uuid}</code></td>
                                                     </tr>
                                                     <tr>
-                                                        <td class="text-muted">加密方式</td>
+                                                        <td class="text-muted">{trans key='user.dashboard.encryption_method'}</td>
                                                         <td><code>{$user->method}</code></td>
                                                     </tr>
                                                     </tbody>
@@ -290,7 +290,7 @@
                     <div class="vstack">
                         <div class="card">
                             <div class="card-body">
-                                <h3 class="card-title">流量用量</h3>
+                                <h3 class="card-title">{trans key='user.dashboard.traffic_usage'}</h3>
                                 <div class="progress progress-separated mb-3">
                                     {if $user->LastusedTrafficPercent() < '1'}
                                     <div class="progress-bar bg-primary" role="progressbar" style="width: 1%"></div>
@@ -309,24 +309,24 @@
                                 <div class="row">
                                     <div class="col-auto d-flex align-items-center pe-2">
                                         <span class="legend me-2 bg-primary"></span>
-                                        <span>过去用量 {$user->LastusedTraffic()}</span>
+                                        <span>{trans key='user.dashboard.past_usage'} {$user->LastusedTraffic()}</span>
                                     </div>
                                     <div class="col-auto d-flex align-items-center px-2">
                                         <span class="legend me-2 bg-success"></span>
-                                        <span>今日用量 {$user->TodayusedTraffic()}</span>
+                                        <span>{trans key='user.dashboard.today_usage'} {$user->TodayusedTraffic()}</span>
                                     </div>
                                     <div class="col-auto d-flex align-items-center ps-2">
                                         <span class="legend me-2"></span>
-                                        <span>剩余流量 {$user->unusedTraffic()}</span>
+                                        <span>{trans key='user.dashboard.remaining_traffic'} {$user->unusedTraffic()}</span>
                                     </div>
                                 </div>
                                 <p class="my-3">
                                     {if $user->class === 0}
-                                    前往
-                                    <a href="/user/product">商店</a>
-                                    购买套餐
+                                    {trans key='user.dashboard.go_to'}
+                                    <a href="/user/product">{trans key='user.nav.shop'}</a>
+                                    {trans key='user.dashboard.buy_plan'}
                                     {else}
-                                    你的 LV. {$user->class} 账户会在 {$class_expire_days} 天后到期（{$user->class_expire}）
+                                    {trans key='user.dashboard.account_level_prefix'} {$user->class} {trans key='user.dashboard.account_expires_prefix'} {$class_expire_days} {trans key='user.dashboard.account_expires_suffix'}{trans key='user.dashboard.account_expires_date_prefix'}{$user->class_expire}{trans key='user.dashboard.account_expires_date_suffix'}
                                     {/if}
                                 </p>
                             </div>
@@ -334,7 +334,7 @@
                         {if $public_setting['traffic_log']}
                         <div class="card my-3 mb-0">
                             <div class="card-body">
-                                <h3 class="card-title">每小时用量</h3>
+                                <h3 class="card-title">{trans key='user.dashboard.hourly_usage'}</h3>
                                 <div id="traffic-log"></div>
                             </div>
                         </div>
@@ -350,27 +350,27 @@
                             </div>
                         </div>
                         <div class="card-body">
-                            <h3 class="card-title">每日签到</h3>
+                            <h3 class="card-title">{trans key='user.dashboard.daily_checkin'}</h3>
                             <p>
-                                签到可领取
+                                {trans key='user.dashboard.checkin_reward_prefix'}
                                 {if $public_setting['checkin_min'] !== $public_setting['checkin_max']}
                                 &nbsp;
                                 <code>{$public_setting['checkin_min']} MB</code>
-                                至
+                                {trans key='user.dashboard.to'}
                                 <code>{$public_setting['checkin_max']} MB</code>
-                                范围内的流量
+                                {trans key='user.dashboard.checkin_reward_suffix'}
                                 {else}
                                 <code>{$public_setting['checkin_min']} MB</code>
                                 {/if}
                             </p>
                             <p>
-                                上次签到时间：<code id="last-checkin-time">{$user->lastCheckInTime()}</code>
+                                {trans key='user.dashboard.last_checkin_time'}<code id="last-checkin-time">{$user->lastCheckInTime()}</code>
                             </p>
                         </div>
                         <div class="card-footer">
                             <div class="d-flex">
                                 {if !$user->isAbleToCheckin()}
-                                <button id="check-in" class="btn btn-primary ms-auto" disabled>已签到</button>
+                                <button id="check-in" class="btn btn-primary ms-auto" disabled>{trans key='user.dashboard.checked_in'}</button>
                                 {else}
                                 {if $public_setting['enable_checkin_captcha']}
                                 {include file='captcha/div.tpl'}
@@ -381,7 +381,7 @@
                                     {include file='captcha/ajax.tpl'}
                                     {/if}
                                     }'>
-                                    签到
+                                    {trans key='user.dashboard.checkin'}
                                 </button>
                                 {/if}
                             </div>
@@ -396,7 +396,7 @@
                         </div>
                         <div class="card-body">
                             <h3 class="card-title">
-                                置顶公告
+                                {trans key='user.dashboard.pinned_announcement'}
                                 {if $ann !== null}
                                 <span class="card-subtitle">{$ann->date}</span>
                                 {/if}
@@ -405,7 +405,7 @@
                                 {if $ann !== null}
                                 {$ann->content}
                                 {else}
-                                暂无公告
+                                {trans key='user.dashboard.no_announcement'}
                                 {/if}
                             </p>
                         </div>
@@ -444,7 +444,7 @@
                 },
                 series: [
                     {
-                        name: "使用流量（MB）",
+                        name: "{trans key='user.dashboard.traffic_chart_name'}",
                         data: trafficData
                     }
                 ],
@@ -462,7 +462,7 @@
                 },
                 xaxis: {
                     title: {
-                        text: "小时"
+                        text: "{trans key='user.dashboard.hour'}"
                     },
                     labels: {
                         padding: 0
@@ -480,7 +480,7 @@
                 },
                 yaxis: {
                     title: {
-                        text: "使用流量（MB）",
+                        text: "{trans key='user.dashboard.traffic_chart_name'}",
                         rotate: -90
                     },
                     labels: {
@@ -525,6 +525,14 @@
     const platformIcons = {$platformIcons};
 
     const clientRecommendations = {$clientData};
+    window.USER_DASHBOARD_I18N = {
+        clipboardSuccess: "{trans key='common.copied'}",
+        clipboardError: "{trans key='common.copy_failed_select'}",
+        download: "{trans key='common.download'}",
+        copySubscription: "{trans key='user.dashboard.copy_subscription'}",
+        import: "{trans key='user.dashboard.import'}",
+        importRecommended: "{trans key='user.dashboard.import'}"
+    };
     
     {literal}
     function detectOS() {
@@ -541,8 +549,8 @@
     const CONFIG = {
         ANIMATION_DURATION: 350,        // 动画持续时间（毫秒）
         FEEDBACK_TIMEOUT: 2000,         // 反馈提示持续时间（毫秒）
-        CLIPBOARD_SUCCESS_TEXT: '已复制',
-        CLIPBOARD_ERROR_TEXT: '复制失败，请手动选择并复制',
+        CLIPBOARD_SUCCESS_TEXT: window.USER_DASHBOARD_I18N.clipboardSuccess,
+        CLIPBOARD_ERROR_TEXT: window.USER_DASHBOARD_I18N.clipboardError,
         CLASSES: {
             BTN_GROUP_MOBILE: 'btn-group-vertical',
             BTN_GROUP_DESKTOP: 'btn-group btn-group-sm', 
@@ -552,11 +560,11 @@
             DESKTOP_SM: 'd-none d-sm-flex'
         },
         BUTTONS: {
-            download: { icon: 'ti-download', text: '下载', class: 'btn-primary' },
+            download: { icon: 'ti-download', text: window.USER_DASHBOARD_I18N.download, class: 'btn-primary' },
             downloadAppStore: { icon: 'ti-brand-appstore', text: 'App Store', class: 'btn-primary' },
-            copy: { icon: 'ti-copy', text: '复制订阅', class: 'btn-info copy' },
-            import: { icon: 'ti-link', text: '一键导入', class: 'btn-success' },
-            importRecommended: { icon: 'ti-rocket', text: '一键导入', class: 'btn-success' }
+            copy: { icon: 'ti-copy', text: window.USER_DASHBOARD_I18N.copySubscription, class: 'btn-info copy' },
+            import: { icon: 'ti-link', text: window.USER_DASHBOARD_I18N.import, class: 'btn-success' },
+            importRecommended: { icon: 'ti-rocket', text: window.USER_DASHBOARD_I18N.importRecommended, class: 'btn-success' }
         }
     };
     

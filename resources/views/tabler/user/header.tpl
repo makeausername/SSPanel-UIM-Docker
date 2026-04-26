@@ -63,11 +63,11 @@
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
                         {if $user->is_dark_mode}
                             <a class="dropdown-item" hx-post="/user/switch_theme_mode" hx-swap="none">
-                                浅色模式
+                                {trans key='user.nav.light_mode'}
                             </a>
                         {else}
                             <a class="dropdown-item" hx-post="/user/switch_theme_mode" hx-swap="none">
-                                深色模式
+                                {trans key='user.nav.dark_mode'}
                             </a>
                         {/if}
                         <div class="dropdown-divider"></div>
@@ -85,7 +85,7 @@
                                 </button>
                             </div>
                         </form>
-                        <a href="/user/logout" class="dropdown-item">登出</a>
+                        <a href="/user/logout" class="dropdown-item">{trans key='user.nav.logout'}</a>
                     </div>
                 </div>
             </div>
@@ -98,7 +98,7 @@
                                         <i class="ti ti-home icon"></i>
                                     </span>
                                 <span class="nav-link-title">
-                                        主页
+                                        {trans key='user.nav.dashboard'}
                                     </span>
                             </a>
                         </li>
@@ -109,7 +109,7 @@
                                         <i class="ti ti-user icon"></i>
                                     </span>
                                 <span class="nav-link-title">
-                                        我的
+                                        {trans key='user.nav.my'}
                                     </span>
                             </a>
                             <div class="dropdown-menu">
@@ -117,15 +117,15 @@
                                     <div class="dropdown-menu-column">
                                         <a class="dropdown-item" href="/user/profile">
                                             <i class="ti ti-info-square"></i>&nbsp;
-                                            账户
+                                            {trans key='user.nav.account'}
                                         </a>
                                         <a class="dropdown-item" href="/user/edit">
                                             <i class="ti ti-edit"></i>&nbsp;
-                                            资料
+                                            {trans key='user.nav.profile'}
                                         </a>
                                         <a class="dropdown-item" href="/user/invite">
                                             <i class="ti ti-friends"></i>&nbsp;
-                                            邀请
+                                            {trans key='user.nav.invite'}
                                         </a>
                                     </div>
                                 </div>
@@ -138,17 +138,17 @@
                                         <i class="ti ti-brand-telegram icon"></i>
                                     </span>
                                 <span class="nav-link-title">
-                                        使用
+                                        {trans key='user.nav.usage'}
                                     </span>
                             </a>
                             <div class="dropdown-menu">
                                 <a class="dropdown-item" href="/user/server">
                                     <i class="ti ti-server"></i>&nbsp;
-                                    节点
+                                    {trans key='user.nav.nodes'}
                                 </a>
                                 <a class="dropdown-item" href="/user/rate">
                                     <i class="ti ti-chart-bar"></i>&nbsp;
-                                    流量倍率
+                                    {trans key='user.nav.traffic_rate'}
                                 </a>
                             </div>
                         </li>
@@ -159,25 +159,25 @@
                                         <i class="ti ti-dots-circle-horizontal icon"></i>
                                     </span>
                                 <span class="nav-link-title">
-                                        支援
+                                        {trans key='user.nav.support'}
                                     </span>
                             </a>
                             <div class="dropdown-menu">
                                 <a class="dropdown-item" href="/user/announcement">
                                     <i class="ti ti-speakerphone"></i>&nbsp;
-                                    公告
+                                    {trans key='user.nav.announcements'}
                                 </a>
                                 {if $public_setting['enable_ticket']}
                                     <a class="dropdown-item" href="/user/ticket">
                                         <i class="ti ti-ticket"></i>&nbsp;
-                                        工单
+                                        {trans key='user.nav.tickets'}
                                     </a>
                                 {/if}
                                 {if $public_setting['display_docs'] &&
                                 (! $public_setting['display_docs_only_for_paid_user'] || $user->class !== 0)}
                                     <a class="dropdown-item" href="/user/docs">
                                         <i class="ti ti-notes"></i>&nbsp;
-                                        文档
+                                        {trans key='user.nav.docs'}
                                     </a>
                                 {/if}
                             </div>
@@ -189,18 +189,18 @@
                                         <i class="ti ti-shield-check icon"></i>
                                     </span>
                                 <span class="nav-link-title">
-                                        审计
+                                        {trans key='user.nav.audit'}
                                     </span>
                             </a>
                             <div class="dropdown-menu">
                                 <a class="dropdown-item" href="/user/detect">
                                     <i class="ti ti-barrier-block"></i>&nbsp;
-                                    规则
+                                    {trans key='user.nav.rules'}
                                 </a>
                                 {if $public_setting['display_detect_log']}
                                     <a class="dropdown-item" href="/user/detect/log">
                                         <i class="ti ti-notes"></i>&nbsp;
-                                        日志
+                                        {trans key='user.nav.logs'}
                                     </a>
                                 {/if}
                             </div>
@@ -212,7 +212,7 @@
                                         <i class="ti ti-building-store icon"></i>
                                     </span>
                                 <span class="nav-link-title">
-                                        商店
+                                        {trans key='user.nav.shop'}
                                     </span>
                             </a>
                             <div class="dropdown-menu">
@@ -220,19 +220,19 @@
                                     <div class="dropdown-menu-column">
                                         <a class="dropdown-item" href="/user/product">
                                             <i class="ti ti-list"></i>&nbsp;
-                                            商品
+                                            {trans key='user.nav.products'}
                                         </a>
                                         <a class="dropdown-item" href="/user/order">
                                             <i class="ti ti-file-invoice"></i>&nbsp;
-                                            订单
+                                            {trans key='user.nav.orders'}
                                         </a>
                                         <a class="dropdown-item" href="/user/invoice">
                                             <i class="ti ti-file-dollar"></i>&nbsp;
-                                            账单
+                                            {trans key='user.nav.invoices'}
                                         </a>
                                         <a class="dropdown-item" href="/user/money">
                                             <i class="ti ti-home-dollar"></i>&nbsp;
-                                            余额
+                                            {trans key='user.nav.balance'}
                                         </a>
                                     </div>
                                 </div>
@@ -245,7 +245,7 @@
                                         <i class="ti ti-settings icon"></i>
                                     </span>
                                     <span class="nav-link-title">
-                                        站点管理
+                                        {trans key='user.nav.admin'}
                                     </span>
                                 </a>
                             </li>

@@ -6,10 +6,10 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <span class="home-title">账户信息</span>
+                        <span class="home-title">{trans key='user.profile.title'}</span>
                     </h2>
                     <div class="page-pretitle my-3">
-                        <span class="home-subtitle">浏览最近的登录和使用记录</span>
+                        <span class="home-subtitle">{trans key='user.profile.subtitle'}</span>
                     </div>
                 </div>
             </div>
@@ -22,7 +22,7 @@
                     <div class="card">
                         <div class="card-body">
                             <div class="d-flex align-items-center">
-                                <div class="subheader">账户邮箱</div>
+                                <div class="subheader">{trans key='user.profile.email'}</div>
                             </div>
                             <div class="h1 mb-3">{$user->email}</div>
                         </div>
@@ -32,7 +32,7 @@
                     <div class="card">
                         <div class="card-body">
                             <div class="d-flex align-items-center">
-                                <div class="subheader">用户名</div>
+                                <div class="subheader">{trans key='user.profile.username'}</div>
                             </div>
                             <div class="h1 mb-3">{$user->user_name}</div>
                         </div>
@@ -42,7 +42,7 @@
                     <div class="card">
                         <div class="card-body">
                             <div class="d-flex align-items-center">
-                                <div class="subheader">账户注册时间</div>
+                                <div class="subheader">{trans key='user.profile.registered_at'}</div>
                             </div>
                             <div class="h1 mb-3">{$user->reg_date}</div>
                         </div>
@@ -52,7 +52,7 @@
                     <div class="card">
                         <div class="card-body">
                             <div class="d-flex align-items-center">
-                                <div class="subheader">账户累计使用流量</div>
+                                <div class="subheader">{trans key='user.profile.total_traffic'}</div>
                             </div>
                             <div class="h1 mb-3">{$user->totalTraffic()}</div>
                         </div>
@@ -64,17 +64,17 @@
                 <div class="col-md-12">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">最近10次订阅记录</h3>
+                            <h3 class="card-title">{trans key='user.profile.recent_subscriptions'}</h3>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-vcenter text-nowrap card-table">
                                 <thead>
                                     <tr>
-                                        <th>类型</th>
+                                        <th>{trans key='user.profile.type'}</th>
                                         <th>UA</th>
                                         <th>IP</th>
-                                        <th>IP归属地</th>
-                                        <th>时间</th>
+                                        <th>{trans key='user.profile.ip_location'}</th>
+                                        <th>{trans key='user.profile.time'}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -99,15 +99,15 @@
                 <div class="col-md-6 col-sm-12">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">最近10次成功登录记录</h3>
+                            <h3 class="card-title">{trans key='user.profile.recent_logins'}</h3>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-vcenter text-nowrap card-table">
                                 <thead>
                                     <tr>
                                         <th>IP</th>
-                                        <th>IP归属地</th>
-                                        <th>时间</th>
+                                        <th>{trans key='user.profile.ip_location'}</th>
+                                        <th>{trans key='user.profile.time'}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -127,16 +127,16 @@
                 <div class="col-md-6 col-sm-12">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">当前在线IP</h3>
+                            <h3 class="card-title">{trans key='user.profile.online_ips'}</h3>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-vcenter text-nowrap card-table">
                                 <thead>
                                     <tr>
                                         <th>IP</th>
-                                        <th>IP归属地</th>
-                                        <th>节点名称</th>
-                                        <th>最后在线时间</th>
+                                        <th>{trans key='user.profile.ip_location'}</th>
+                                        <th>{trans key='user.profile.node_name'}</th>
+                                        <th>{trans key='user.profile.last_seen'}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
