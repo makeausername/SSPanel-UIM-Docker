@@ -4,6 +4,7 @@
 */.DS_Store
 .DS_Store
 .env
+.env.bak*
 .env.docker
 
 vendor
@@ -22,8 +23,9 @@ composer.phar
 index.html
 
 config/.config.php
-config/.config.php.bak
+config/.config.php.bak*
 config/appprofile.php
+config/appprofile.php.bak*
 
 public/clients/*.*
 !public/clients/.gitkeep

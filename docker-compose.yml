@@ -12,12 +12,14 @@ services:
       DB_PORT: 3306
       DB_DATABASE: ${DB_DATABASE:-sspanel}
       DB_USERNAME: ${DB_USERNAME:-sspanel}
-      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env.docker}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
+      - ./config/.config.php:/var/www/html/config/.config.php:ro
+      - ./config/appprofile.php:/var/www/html/config/appprofile.php:ro
       - app_storage:/var/www/html/storage/framework
       - app_clients:/var/www/html/public/clients
     depends_on:
@@ -48,8 +50,8 @@ services:
     environment:
       MARIADB_DATABASE: ${DB_DATABASE:-sspanel}
       MARIADB_USER: ${DB_USERNAME:-sspanel}
-      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env.docker}
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env.docker}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
       TZ: ${TZ:-Asia/Shanghai}
     command:
       - --character-set-server=utf8mb4
@@ -100,12 +102,14 @@ services:
       DB_PORT: 3306
       DB_DATABASE: ${DB_DATABASE:-sspanel}
       DB_USERNAME: ${DB_USERNAME:-sspanel}
-      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env.docker}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
+      - ./config/.config.php:/var/www/html/config/.config.php:ro
+      - ./config/appprofile.php:/var/www/html/config/appprofile.php:ro
       - app_storage:/var/www/html/storage/framework
       - app_clients:/var/www/html/public/clients
     depends_on:
