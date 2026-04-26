@@ -105,6 +105,24 @@ return [
             'title_prefix' => '账单 #',
         ],
     ],
+    'docs' => [
+        'list_title' => '文档列表',
+        'subtitle' => '在这里查看安装和使用教程',
+        'title' => '文档中心',
+        'view' => '查看',
+    ],
+    'node' => [
+        'class_too_low' => '当前账户等级小于节点等级',
+        'dynamic_rate' => '动态倍率',
+        'free' => '免费',
+        'no_permission' => '无权限',
+        'product_page' => '商品页面',
+        'rate_suffix' => '倍',
+        'subtitle' => '查看节点在线情况',
+        'title' => '节点列表',
+        'upgrade_prefix' => '前往',
+        'upgrade_suffix' => '订购时间流量包',
+    ],
     'order' => [
         'actual_payment' => '实际支付',
         'amount' => '订单金额',
@@ -131,6 +149,13 @@ return [
             'title_prefix' => '订单 #',
         ],
         'view_invoice' => '查看账单',
+    ],
+    'rate' => [
+        'chart_title' => '流量倍率图表',
+        'description' => '查看节点的每小时流量倍率',
+        'hour' => '小时',
+        'multiplier' => '倍率',
+        'title' => '流量倍率',
     ],
     'payment' => [
         'alipay_f2f' => '支付宝当面付',

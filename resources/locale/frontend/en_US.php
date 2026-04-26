@@ -105,6 +105,24 @@ return [
             'title_prefix' => 'Invoice #',
         ],
     ],
+    'docs' => [
+        'list_title' => 'Documentation List',
+        'subtitle' => 'View setup and usage tutorials here',
+        'title' => 'Documentation Center',
+        'view' => 'View',
+    ],
+    'node' => [
+        'class_too_low' => 'Your account level is lower than this node level',
+        'dynamic_rate' => 'Dynamic rate',
+        'free' => 'Free',
+        'no_permission' => 'No permission',
+        'product_page' => 'Products',
+        'rate_suffix' => 'x',
+        'subtitle' => 'View node availability',
+        'title' => 'Nodes',
+        'upgrade_prefix' => 'Go to',
+        'upgrade_suffix' => 'to buy a time + traffic package',
+    ],
     'order' => [
         'actual_payment' => 'Amount due',
         'amount' => 'Order amount',
@@ -131,6 +149,13 @@ return [
             'title_prefix' => 'Order #',
         ],
         'view_invoice' => 'View invoice',
+    ],
+    'rate' => [
+        'chart_title' => 'Traffic Rate Chart',
+        'description' => 'View each node hourly traffic rate',
+        'hour' => 'Hour',
+        'multiplier' => 'Rate',
+        'title' => 'Traffic Rates',
     ],
     'payment' => [
         'alipay_f2f' => 'Alipay Face-to-Face',

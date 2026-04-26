@@ -6,10 +6,10 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <span class="home-title">节点列表</span>
+                        <span class="home-title">{trans key='node.title'}</span>
                     </h2>
                     <div class="page-pretitle my-3">
-                        <span class="home-subtitle">查看节点在线情况</span>
+                        <span class="home-subtitle">{trans key='node.subtitle'}</span>
                     </div>
                 </div>
             </div>
@@ -27,7 +27,7 @@
                                         <div class="col-lg-4 col-md-6 col-sm-12">
                                             <div class="card">
                                                 {if $server['class'] === 0}
-                                                    <div class="ribbon bg-blue">免费</div>
+                                                    <div class="ribbon bg-blue">{trans key='node.free'}</div>
                                                 {else}
                                                     <div class="ribbon bg-blue">LV. {$server['class']}</div>
                                                 {/if}
@@ -55,9 +55,9 @@
                                                                     {$server['online_user']}</span>
                                                                 <span class="badge bg-blue-lt">
                                                                     {if $server['is_dynamic_rate']}
-                                                                        动态倍率
+                                                                        {trans key='node.dynamic_rate'}
                                                                     {else}
-                                                                        {$server['traffic_rate']} 倍
+                                                                        {$server['traffic_rate']} {trans key='node.rate_suffix'}
                                                                     {/if}
                                                                 </span>
                                                                 <span class="badge bg-blue-lt">{$server['sort']}</span>
@@ -65,9 +65,9 @@
                                                                 <span class="badge bg-blue-lt">IPv6</span>
                                                                 {/if}
                                                                 {if $user->class < $server['class']}
-                                                                <span class="badge bg-red-lt">无权限</span>
-                                                                <span class="badge bg-pink-lt">当前账户等级小于节点等级</span>
-                                                                <span class="badge bg-green-lt">前往 <a href="/user/product">商品页面</a> 订购时间流量包</span>
+                                                                <span class="badge bg-red-lt">{trans key='node.no_permission'}</span>
+                                                                <span class="badge bg-pink-lt">{trans key='node.class_too_low'}</span>
+                                                                <span class="badge bg-green-lt">{trans key='node.upgrade_prefix'} <a href="/user/product">{trans key='node.product_page'}</a> {trans key='node.upgrade_suffix'}</span>
                                                                 {/if}
                                                             </div>
                                                         </div>
