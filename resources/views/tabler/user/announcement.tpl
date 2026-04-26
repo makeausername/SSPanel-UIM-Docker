@@ -6,10 +6,10 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <span class="home-title">站点公告</span>
+                        <span class="home-title">{trans key='announcement.title'}</span>
                     </h2>
                     <div class="page-pretitle my-3">
-                        <span class="home-subtitle">管理员发布的所有公告</span>
+                        <span class="home-subtitle">{trans key='announcement.subtitle'}</span>
                     </div>
                 </div>
             </div>
@@ -24,9 +24,9 @@
                             <table class="table table-vcenter card-table">
                                 <thead>
                                 <tr>
-                                    <th>公告ID</th>
-                                    <th>发布日期</th>
-                                    <th>公告内容</th>
+                                    <th>{trans key='announcement.id'}</th>
+                                    <th>{trans key='announcement.date'}</th>
+                                    <th>{trans key='announcement.content'}</th>
                                 </tr>
                                 </thead>
                                 <tbody>

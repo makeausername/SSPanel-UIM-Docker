@@ -5,14 +5,14 @@
     <div class="container-tight my-auto">
         <div class="empty">
             <div class="empty-header">500</div>
-            <p class="empty-title">服务器内部错误</p>
+            <p class="empty-title">{trans key='error.500.title'}</p>
             <p class="empty-subtitle text-secondary">
-                Take me home, country roads, to the place, I belong... Oh wait the server is down.
+                {trans key='error.500.subtitle'}
             </p>
             <div class="empty-action">
                 <a href="/" class="btn btn-primary">
                     <i class="icon ti ti-chevron-left"></i>
-                    返回主页
+                    {trans key='error.return_home'}
                 </a>
             </div>
         </div>

@@ -24,13 +24,13 @@
                 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
                 SOFTWARE.</p>
             <br>
-            <p class="empty-title"><a href="https://github.com/Anankke/SSPanel-UIM/graphs/contributors">贡献者清单</a></p>
+            <p class="empty-title"><a href="https://github.com/Anankke/SSPanel-UIM/graphs/contributors">{trans key='staff.contributors'}</a></p>
             <br>
             <p class="empty-title"><a href="https://github.com/Anankke/SSPanel-Uim">GitHub Repo</a></p>
             <br>
             <p class="empty-title"><a href="https://github.com/sspanel-uim">GitHub Org</a></p>
             <br>
-            <p class="empty-title">SSPanel-UIM 的存在离不开以下开源项目</p>
+            <p class="empty-title">{trans key='staff.open_source_projects'}</p>
             <p><a href="https://github.com/slimphp/Slim">Slim Framework</a></p>
             <p><a href="https://github.com/tabler/tabler">Tabler</a></p>
             <p><a href="https://github.com/twigphp/Twig">Twig</a></p>
@@ -38,8 +38,8 @@
             <p>This product includes GeoLite2 data created by MaxMind, available from
                 <a href="https://www.maxmind.com">https://www.maxmind.com</a>.</p>
             <br>
-            <p class="empty-title">鸣谢</p>
-            <p>所有被引用过代码的开发者，以及所有提交过 PR 的贡献者。当然，还有在使用这份程序的你我Ta。</p>
+            <p class="empty-title">{trans key='staff.thanks'}</p>
+            <p>{trans key='staff.thanks_text'}</p>
         </div>
     </div>
 </div>
