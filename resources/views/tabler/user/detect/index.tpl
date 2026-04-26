@@ -7,10 +7,10 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <span class="home-title">审计规则</span>
+                        <span class="home-title">{trans key='detect.rules_title'}</span>
                     </h2>
                     <div class="page-pretitle my-3">
-                        <span class="home-subtitle">目前站点中所使用的审计规则</span>
+                        <span class="home-subtitle">{trans key='detect.rules_subtitle'}</span>
                     </div>
                 </div>
             </div>
@@ -25,11 +25,11 @@
                             <table class="table table-vcenter card-table">
                                 <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>名称</th>
-                                    <th>描述</th>
-                                    <th>正则表达式</th>
-                                    <th>类型</th>
+                                    <th>{trans key='detect.id'}</th>
+                                    <th>{trans key='detect.name'}</th>
+                                    <th>{trans key='detect.description'}</th>
+                                    <th>{trans key='detect.regex'}</th>
+                                    <th>{trans key='detect.type'}</th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -40,10 +40,10 @@
                                         <td>{$rule->text}</td>
                                         <td>{$rule->regex}</td>
                                         {if $rule->type === 1}
-                                            <td>数据包明文匹配</td>
+                                            <td>{trans key='detect.packet_plain_match'}</td>
                                         {/if}
                                         {if $rule->type === 2}
-                                            <td>数据包 hex 匹配</td>
+                                            <td>{trans key='detect.packet_hex_match'}</td>
                                         {/if}
                                     </tr>
                                 {/foreach}
