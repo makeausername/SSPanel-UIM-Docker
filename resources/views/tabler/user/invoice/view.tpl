@@ -6,10 +6,10 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <span class="home-title my-3">账单 #{$invoice->id}</span>
+                        <span class="home-title my-3">{trans key='invoice.view.title_prefix'}{$invoice->id}</span>
                     </h2>
                     <div class="page-pretitle">
-                        <span class="home-subtitle">账单详情</span>
+                        <span class="home-subtitle">{trans key='invoice.view.subtitle'}</span>
                     </div>
                 </div>
                 <div class="col-auto ms-auto d-print-none">
@@ -29,37 +29,37 @@
                 {/if}
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">基本信息</h3>
+                            <h3 class="card-title">{trans key='common.basic_info'}</h3>
                         </div>
                         <div class="card-body">
                             <div class="datagrid">
                                 <div class="datagrid-item">
-                                    <div class="datagrid-title">订单ID</div>
+                                    <div class="datagrid-title">{trans key='order.id'}</div>
                                     <div class="datagrid-content">{$invoice->order_id}</div>
                                 </div>
                                 <div class="datagrid-item">
-                                    <div class="datagrid-title">订单金额</div>
+                                    <div class="datagrid-title">{trans key='order.amount'}</div>
                                     <div class="datagrid-content">{$invoice->price}</div>
                                 </div>
                                 <div class="datagrid-item">
-                                    <div class="datagrid-title">订单状态</div>
+                                    <div class="datagrid-title">{trans key='order.status'}</div>
                                     <div class="datagrid-content">{$invoice->status_text}</div>
                                 </div>
                                 <div class="datagrid-item">
-                                    <div class="datagrid-title">创建时间</div>
+                                    <div class="datagrid-title">{trans key='common.created_at'}</div>
                                     <div class="datagrid-content">{$invoice->create_time}</div>
                                 </div>
                                 <div class="datagrid-item">
-                                    <div class="datagrid-title">更新时间</div>
+                                    <div class="datagrid-title">{trans key='common.updated_at'}</div>
                                     <div class="datagrid-content">{$invoice->update_time}</div>
                                 </div>
                                 <div class="datagrid-item">
-                                    <div class="datagrid-title">支付时间</div>
+                                    <div class="datagrid-title">{trans key='payment.paid_at'}</div>
                                     <div class="datagrid-content">{$invoice->pay_time}</div>
                                 </div>
                                 {if $invoice->status === 'paid_gateway'}
                                 <div class="datagrid-item">
-                                    <div class="datagrid-title">支付网关单号</div>
+                                    <div class="datagrid-title">{trans key='payment.gateway_trade_no'}</div>
                                     <div class="datagrid-content">{$paylist->tradeno}</div>
                                 </div>
                                 {/if}
@@ -68,15 +68,15 @@
                     </div>
                     <div class="card my-3">
                         <div class="card-header">
-                            <h3 class="card-title">账单详情</h3>
+                            <h3 class="card-title">{trans key='invoice.details'}</h3>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
                                 <table id="invoice_content_table" class="table table-vcenter card-table">
                                     <thead>
                                     <tr>
-                                        <th>名称</th>
-                                        <th>价格</th>
+                                        <th>{trans key='common.name'}</th>
+                                        <th>{trans key='common.price'}</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -100,7 +100,7 @@
                             <li class="nav-item">
                                 <a href="#balance" class="nav-link active" data-bs-toggle="tab">
                                     <i class="ti ti-coins icon"></i>
-                                    &nbsp;余额支付
+                                    &nbsp;{trans key='payment.balance_payment'}
                                 </a>
                             </li>
                             {/if}
@@ -108,7 +108,7 @@
                             <li class="nav-item">
                                 <a href="#gateway" class="nav-link" data-bs-toggle="tab">
                                     <i class="ti ti-coin icon"></i>
-                                    &nbsp;网关支付
+                                    &nbsp;{trans key='payment.gateway_payment'}
                                 </a>
                             </li>
                             {/if}
@@ -118,7 +118,7 @@
                                 {if $invoice->type !== 'topup'}
                                 <div class="tab-pane active show" id="balance">
                                     <div class="mb-3">
-                                        当前账户可用余额：<code>{$user->money}</code> 元
+                                        {trans key='payment.current_balance_prefix'}<code>{$user->money}</code> {trans key='common.yuan'}
                                     </div>
                                     <div class="d-flex">
                                         <button class="btn btn-primary" type="button"
@@ -126,7 +126,7 @@
                                                 hx-vals='js:{
                                                     invoice_id: {$invoice->id},
                                                 }'>
-                                            支付
+                                            {trans key='payment.pay'}
                                         </button>
                                     </div>
                                 </div>
@@ -142,7 +142,7 @@
                                 </div>
                                 {/if}
                                 {if $invoice->type === 'topup' && count($payments) === 0}
-                                暂无可用支付方式
+                                {trans key='payment.no_available_methods'}
                                 {/if}
                             </div>
                         </div>

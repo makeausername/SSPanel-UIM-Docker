@@ -6,10 +6,10 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <span class="home-title">创建订单</span>
+                        <span class="home-title">{trans key='order.create.title'}</span>
                     </h2>
                     <div class="page-pretitle my-3">
-                        <span class="home-subtitle">创建商品订单</span>
+                        <span class="home-subtitle">{trans key='order.create.subtitle'}</span>
                     </div>
                 </div>
             </div>
@@ -21,55 +21,55 @@
                 <div class="col-sm-12 col-md-6 col-lg-9">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">订单内容</h3>
+                            <h3 class="card-title">{trans key='order.content'}</h3>
                         </div>
                         <div class="card-body">
                             <table class="table table-transparent table-responsive">
                                 <tr hidden>
-                                    <td>商品ID</td>
+                                    <td>{trans key='shop.product.id'}</td>
                                     <td id="product-id" class="text-end">{$product->id}</td>
                                 </tr>
                                 <tr>
-                                    <td>商品名称</td>
+                                    <td>{trans key='shop.product.name'}</td>
                                     <td class="text-end">{$product->name}</td>
                                 </tr>
                                 <tr>
-                                    <td>商品类型</td>
+                                    <td>{trans key='shop.product.type'}</td>
                                     <td class="text-end">{$product->type_text}</td>
                                 </tr>
                                 {if $product->type === 'tabp' || $product->type === 'time'}
                                     <tr>
-                                        <td>商品时长</td>
-                                        <td class="text-end">{$product->content->time} 天</td>
+                                        <td>{trans key='shop.product.duration'}</td>
+                                        <td class="text-end">{$product->content->time} {trans key='common.days'}</td>
                                     </tr>
                                     <tr>
-                                        <td>等级时长</td>
-                                        <td class="text-end">{$product->content->class_time} 天</td>
+                                        <td>{trans key='shop.product.level_duration'}</td>
+                                        <td class="text-end">{$product->content->class_time} {trans key='common.days'}</td>
                                     </tr>
                                     <tr>
-                                        <td>等级</td>
+                                        <td>{trans key='shop.product.level'}</td>
                                         <td class="text-end">Lv. {$product->content->class}</td>
                                     </tr>
                                 {/if}
                                 {if $product->type === 'tabp' || $product->type === 'bandwidth'}
                                     <tr>
-                                        <td>可用流量</td>
+                                        <td>{trans key='shop.product.available_traffic'}</td>
                                         <td class="text-end">{$product->content->bandwidth} GB</td>
                                     </tr>
                                 {/if}
                                 {if $product->type === 'tabp' || $product->type === 'time'}
                                     <tr>
-                                        <td>速率限制</td>
+                                        <td>{trans key='shop.product.speed_limit'}</td>
                                         {if $product->content->speed_limit === '0'}
-                                            <td class="text-end">不限制</td>
+                                            <td class="text-end">{trans key='common.unlimited'}</td>
                                         {else}
                                             <td class="text-end">{$product->content->speed_limit} Mbps</td>
                                         {/if}
                                     </tr>
                                     <tr>
-                                        <td>同时连接 IP 限制</td>
+                                        <td>{trans key='shop.product.concurrent_ip_limit'}</td>
                                         {if $product->content->ip_limit === '0'}
-                                            <td class="text-end">不限制</td>
+                                            <td class="text-end">{trans key='common.unlimited'}</td>
                                         {else}
                                             <td class="text-end">{$product->content->ip_limit}</td>
                                         {/if}
@@ -82,24 +82,24 @@
                 <div class="col-sm-12 col-md-6 col-lg-3">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">价格明细（元）</h3>
+                            <h3 class="card-title">{trans key='order.price_details_yuan'}</h3>
                         </div>
                         <div class="card-body">
                             <table class="table table-transparent table-responsive">
                                 <tr>
-                                    <td>商品价格</td>
+                                    <td>{trans key='shop.product.price'}</td>
                                     <td class="text-end">{$product->price}</td>
                                 </tr>
                                 <tr>
-                                    <td>优惠码</td>
+                                    <td>{trans key='order.coupon'}</td>
                                     <td class="text-end" id="coupon-code"></td>
                                 </tr>
                                 <tr>
-                                    <td>优惠金额</td>
+                                    <td>{trans key='order.discount_amount'}</td>
                                     <td class="text-end" id="product-buy-discount"></td>
                                 </tr>
                                 <tr>
-                                    <td>实际支付</td>
+                                    <td>{trans key='order.actual_payment'}</td>
                                     <td class="text-end" id="product-buy-total">{$product->price}</td>
                                 </tr>
                             </table>
@@ -107,20 +107,20 @@
                     </div>
                     <div class="card my-3">
                         <div class="card-header">
-                            <h3 class="card-title">优惠码</h3>
+                            <h3 class="card-title">{trans key='order.coupon'}</h3>
                         </div>
                         <div class="card-body">
                             <div class="mb-3">
                                 <div class="input-group mb-2">
                                     <input id="coupon" type="text" class="form-control"
-                                           placeholder="填写优惠码，没有请留空">
+                                           placeholder="{trans key='order.coupon_placeholder'}">
                                     <button class="btn" type="button"
                                             hx-post="/user/coupon" hx-swap="none"
                                             hx-vals='js:{
                                                 coupon: document.getElementById("coupon").value,
                                                 product_id: {$product->id},
                                             }'>
-                                        应用
+                                        {trans key='common.apply'}
                                     </button>
                                 </div>
                             </div>
@@ -135,7 +135,7 @@
                                         coupon: document.getElementById("coupon").value,
                                         product_id: {$product->id},
                                     }'>
-                                创建订单
+                                {trans key='order.create.submit'}
                             </button>
                         </div>
                     </div>
