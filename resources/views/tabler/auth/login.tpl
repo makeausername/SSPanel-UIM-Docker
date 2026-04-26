@@ -12,7 +12,7 @@
         </div>
         <div class="card card-md">
             <div class="card-body">
-                <h2 class="card-title text-center mb-4">登录到用户中心</h2>
+                <h2 class="card-title text-center mb-4">{trans key='auth.login_title'}</h2>
                 <div class="mb-3">
                     <label class="form-label">邮箱</label>
                     <input id="email" type="email" class="form-control">

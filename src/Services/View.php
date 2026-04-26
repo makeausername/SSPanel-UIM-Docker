@@ -24,9 +24,28 @@ final class View
         $smarty->setTemplateDir(BASE_PATH . '/resources/views/' . self::getTheme($user) . '/'); //设置模板文件存放目录
         $smarty->setCompileDir(BASE_PATH . '/storage/framework/smarty/compile/'); //设置生成文件存放目录
         $smarty->setCacheDir(BASE_PATH . '/storage/framework/smarty/cache/'); //设置缓存文件存放目录
+        $smarty->registerPlugin(
+            Smarty::PLUGIN_FUNCTION,
+            'trans',
+            static function (array $params): string {
+                $key = (string) ($params['key'] ?? '');
+
+                if ($key === '') {
+                    return '';
+                }
+
+                unset($params['key']);
+                $locale = isset($params['locale']) ? (string) $params['locale'] : null;
+                unset($params['locale']);
+
+                return FrontendI18n::trans($key, $params, $locale);
+            }
+        );
         // add config
         $smarty->assign('config', self::getConfig());
         $smarty->assign('public_setting', Config::getPublicConfig());
+        $smarty->assign('current_locale', Locale::current());
+        $smarty->assign('frontend_locales', Locale::supportedLocales());
         $smarty->assign('user', $user);
 
         return $smarty;
@@ -43,6 +62,8 @@ final class View
 
         $twig->addGlobal('config', self::getConfig());
         $twig->addGlobal('public_setting', Config::getPublicConfig());
+        $twig->addGlobal('current_locale', Locale::current());
+        $twig->addGlobal('frontend_locales', Locale::supportedLocales());
         $twig->addGlobal('user', $user);
 
         return $twig;
@@ -70,8 +91,8 @@ final class View
             'enable_r2_client_download' => $_ENV['enable_r2_client_download'],
             'jsdelivr_url' => $_ENV['jsdelivr_url'],
             'enable_telemetry' => $_ENV['enable_telemetry'] ?? true,
-            // site default language
-            'locale' => $_ENV['locale'],
+            'locale' => Locale::current(),
+            'site_locale' => $_ENV['locale'],
         ];
     }
 }

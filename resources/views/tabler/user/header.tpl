@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh">
+<html lang="{$config['locale']}">
 
 <head>
     <meta charset="utf-8"/>
@@ -16,6 +16,13 @@
     <script src="//{$config['jsdelivr_url']}/npm/qrcode_js@latest/qrcode.min.js"></script>
     <script src="//{$config['jsdelivr_url']}/npm/clipboard@latest/dist/clipboard.min.js"></script>
     <script src="//{$config['jsdelivr_url']}/npm/htmx.org@latest/dist/htmx.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.frontend-locale-redirect').forEach(function (input) {
+                input.value = window.location.pathname + window.location.search + window.location.hash;
+            });
+        });
+    </script>
     <style>
         .home-subtitle {
             font-size: 14px;
@@ -63,6 +70,21 @@
                                 深色模式
                             </a>
                         {/if}
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-item-text text-secondary small">{trans key='common.language'}</div>
+                        <form method="post" action="/locale" class="px-3 pb-2">
+                            <input type="hidden" name="redirect" class="frontend-locale-redirect">
+                            <div class="btn-group w-100" role="group" aria-label="{trans key='common.switch_language'}">
+                                <button type="submit" name="locale" value="zh-CN"
+                                        class="btn btn-sm {if $current_locale === 'zh-CN'}btn-primary{else}btn-outline-secondary{/if}">
+                                    {trans key='locale.zh-CN'}
+                                </button>
+                                <button type="submit" name="locale" value="en-US"
+                                        class="btn btn-sm {if $current_locale === 'en-US'}btn-primary{else}btn-outline-secondary{/if}">
+                                    {trans key='locale.en-US'}
+                                </button>
+                            </div>
+                        </form>
                         <a href="/user/logout" class="dropdown-item">登出</a>
                     </div>
                 </div>
