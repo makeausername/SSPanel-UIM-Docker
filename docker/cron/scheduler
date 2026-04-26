@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="${APP_DIR:-/var/www/html}"
+INTERVAL_SECONDS="${CRON_INTERVAL_SECONDS:-300}"
+LOCK_DIR="${CRON_LOCK_DIR:-${APP_DIR}/storage/framework/sspanel-cron.lock}"
+STALE_AFTER_SECONDS="${CRON_STALE_AFTER_SECONDS:-900}"
+
+cd "${APP_DIR}"
+
+cleanup_lock() {
+    if [ -d "${LOCK_DIR}" ] && [ "$(cat "${LOCK_DIR}/owner" 2>/dev/null || true)" = "$$" ]; then
+        rm -rf "${LOCK_DIR}"
+    fi
+}
+
+trap cleanup_lock EXIT INT TERM
+
+while true; do
+    start_time="$(date +%s)"
+
+    if mkdir "${LOCK_DIR}" 2>/dev/null; then
+        echo "$$" > "${LOCK_DIR}/owner"
+        echo "[scheduler] $(date -Iseconds) running php xcat Cron"
+
+        if php xcat Cron; then
+            echo "[scheduler] $(date -Iseconds) cron completed"
+        else
+            status="$?"
+            echo "[scheduler] $(date -Iseconds) cron failed with exit code ${status}" >&2
+        fi
+
+        rm -rf "${LOCK_DIR}"
+    else
+        lock_mtime="$(stat -c %Y "${LOCK_DIR}" 2>/dev/null || echo 0)"
+        now="$(date +%s)"
+
+        if [ "${lock_mtime}" != "0" ] && [ $((now - lock_mtime)) -gt "${STALE_AFTER_SECONDS}" ]; then
+            echo "[scheduler] $(date -Iseconds) removing stale cron lock" >&2
+            rm -rf "${LOCK_DIR}"
+        else
+            echo "[scheduler] $(date -Iseconds) previous cron run still active, skipping"
+        fi
+    fi
+
+    elapsed="$(( $(date +%s) - start_time ))"
+    sleep_for="$(( INTERVAL_SECONDS - elapsed ))"
+
+    if [ "${sleep_for}" -lt 1 ]; then
+        sleep_for=1
+    fi
+
+    sleep "${sleep_for}"
+done
