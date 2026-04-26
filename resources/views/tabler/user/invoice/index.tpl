@@ -39,7 +39,7 @@
 
     <script src="//{$config['jsdelivr_url']}/npm/jquery/dist/jquery.min.js"></script>
 
-    {include file='datatable.tpl'}
+    {include file='datatable_frontend.tpl'}
 
     <script>
         tableConfig.ajax = {
