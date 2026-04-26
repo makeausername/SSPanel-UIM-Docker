@@ -7,8 +7,8 @@
     <div class="container-tight my-auto">
         <div class="card card-md">
             <div class="card-body">
-                <h2 class="card-title text-center mb-4">二步验证</h2>
-                <p>您的账户已启用二步验证，为了您的账户安全，请您完成附加身份验证。</p>
+                <h2 class="card-title text-center mb-4">{trans key='auth.mfa.title'}</h2>
+                <p>{trans key='auth.mfa.description'}</p>
                 {if $method['totp']}
                     <div class="my-5">
                         <div class="row g-4">
@@ -53,12 +53,12 @@
                                 hx-post="/auth/totp" hx-swap="none" hx-vals="js:{
                                 code: code,
                              }">
-                            提交
+                            {trans key='auth.mfa.submit'}
                         </button>
                     {/if}
                     {if $method['fido']}
                         <button class="btn btn-primary w-100" id="webauthnLogin">
-                            使用 FIDO2 验证
+                            {trans key='auth.mfa.fido_submit'}
                         </button>
                     {/if}
                 </div>
