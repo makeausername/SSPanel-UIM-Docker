@@ -12,6 +12,7 @@ use App\Services\Auth;
 use App\Services\Cache;
 use App\Services\Captcha;
 use App\Services\Filter;
+use App\Services\Locale;
 use App\Services\Mail;
 use App\Services\MFA\FIDO;
 use App\Services\MFA\TOTP;
@@ -32,6 +33,7 @@ use Slim\Http\ServerRequest;
 use function array_rand;
 use function date;
 use function explode;
+use function is_string;
 use function strlen;
 use function strtolower;
 use function time;
@@ -68,7 +70,7 @@ final class AuthController extends BaseController
         $password = $request->getParam('password');
         $rememberMe = $request->getParam('remember_me') === 'true' ? 1 : 0;
         $email = strtolower(trim($this->antiXss->xss_clean($request->getParam('email'))));
-        $redir = $this->antiXss->xss_clean(Cookie::get('redir')) ?? '/user';
+        $redir = $this->redirectTarget(Cookie::get('redir'));
         $user = (new User())->where('email', $email)->first();
         $loginIp = new LoginIp();
 
@@ -226,7 +228,7 @@ final class AuthController extends BaseController
         $money,
         $is_admin_reg
     ): ResponseInterface {
-        $redir = $this->antiXss->xss_clean(Cookie::get('redir')) ?? '/user';
+        $redir = $this->redirectTarget(Cookie::get('redir'));
         $configs = Config::getClass('reg');
         // do reg user
         $user = new User();
@@ -394,7 +396,7 @@ final class AuthController extends BaseController
     public function webauthnHandle(ServerRequest $request, Response $response, $next): ResponseInterface
     {
         $data = $this->antiXss->xss_clean((array) $request->getParsedBody());
-        $redir = $this->antiXss->xss_clean(Cookie::get('redir')) ?? '/user';
+        $redir = $this->redirectTarget(Cookie::get('redir'));
         $result = WebAuthn::AssertHandle($data);
         if ($result['ret'] === 1) {
             $user = $result['user'];
@@ -437,6 +439,7 @@ final class AuthController extends BaseController
         if ($result['ret'] === 1) {
             $redis->del('mfa_login_' . session_id());
             $rememberMe = $login_session['remember_me'];
+            $redir = $this->redirectTarget($login_session['redir'] ?? null);
             $time = $rememberMe ? 86400 * ($_ENV['rememberMeDuration'] ?? 7) : 3600;
             Auth::login($user->id, $time);
             $loginIp = new LoginIp();
@@ -444,7 +447,7 @@ final class AuthController extends BaseController
             $user->last_login_time = time();
             $user->save();
             return $response
-                ->withHeader('HX-Redirect', $login_session['redir'])
+                ->withHeader('HX-Redirect', $redir)
                 ->withJson(['ret' => 1, 'msg' => '登录成功']);
         }
         return $response->withJson($result);
@@ -482,14 +485,30 @@ final class AuthController extends BaseController
         if ($result['ret'] === 1) {
             $redis->del('mfa_login_' . session_id());
             $rememberMe = $login_session['remember_me'];
+            $redir = $this->redirectTarget($login_session['redir'] ?? null);
             $time = $rememberMe ? 86400 * ($_ENV['rememberMeDuration'] ?? 7) : 3600;
             Auth::login($user->id, $time);
             $loginIp = new LoginIp();
             $loginIp->collectLoginIP($_SERVER['REMOTE_ADDR'], 0, $user->id);
             $user->last_login_time = time();
             $user->save();
-            return $response->withJson(['ret' => 1, 'msg' => '登录成功', 'redir' => $login_session['redir']]);
+            return $response->withJson(['ret' => 1, 'msg' => '登录成功', 'redir' => $redir]);
         }
         return $response->withJson($result);
+    }
+
+    private function redirectTarget(mixed $target): string
+    {
+        if (! is_string($target)) {
+            return '/user';
+        }
+
+        $target = $this->antiXss->xss_clean($target);
+
+        if (! is_string($target)) {
+            return '/user';
+        }
+
+        return Locale::sanitizeRedirect($target, $_SERVER['HTTP_HOST'] ?? '') ?? '/user';
     }
 }

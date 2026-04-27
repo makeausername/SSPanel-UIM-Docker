@@ -25,6 +25,7 @@
 
 - MariaDB 和 Redis 默认只在 Docker 内部网络中使用，不会把数据库端口公开到公网。
 - 安装脚本会生成 `.env`、`config/.config.php`、`config/appprofile.php`，这些文件包含本地部署配置或敏感信息，不要提交到 Git。
+- 当前 Docker 阶段是 HTTP-only，安装脚本会在生成的 `config/.config.php` 中关闭 Secure Cookie，保证浏览器可以在 HTTP 下保存登录 Cookie。后续启用 HTTPS 或反向代理后，应重新检查并开启 Cookie Secure 设置。
 
 ## 首次安装
 
