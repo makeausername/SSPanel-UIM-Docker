@@ -27,7 +27,15 @@ done
 if [ "$(id -u)" = "0" ]; then
     chown -R www-data:www-data "${WRITABLE_DIRS[@]}"
     chmod -R ug+rwX "${WRITABLE_DIRS[@]}"
-    exec gosu www-data docker-php-entrypoint "$@"
+
+    case "${1:-}" in
+        php-fpm|php-fpm*|-*)
+            exec docker-php-entrypoint "$@"
+            ;;
+        *)
+            exec gosu www-data docker-php-entrypoint "$@"
+            ;;
+    esac
 fi
 
 for dir in "${WRITABLE_DIRS[@]}"; do
