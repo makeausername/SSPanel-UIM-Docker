@@ -9,11 +9,16 @@ WORKDIR /var/www/html
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
+        autoconf \
+        build-essential \
         ca-certificates \
+        curl \
         git \
         gosu \
         libcurl4-openssl-dev \
+        libgmp-dev \
         libonig-dev \
+        libsodium-dev \
         libxml2-dev \
         libyaml-dev \
         libzip-dev \
@@ -24,6 +29,7 @@ RUN set -eux; \
         bcmath \
         curl \
         fileinfo \
+        gmp \
         mbstring \
         mysqli \
         opcache \
@@ -32,6 +38,9 @@ RUN set -eux; \
         posix \
         xml \
         zip; \
+    if ! php -m | grep -qi '^sodium$'; then \
+        docker-php-ext-install -j"$(nproc)" sodium; \
+    fi; \
     printf "\n" | pecl install redis; \
     printf "\n" | pecl install yaml; \
     docker-php-ext-enable redis yaml opcache; \
@@ -45,6 +54,9 @@ COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/zz-opcache.ini
 COPY . /var/www/html
 
 RUN set -eux; \
+    php -v; \
+    php -m | sort; \
+    php -r '$required = ["bcmath","curl","fileinfo","gmp","json","mbstring","mysqli","openssl","pdo","pdo_mysql","posix","redis","sodium","xml","yaml","zip"]; foreach ($required as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Missing required PHP extension: {$extension}\n"); exit(1); } } if (!extension_loaded("Zend OPcache") && !extension_loaded("opcache")) { fwrite(STDERR, "Missing required PHP extension: opcache\n"); exit(1); }'; \
     composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist; \
     sed -i 's/\r$//' docker/entrypoint.sh docker/cron/scheduler; \
     mkdir -p \

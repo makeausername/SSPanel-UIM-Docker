@@ -374,6 +374,13 @@ run_init_command() {
     docker compose exec -T app php xcat "$@"
 }
 
+ensure_app_autoload() {
+    echo "+ docker compose exec -T app test -f vendor/autoload.php"
+    if ! docker compose exec -T app test -f vendor/autoload.php; then
+        die "Missing vendor/autoload.php in the app container. Rebuild the image and make sure composer install completes before initialization."
+    fi
+}
+
 main() {
     step "Checking prerequisites"
     require_command docker
@@ -432,9 +439,11 @@ main() {
     step "Starting application services"
     docker compose up -d app nginx scheduler
 
+    step "Checking Composer dependencies"
+    ensure_app_autoload
+
     step "Initializing database"
     run_init_command Migration new
-    run_init_command Tool importSetting
     run_init_command Migration latest
     run_init_command Tool importSetting
 

@@ -14,6 +14,13 @@
 - HTTP 阶段需要开放服务器的 80 端口，或安装时填写其他可用 HTTP 端口。
 - 如果使用域名访问，建议先把域名 A 记录解析到服务器 IP。HTTP 阶段域名不是强制要求，也可以先用服务器 IP 测试。
 
+运行环境说明：
+
+- Docker 镜像默认使用 PHP 8.3 FPM。项目要求 PHP 8.2+，官方手动安装文档使用 PHP 8.4；当前 Docker 方案选择 PHP 8.3 是为了在满足要求的前提下降低依赖波动。
+- 镜像会安装或启用官方要求的 PHP 扩展：`bcmath`、`curl`、`fileinfo`、`gmp`、`json`、`mbstring`、`mysqli`、`openssl`、`pdo`、`pdo_mysql`、`posix`、`redis`、`sodium`、`xml`、`yaml`、`zip`，并启用推荐的 `opcache`。
+- Docker Compose 默认使用 MariaDB 10.11。官方要求 MariaDB 10.11+，并推荐 MariaDB 11.8 LTS；升级到 11.8 可作为后续运行时加固步骤。
+- Docker Compose 默认使用 Redis 7 Alpine，满足 Redis 7.0+ 要求。
+
 安全说明：
 
 - MariaDB 和 Redis 默认只在 Docker 内部网络中使用，不会把数据库端口公开到公网。
@@ -77,15 +84,15 @@ Timezone [Asia/Shanghai]: Asia/Shanghai
 6. 启动 MariaDB 和 Redis。
 7. 等待 MariaDB 和 Redis 就绪。
 8. 启动 app、nginx、scheduler 服务。
-9. 执行数据库迁移和配置导入。
-10. 创建管理员账号。
-11. 打印最终访问地址和常用命令。
+9. 检查容器内 `vendor/autoload.php` 是否存在，确认 Composer 依赖已安装完成。
+10. 执行数据库迁移和配置导入。
+11. 创建管理员账号。
+12. 打印最终访问地址和常用命令。
 
 初始化命令顺序为：
 
 ```bash
 docker compose exec app php xcat Migration new
-docker compose exec app php xcat Tool importSetting
 docker compose exec app php xcat Migration latest
 docker compose exec app php xcat Tool importSetting
 docker compose exec app php xcat Tool createAdmin "admin@example.com" "your_admin_password"
@@ -261,7 +268,7 @@ docker compose logs -f redis
 查看构建输出中的 Composer 错误。常见原因：
 
 - 服务器无法访问 Composer 镜像或 GitHub。
-- PHP 扩展构建失败。
+- PHP 扩展构建失败，例如 `gmp`、`sodium`、`redis` 或 `yaml`。
 - 网络代理或 DNS 配置异常。
 
 可以重新执行：
@@ -296,7 +303,7 @@ docker compose exec app php xcat Tool createAdmin "admin@example.com" "your_admi
 
 ## 当前限制
 
-- 当前 D4 阶段仅说明 HTTP 部署。
+- 当前 Docker 阶段仅说明 HTTP 部署。
 - 暂无自动 SSL。
 - Caddy/HTTPS 会在后续阶段加入。
 - 仍需要在真实 Docker 主机上完成运行时测试。
