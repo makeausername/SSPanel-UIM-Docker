@@ -3,7 +3,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/var/www/html}"
 
-WRITABLE_DIRS=(
+REQUIRED_DIRS=(
     "${APP_DIR}/storage/framework"
     "${APP_DIR}/storage/framework/smarty/cache"
     "${APP_DIR}/storage/framework/smarty/compile"
@@ -12,7 +12,15 @@ WRITABLE_DIRS=(
     "${APP_DIR}/config"
 )
 
-for dir in "${WRITABLE_DIRS[@]}"; do
+WRITABLE_DIRS=(
+    "${APP_DIR}/storage/framework"
+    "${APP_DIR}/storage/framework/smarty/cache"
+    "${APP_DIR}/storage/framework/smarty/compile"
+    "${APP_DIR}/storage/framework/twig/cache"
+    "${APP_DIR}/public/clients"
+)
+
+for dir in "${REQUIRED_DIRS[@]}"; do
     mkdir -p "${dir}"
 done
 
@@ -22,5 +30,11 @@ if [ "$(id -u)" = "0" ]; then
     exec gosu www-data docker-php-entrypoint "$@"
 fi
 
-chmod -R ug+rwX "${WRITABLE_DIRS[@]}" 2>/dev/null || true
+for dir in "${WRITABLE_DIRS[@]}"; do
+    if [ ! -w "${dir}" ]; then
+        echo "ERROR: Required writable directory is not writable: ${dir}" >&2
+        exit 1
+    fi
+done
+
 exec docker-php-entrypoint "$@"
