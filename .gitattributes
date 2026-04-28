@@ -9,4 +9,5 @@ Dockerfile text eol=lf
 docker-compose.yml text eol=lf
 docker/**/*.conf text eol=lf
 docker/**/*.ini text eol=lf
+docker/caddy/Caddyfile text eol=lf
 docker/cron/scheduler text eol=lf

@@ -1,6 +1,11 @@
 # Docker 一键安装说明
 
-本文档说明当前 Docker Compose 一键安装方案的使用方式。当前阶段为 HTTP 部署文档，不包含 SSL、Caddy、Traefik、Certbot 或自动 HTTPS。
+本文档说明当前 Docker Compose 一键安装方案的使用方式。安装脚本支持两种模式：
+
+- HTTP-only 模式：适合本地测试、内网测试或暂时没有 HTTPS 的部署。
+- HTTPS 模式：使用 Caddy 作为 Docker 入口网关，自动申请并续期 Let's Encrypt 证书。
+
+本方案不使用 Certbot、Traefik 或手写证书续期脚本。
 
 ## 前置条件
 
@@ -11,8 +16,10 @@
 - 已安装 Docker。
 - 已安装 Docker Compose v2 插件，可以执行 `docker compose version`。
 - 已安装 Git。
-- HTTP 阶段需要开放服务器的 80 端口，或安装时填写其他可用 HTTP 端口。
-- 如果使用域名访问，建议先把域名 A 记录解析到服务器 IP。HTTP 阶段域名不是强制要求，也可以先用服务器 IP 测试。
+- HTTP-only 模式需要开放服务器的 80 端口，或安装时填写其他可用 HTTP 端口；HTTP-only 模式不会绑定服务器的 443 端口。
+- HTTPS 模式固定使用公网 80 和 443 端口，需要域名 A/AAAA 记录指向服务器 IP，并开放 80 和 443 端口。
+- HTTPS 模式下，服务器上不能有其他程序占用 80/443 端口。
+- 如果使用 Cloudflare，证书申请失败时建议先把 DNS 记录切换为 DNS-only，证书签发完成后再按需调整代理模式。
 
 运行环境说明：
 
@@ -20,12 +27,16 @@
 - 镜像会安装或启用官方要求的 PHP 扩展：`bcmath`、`curl`、`fileinfo`、`gmp`、`json`、`mbstring`、`mysqli`、`openssl`、`pdo`、`pdo_mysql`、`posix`、`redis`、`sodium`、`xml`、`yaml`、`zip`，并启用推荐的 `opcache`。
 - Docker Compose 默认使用 MariaDB 10.11。官方要求 MariaDB 10.11+，并推荐 MariaDB 11.8 LTS；升级到 11.8 可作为后续运行时加固步骤。
 - Docker Compose 默认使用 Redis 7 Alpine，满足 Redis 7.0+ 要求。
+- Docker Compose 使用 Caddy 作为公开入口，Caddy 反向代理到内部 nginx，nginx 继续负责 `public/` 静态文件和 PHP-FPM 转发。
 
 安全说明：
 
 - MariaDB 和 Redis 默认只在 Docker 内部网络中使用，不会把数据库端口公开到公网。
 - 安装脚本会生成 `.env`、`config/.config.php`、`config/appprofile.php`，这些文件包含本地部署配置或敏感信息，不要提交到 Git。
-- 当前 Docker 阶段是 HTTP-only，安装脚本会在生成的 `config/.config.php` 中关闭 Secure Cookie，保证浏览器可以在 HTTP 下保存登录 Cookie。后续启用 HTTPS 或反向代理后，应重新检查并开启 Cookie Secure 设置。
+- HTTP-only 模式下，安装脚本会在生成的 `config/.config.php` 中设置 `cookie_secure=false`，保证浏览器可以在 HTTP 下保存登录 Cookie。
+- HTTPS 模式下，安装脚本会设置 `cookie_secure=true`。如果后续更换反向代理或 TLS 终止方式，应重新检查 Cookie Secure 设置。
+- Caddy 的证书和账号数据保存在 Docker volume 中。不要在不了解后果的情况下删除 `caddy_data` 或执行 `docker compose down -v`。
+- HTTPS 模式会生成被 Git 忽略的 `docker-compose.override.yml`，用于额外发布 443 端口；HTTP-only 模式会移除安装脚本生成的该文件。
 
 ## 首次安装
 
@@ -45,9 +56,10 @@ bash install.sh
 
 脚本会依次询问以下内容：
 
+- 是否启用 Caddy 自动 HTTPS。
 - 域名，不需要填写 `http://` 或 `https://`。
 - 站点名称，默认 `SSPanel-UIM`。
-- HTTP 端口，默认 `80`。
+- HTTP 端口，默认 `80`。如果选择 HTTPS 模式，脚本会固定使用 HTTP 80 和 HTTPS 443，不再询问自定义端口。
 - 数据库名，默认 `sspanel`。
 - 数据库用户名，默认 `sspanel`。
 - 数据库密码。
@@ -60,9 +72,13 @@ bash install.sh
 示例输入：
 
 ```text
+Enable HTTPS with automatic Let's Encrypt certificates through Caddy? [y/N]: y
+HTTPS mode selected.
+Before continuing, make sure DNS A/AAAA records point to this server and ports 80/443 are open.
 Domain name, without http:// or https://: example.com
 App/site name [SSPanel-UIM]: My Panel
-HTTP port [80]: 80
+HTTP port: 80
+HTTPS port: 443
 Database name [sspanel]: sspanel
 Database username [sspanel]: sspanel
 Database password:
@@ -73,22 +89,27 @@ Admin password:
 Timezone [Asia/Shanghai]: Asia/Shanghai
 ```
 
+如果选择 HTTP-only 模式，脚本会把访问地址生成为 `http://域名` 或 `http://域名:端口`，并关闭 Secure Cookie。
+
+如果选择 HTTPS 模式，脚本会把访问地址生成为 `https://域名`，固定发布 80/443 端口，生成 `docker-compose.override.yml`，Caddy 会自动申请和续期证书，并开启 Secure Cookie。
+
 ## install.sh 会做什么
 
 `install.sh` 会执行以下步骤：
 
 1. 检查 `docker` 和 `docker compose` 是否可用。
 2. 生成 Docker Compose 使用的 `.env` 文件。
-3. 根据 `config/.config.example.php` 生成 `config/.config.php`。
-4. 根据 `config/appprofile.example.php` 生成 `config/appprofile.php`。
-5. 构建 Docker 镜像。
-6. 启动 MariaDB 和 Redis。
-7. 等待 MariaDB 和 Redis 就绪。
-8. 启动 app、nginx、scheduler 服务。
-9. 检查容器内 `vendor/autoload.php` 是否存在，确认 Composer 依赖已安装完成。
-10. 执行数据库迁移和配置导入。
-11. 创建管理员账号。
-12. 打印最终访问地址和常用命令。
+3. 如果选择 HTTPS，生成 `docker-compose.override.yml` 来发布 443 端口；如果选择 HTTP-only，移除安装脚本生成的 override 文件。
+4. 根据 `config/.config.example.php` 生成 `config/.config.php`。
+5. 根据 `config/appprofile.example.php` 生成 `config/appprofile.php`。
+6. 构建 Docker 镜像。
+7. 启动 MariaDB 和 Redis。
+8. 等待 MariaDB 和 Redis 就绪。
+9. 启动 app、nginx、caddy、scheduler 服务。
+10. 检查容器内 `vendor/autoload.php` 是否存在，确认 Composer 依赖已安装完成。
+11. 执行数据库迁移和配置导入。
+12. 创建管理员账号。
+13. 打印最终访问地址和常用命令。
 
 初始化命令顺序为：
 
@@ -117,6 +138,12 @@ docker compose logs -f app
 
 ```bash
 docker compose logs -f nginx
+```
+
+查看 Caddy 入口网关日志：
+
+```bash
+docker compose logs -f caddy
 ```
 
 查看定时任务日志：
@@ -198,7 +225,9 @@ docker compose exec -T mariadb mariadb -u root -p sspanel < sspanel.sql
 
 - 不要把 `.env`、`config/.config.php`、`config/appprofile.php` 提交到 Git。
 - 恢复前先确认目标数据库和 volume，避免覆盖生产数据。
-- `docker compose down` 不会删除 volume。不要在不了解后果的情况下使用 `docker compose down -v`。
+- `docker compose down` 不会删除 volume。不要在不了解后果的情况下使用 `docker compose down -v`，否则会删除数据库、Redis 数据和 Caddy 证书数据。
+- HTTPS 模式下请备份 Caddy 的 Docker volume，证书和 ACME 账号数据存放在 `caddy_data` / `caddy_config` 中。
+- HTTPS 模式生成的 `docker-compose.override.yml` 可以随 `.env` 一起备份；它不包含密码，但控制是否发布 443 端口。
 
 ## 故障排查
 
@@ -226,15 +255,36 @@ docker compose version
 
 如果命令不存在，请安装 Docker Compose 插件。
 
-### 80 端口已被占用
+### 80 或 443 端口已被占用
 
-如果服务器已有 nginx、Apache 或其他程序占用 80 端口，安装时可以填写其他 HTTP 端口，例如 `8080`。
+如果服务器已有 nginx、Apache 或其他程序占用 80 端口，HTTP-only 模式安装时可以填写其他 HTTP 端口，例如 `8080`。HTTP-only 模式不会占用 443。
+
+HTTPS 模式需要 Caddy 使用公网 80 和 443 端口申请证书，安装脚本会固定使用这两个端口，建议先停止占用端口的服务。
 
 也可以检查占用：
 
 ```bash
 sudo ss -ltnp | grep ':80'
+sudo ss -ltnp | grep ':443'
 ```
+
+### Caddy 证书申请失败
+
+先查看 Caddy 日志：
+
+```bash
+docker compose logs -f caddy
+```
+
+常见原因：
+
+- 域名 A/AAAA 记录没有指向当前服务器。
+- 服务器防火墙或云厂商安全组没有开放 80/443。
+- 服务器已有其他进程占用 80/443。
+- Cloudflare 代理模式影响证书验证。可以先切换为 DNS-only，证书签发完成后再按需调整。
+- Let's Encrypt 对同一域名有频率限制，反复失败后需要等待一段时间再重试。
+
+证书数据保存在 Caddy Docker volume 中，正常更新、重启或 `docker compose down` 不会删除证书。
 
 ### 数据库等待超时
 
@@ -304,9 +354,9 @@ docker compose exec app php xcat Tool createAdmin "admin@example.com" "your_admi
 
 ## 当前限制
 
-- 当前 Docker 阶段仅说明 HTTP 部署。
-- 暂无自动 SSL。
-- Caddy/HTTPS 会在后续阶段加入。
+- 当前 Docker 阶段支持 HTTP-only 和 Caddy 自动 HTTPS 两种模式。
+- 暂未加入 Certbot、Traefik 或手动证书续期脚本。
+- HTTPS 模式依赖真实域名、正确 DNS 和公网 80/443 端口；本阶段不支持非标准 ACME 端口。
 - 仍需要在真实 Docker 主机上完成运行时测试。
 - 推荐数据库目标是 MariaDB 10.11+。
 - MySQL 兼容性在实际测试前不保证。
