@@ -50,6 +50,26 @@
                      class="navbar-brand-image" style="filter: none;">
             </h1>
             <div class="navbar-nav flex-row order-md-last">
+                <div class="nav-item dropdown me-2">
+                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown"
+                       aria-label="{trans key='common.switch_language'}">
+                        <i class="ti ti-language icon"></i>
+                        <span class="d-none d-md-inline ms-1">{trans key='common.language'}</span>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                        <form method="post" action="/locale" class="m-0">
+                            <input type="hidden" name="redirect" class="frontend-locale-redirect">
+                            <button type="submit" name="locale" value="zh-CN"
+                                    class="dropdown-item {if $current_locale === 'zh-CN'}active{/if}">
+                                {trans key='locale.zh-CN'}
+                            </button>
+                            <button type="submit" name="locale" value="en-US"
+                                    class="dropdown-item {if $current_locale === 'en-US'}active{/if}">
+                                {trans key='locale.en-US'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
                 <div class="nav-item dropdown">
                     <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown"
                        aria-label="Open user menu">
@@ -71,20 +91,6 @@
                             </a>
                         {/if}
                         <div class="dropdown-divider"></div>
-                        <div class="dropdown-item-text text-secondary small">{trans key='common.language'}</div>
-                        <form method="post" action="/locale" class="px-3 pb-2">
-                            <input type="hidden" name="redirect" class="frontend-locale-redirect">
-                            <div class="btn-group w-100" role="group" aria-label="{trans key='common.switch_language'}">
-                                <button type="submit" name="locale" value="zh-CN"
-                                        class="btn btn-sm {if $current_locale === 'zh-CN'}btn-primary{else}btn-outline-secondary{/if}">
-                                    {trans key='locale.zh-CN'}
-                                </button>
-                                <button type="submit" name="locale" value="en-US"
-                                        class="btn btn-sm {if $current_locale === 'en-US'}btn-primary{else}btn-outline-secondary{/if}">
-                                    {trans key='locale.en-US'}
-                                </button>
-                            </div>
-                        </form>
                         <a href="/user/logout" class="dropdown-item">{trans key='user.nav.logout'}</a>
                     </div>
                 </div>
