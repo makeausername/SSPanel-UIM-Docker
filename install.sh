@@ -686,6 +686,36 @@ run_init_command() {
     docker compose exec -T app php xcat "$@"
 }
 
+run_mariadb_root_sql() {
+    local sql="$1"
+
+    docker compose exec -T -e "MYSQL_PWD=${DB_ROOT_PASSWORD}" mariadb \
+        mariadb --batch --raw --skip-column-names -u root "$DB_DATABASE" -e "$sql"
+}
+
+ensure_user_ga_enable_column() {
+    local column_count
+
+    echo "检查 Docker 兼容字段：user.ga_enable"
+
+    if ! column_count="$(run_mariadb_root_sql "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user' AND COLUMN_NAME = 'ga_enable';" | tr -d '[:space:]')"; then
+        die "检查 user.ga_enable 字段失败。请查看数据库日志：docker compose logs mariadb"
+    fi
+
+    case "$column_count" in
+        1)
+            echo "user.ga_enable 已存在，跳过兼容修复。"
+            ;;
+        0)
+            echo "user.ga_enable 缺失，正在添加兼容字段。"
+            run_mariadb_root_sql "ALTER TABLE \`user\` ADD COLUMN \`ga_enable\` tinyint(1) unsigned NOT NULL DEFAULT 0;"
+            ;;
+        *)
+            die "检查 user.ga_enable 字段返回了意外结果：${column_count}"
+            ;;
+    esac
+}
+
 ensure_app_autoload() {
     echo "+ docker compose exec -T app test -f vendor/autoload.php"
     if ! docker compose exec -T app test -f vendor/autoload.php; then
@@ -803,6 +833,7 @@ main() {
     run_init_command Migration new
     run_init_command Migration latest
     run_init_command Tool importSetting
+    ensure_user_ga_enable_column
 
     progress_step 8 "创建管理员账号"
     if docker compose exec -T app php xcat Tool createAdmin "$ADMIN_EMAIL" "$ADMIN_PASSWORD"; then
