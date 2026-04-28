@@ -26,9 +26,41 @@ die() {
     exit 1
 }
 
+banner() {
+    cat <<'EOF'
+============================================================
+ SSPanel-UIM Docker 一键安装向导
+============================================================
+本向导将会：
+  - 生成 .env 和 Docker 部署配置文件
+  - 生成 config/.config.php 和 config/appprofile.php
+  - 构建并启动 Docker 容器
+  - 执行数据库迁移和设置导入
+  - 创建管理员账号
+
+重要提醒：
+  - 不会删除已有 Docker volume
+  - 不会执行 docker compose down -v
+  - 不要运行 docker compose down -v，除非你明确要删除数据库、Redis 数据和 Caddy 证书
+============================================================
+EOF
+}
+
 step() {
     echo
     echo "==> $*"
+}
+
+wizard_section() {
+    echo
+    echo "[$1/7] $2"
+    echo "------------------------------------------------------------"
+}
+
+progress_step() {
+    echo
+    echo "[$1/8] $2"
+    echo "------------------------------------------------------------"
 }
 
 trim() {
@@ -47,7 +79,7 @@ confirm() {
         case "$(trim "$answer")" in
             y|Y|yes|YES) return 0 ;;
             n|N|no|NO|"") return 1 ;;
-            *) echo "Please answer y or n." ;;
+            *) echo "请输入 y 或 n。" ;;
         esac
     done
 }
@@ -91,7 +123,56 @@ prompt_secret() {
             return 0
         fi
 
-        echo "${label} cannot be empty."
+        echo "${label} 不能为空。"
+    done
+}
+
+prompt_secret_confirm() {
+    local variable_name="$1"
+    local label="$2"
+    local first_value
+    local second_value
+
+    while true; do
+        prompt_secret first_value "$label"
+        prompt_secret second_value "请再次输入${label}"
+
+        if [ "$first_value" = "$second_value" ]; then
+            printf -v "$variable_name" "%s" "$first_value"
+            return 0
+        fi
+
+        echo "两次输入不一致，请重新输入。"
+    done
+}
+
+prompt_domain() {
+    while true; do
+        prompt_value APP_DOMAIN "域名或访问地址（不要包含 http:// 或 https://）"
+
+        if [ -z "$APP_DOMAIN" ]; then
+            echo "域名不能为空。"
+            continue
+        fi
+
+        case "$APP_DOMAIN" in
+            http://*|https://*)
+                echo "请只输入域名、IP 或主机名，不要包含 http:// 或 https://。"
+                continue
+                ;;
+        esac
+
+        if [[ "$APP_DOMAIN" =~ [[:space:]/] ]]; then
+            echo "域名或访问地址不能包含空格或路径。"
+            continue
+        fi
+
+        if [ "$HTTPS_ENABLED" = "true" ] && ! [[ "$APP_DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$ ]]; then
+            echo "HTTPS 模式需要可公开解析的域名，例如 example.com。"
+            continue
+        fi
+
+        return 0
     done
 }
 
@@ -99,6 +180,10 @@ require_command() {
     local command_name="$1"
 
     if ! command -v "$command_name" >/dev/null 2>&1; then
+        if [ "$command_name" = "docker" ]; then
+            die "未找到 docker 命令。请先安装 Docker Engine，并确认当前用户可以执行 docker。"
+        fi
+
         die "Required command not found: ${command_name}"
     fi
 }
@@ -109,38 +194,54 @@ validate_inputs() {
         *) die "HTTPS mode must be true or false." ;;
     esac
 
-    [ -n "$APP_DOMAIN" ] || die "Domain name cannot be empty."
-    [ -n "$APP_NAME" ] || die "App/site name cannot be empty."
-    [ -n "$DB_DATABASE" ] || die "Database name cannot be empty."
-    [ -n "$DB_USERNAME" ] || die "Database username cannot be empty."
-    [ -n "$DB_PASSWORD" ] || die "Database password cannot be empty."
-    [ -n "$DB_ROOT_PASSWORD" ] || die "Database root password cannot be empty."
-    [ -n "$ADMIN_EMAIL" ] || die "Admin email cannot be empty."
-    [ -n "$ADMIN_PASSWORD" ] || die "Admin password cannot be empty."
+    [ -n "$APP_DOMAIN" ] || die "域名不能为空。"
+    [ -n "$APP_NAME" ] || die "站点名称不能为空。"
+    [ -n "$DB_DATABASE" ] || die "数据库名不能为空。"
+    [ -n "$DB_USERNAME" ] || die "数据库用户名不能为空。"
+    [ -n "$DB_PASSWORD" ] || die "数据库密码不能为空。"
+    [ -n "$DB_ROOT_PASSWORD" ] || die "数据库 root 密码不能为空。"
+    [ -n "$ADMIN_EMAIL" ] || die "管理员邮箱不能为空。"
+    [ -n "$ADMIN_PASSWORD" ] || die "管理员密码不能为空。"
+
+    case "$APP_DOMAIN" in
+        http://*|https://*) die "域名不要包含 http:// 或 https://。" ;;
+    esac
+
+    if [[ "$APP_DOMAIN" =~ [[:space:]/] ]]; then
+        die "域名或访问地址不能包含空格或路径。"
+    fi
+
+    if [ "$HTTPS_ENABLED" = "true" ] && ! [[ "$APP_DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$ ]]; then
+        die "HTTPS 模式需要可公开解析的域名，例如 example.com。"
+    fi
 
     case "$HTTP_PORT" in
-        ""|*[!0-9]*) die "HTTP port must be numeric." ;;
+        ""|*[!0-9]*) die "HTTP 端口必须是数字。" ;;
     esac
 
     if [ "$HTTP_PORT" -lt 1 ] || [ "$HTTP_PORT" -gt 65535 ]; then
-        die "HTTP port must be between 1 and 65535."
+        die "HTTP 端口必须在 1 到 65535 之间。"
     fi
 
     case "$HTTPS_PORT" in
-        ""|*[!0-9]*) die "HTTPS port must be numeric." ;;
+        ""|*[!0-9]*) die "HTTPS 端口必须是数字。" ;;
     esac
 
     if [ "$HTTPS_PORT" -lt 1 ] || [ "$HTTPS_PORT" -gt 65535 ]; then
-        die "HTTPS port must be between 1 and 65535."
+        die "HTTPS 端口必须在 1 到 65535 之间。"
     fi
 
     case "$ADMIN_EMAIL" in
         *@*.*) ;;
-        *) die "Admin email does not look valid." ;;
+        *) die "管理员邮箱格式看起来不正确。" ;;
     esac
 
     if [ "$HTTPS_ENABLED" = "true" ] && { [ "$HTTP_PORT" != "80" ] || [ "$HTTPS_PORT" != "443" ]; }; then
-        die "HTTPS mode requires public HTTP port 80 and HTTPS port 443 for Let's Encrypt validation."
+        die "HTTPS 模式需要公网 HTTP 80 和 HTTPS 443 端口用于 Let's Encrypt 验证。"
+    fi
+
+    if [ -n "$MU_KEY" ] && [[ "$MU_KEY" =~ [[:space:]] ]]; then
+        die "muKey 不能包含空白字符。"
     fi
 }
 
@@ -166,16 +267,60 @@ make_base_url() {
     fi
 }
 
+print_final_summary() {
+    local redis_state
+    local mu_key_state
+
+    if [ -n "$REDIS_PASSWORD" ]; then
+        redis_state="已配置（不显示）"
+    else
+        redis_state="未设置"
+    fi
+
+    if [ -n "$MU_KEY" ]; then
+        mu_key_state="自定义值已输入（不显示）"
+    else
+        mu_key_state="留空，安装时自动生成"
+    fi
+
+    wizard_section 7 "配置确认"
+    echo "部署模式: $([ "$HTTPS_ENABLED" = "true" ] && echo "HTTPS / Caddy 自动 SSL" || echo "HTTP-only")"
+    echo "访问地址: ${BASE_URL}"
+    echo "域名/主机: ${APP_DOMAIN}"
+    echo "站点名称: ${APP_NAME}"
+    echo "HTTP 端口: ${HTTP_PORT}"
+    if [ "$HTTPS_ENABLED" = "true" ]; then
+        echo "HTTPS 端口: ${HTTPS_PORT}"
+    fi
+    echo "数据库名: ${DB_DATABASE}"
+    echo "数据库用户: ${DB_USERNAME}"
+    echo "数据库密码: ********"
+    echo "数据库 root 密码: ********"
+    echo "Redis 密码: ${redis_state}"
+    echo "管理员邮箱: ${ADMIN_EMAIL}"
+    echo "管理员密码: ********"
+    echo "muKey: ${mu_key_state}"
+    echo "时区: ${TZ}"
+    echo
+    echo "继续后才会写入 .env / config 文件并启动 Docker 服务。"
+}
+
 print_https_warning() {
     if [ "$HTTPS_ENABLED" = "true" ]; then
         echo
-        echo "HTTPS mode selected."
-        echo "HTTPS mode will use public ports 80 and 443."
-        echo "Before continuing, make sure DNS A/AAAA records point to this server and ports 80/443 are open."
-        echo "If Cloudflare proxying causes certificate issuance failures, switch the DNS record to DNS-only first."
+        echo "已选择 HTTPS 模式。"
+        echo "HTTPS 模式适合生产环境，并会通过 Caddy 自动申请和续期 Let's Encrypt 证书。"
+        echo "继续前请确认："
+        echo "  - 域名 DNS A/AAAA 记录已经指向本服务器"
+        echo "  - 公网 80 和 443 端口已经开放"
+        echo "  - 服务器上没有其他服务占用 80/443"
+        echo "  - Cloudflare 用户如遇证书签发失败，可先切换为 DNS-only"
+        echo "本阶段 HTTPS 模式会固定使用 HTTP_PORT=80 和 HTTPS_PORT=443。"
     else
         echo
-        echo "HTTP-only mode selected. Secure Cookie will be disabled in the generated application config."
+        echo "已选择 HTTP-only 模式。"
+        echo "HTTP-only 适合测试、内网环境，或前面已经有其他反向代理的用户。"
+        echo "生成的应用配置会设置 cookie_secure=false，确保 HTTP 登录可用。"
     fi
 }
 
@@ -219,10 +364,10 @@ prepare_overwrite() {
     local path="$1"
 
     if [ -e "$path" ]; then
-        if confirm "${path} already exists. Back it up and overwrite it?"; then
+        if confirm "检测到 ${path} 已存在。是否先备份再覆盖？"; then
             backup_file "$path"
         else
-            die "Cannot continue without overwriting ${path}."
+            die "用户选择不覆盖 ${path}，安装已安全停止，未修改该文件。"
         fi
     fi
 }
@@ -231,7 +376,7 @@ prepare_config_file() {
     CONFIG_WRITE="true"
 
     if [ -e "$APP_CONFIG_FILE" ]; then
-        if confirm "${APP_CONFIG_FILE} already exists. Back it up and regenerate it?"; then
+        if confirm "检测到 ${APP_CONFIG_FILE} 已存在。是否先备份再重新生成？"; then
             backup_file "$APP_CONFIG_FILE"
         else
             CONFIG_WRITE="false"
@@ -244,21 +389,21 @@ prepare_appprofile_file() {
     APP_PROFILE_WRITE="true"
 
     if [ -e "$APP_PROFILE_FILE" ]; then
-        if confirm "${APP_PROFILE_FILE} already exists. Back it up and regenerate it?"; then
+        if confirm "检测到 ${APP_PROFILE_FILE} 已存在。是否先备份再重新生成？"; then
             backup_file "$APP_PROFILE_FILE"
         else
             APP_PROFILE_WRITE="false"
-            echo "Keeping existing ${APP_PROFILE_FILE}; it was not modified."
+            echo "保留现有 ${APP_PROFILE_FILE}，不会修改该文件。"
         fi
     fi
 }
 
 warn_existing_config_values() {
-    echo "WARNING: Keeping existing ${APP_CONFIG_FILE}; it was not modified." >&2
-    echo "WARNING: Ensure these values are set manually for the selected Docker mode:" >&2
+    echo "WARNING: 保留现有 ${APP_CONFIG_FILE}，不会修改该文件。" >&2
+    echo "WARNING: 请手动确认当前部署模式需要的值：" >&2
     printf "  \$_ENV['baseUrl'] = %s;\n" "$(php_string "$BASE_URL")" >&2
     printf "  \$_ENV['cookie_secure'] = %s;\n" "$COOKIE_SECURE" >&2
-    echo "WARNING: Existing muKey remains unchanged. Update node-side configs too if you change muKey manually." >&2
+    echo "WARNING: 现有 muKey 保持不变。如手动修改 muKey，请同步更新所有节点侧配置。" >&2
 }
 
 write_https_compose_override() {
@@ -475,11 +620,30 @@ check_existing_containers() {
     existing="$(docker compose ps -a --format '{{.Name}}' 2>/dev/null || true)"
 
     if [ -n "$existing" ]; then
-        echo "Existing Docker Compose containers were found:"
+        echo "检测到当前目录已有 Docker Compose 容器："
         echo "$existing"
-        if ! confirm "Continue without deleting existing containers or volumes?"; then
-            die "Installation cancelled."
+        echo "安装脚本不会删除容器或 volume；继续会尝试复用/更新这些服务。"
+        if ! confirm "是否继续？"; then
+            die "安装已取消。未删除任何容器或 volume。"
         fi
+    fi
+}
+
+docker_compose_up() {
+    local services=("$@")
+
+    if ! docker compose up -d "${services[@]}"; then
+        echo "ERROR: Docker Compose 启动失败：${services[*]}" >&2
+        echo "请查看上方 Docker 输出和以下日志命令：" >&2
+        printf "  docker compose logs %s\n" "${services[@]}" >&2
+
+        case " ${services[*]} " in
+            *" caddy "*)
+                echo "如果 Caddy 启动失败，请检查 80/443 端口是否被其他服务占用。" >&2
+                ;;
+        esac
+
+        exit 1
     fi
 }
 
@@ -504,13 +668,13 @@ wait_for_health() {
                     return 0
                     ;;
                 unhealthy|exited|dead)
-                    die "${service} is ${status}. Check logs with: docker compose logs ${service}"
+                    die "${service} 状态为 ${status}。请查看日志：docker compose logs ${service}"
                     ;;
             esac
         fi
 
         if [ $(( "$(date +%s)" - start_time )) -ge "$timeout_seconds" ]; then
-            die "Timed out waiting for ${service} readiness."
+            die "等待 ${service} 就绪超时。请查看日志：docker compose logs ${service}"
         fi
 
         sleep 3
@@ -530,21 +694,22 @@ ensure_app_autoload() {
 }
 
 main() {
-    step "Checking prerequisites"
+    banner
+
+    step "检查前置条件"
     require_command docker
 
     if ! docker compose version >/dev/null 2>&1; then
-        die "Docker Compose v2 is required. Use the 'docker compose' plugin, not docker-compose."
+        die "未找到 Docker Compose v2 插件。当前脚本使用 'docker compose'，不是旧版 'docker-compose'。"
     fi
 
     [ -f "$APP_CONFIG_EXAMPLE" ] || die "Missing ${APP_CONFIG_EXAMPLE}"
     [ -f "$APP_PROFILE_EXAMPLE" ] || die "Missing ${APP_PROFILE_EXAMPLE}"
 
-    step "Checking existing generated files"
-    prepare_overwrite "$ENV_FILE"
-
-    step "Collecting deployment settings"
-    if confirm "Enable HTTPS with automatic Let's Encrypt certificates through Caddy?"; then
+    wizard_section 1 "部署模式"
+    echo "HTTP-only：适合测试、内网，或已经在前面使用其他反向代理的环境。"
+    echo "HTTPS：推荐生产环境使用，Caddy 会自动申请和续期 Let's Encrypt 证书。"
+    if confirm "是否启用 Caddy 自动 HTTPS？"; then
         HTTPS_ENABLED="true"
     else
         HTTPS_ENABLED="false"
@@ -552,38 +717,58 @@ main() {
 
     print_https_warning
 
-    prompt_value APP_DOMAIN "Domain name, without http:// or https://"
-    normalize_domain
-    prompt_value APP_NAME "App/site name" "SSPanel-UIM"
+    wizard_section 2 "站点信息"
+    prompt_domain
+    prompt_value APP_NAME "站点名称" "SSPanel-UIM"
     if [ "$HTTPS_ENABLED" = "true" ]; then
         HTTP_PORT="80"
         HTTPS_PORT="443"
-        echo "HTTP port: 80"
-        echo "HTTPS port: 443"
+        echo "HTTP 端口: 80"
+        echo "HTTPS 端口: 443"
     else
-        prompt_value HTTP_PORT "HTTP port" "80"
+        prompt_value HTTP_PORT "HTTP 端口" "80"
         HTTPS_PORT="443"
     fi
-    prompt_value DB_DATABASE "Database name" "sspanel"
-    prompt_value DB_USERNAME "Database username" "sspanel"
-    prompt_secret DB_PASSWORD "Database password"
-    prompt_secret DB_ROOT_PASSWORD "Database root password"
-    prompt_secret REDIS_PASSWORD "Redis password (optional)" "true"
-    prompt_value ADMIN_EMAIL "Admin email"
-    prompt_secret ADMIN_PASSWORD "Admin password"
-    prompt_value TZ "Timezone" "Asia/Shanghai"
-    prompt_secret MU_KEY "请输入 muKey（用于节点通信，留空则自动生成强随机值）" "true"
+    prompt_value TZ "时区" "Asia/Shanghai"
+
+    wizard_section 3 "数据库配置"
+    prompt_value DB_DATABASE "数据库名" "sspanel"
+    prompt_value DB_USERNAME "数据库用户名" "sspanel"
+    prompt_secret DB_PASSWORD "数据库密码"
+    prompt_secret DB_ROOT_PASSWORD "数据库 root 密码"
+
+    wizard_section 4 "Redis 配置"
+    echo "Redis 密码可以留空。Redis 默认只在 Docker 内部网络中使用，不会公开端口。"
+    prompt_secret REDIS_PASSWORD "Redis 密码（可留空）" "true"
+
+    wizard_section 5 "管理员账号"
+    prompt_value ADMIN_EMAIL "管理员邮箱"
+    prompt_secret_confirm ADMIN_PASSWORD "管理员密码"
+
+    wizard_section 6 "节点通信密钥"
+    echo "muKey 用于节点/服务端通信。留空则自动生成强随机值。"
+    echo "节点接入后不要随意修改 muKey，除非同步更新所有节点配置。"
+    prompt_secret MU_KEY "muKey（可留空）" "true"
 
     validate_inputs
     make_base_url
 
-    step "Generating Docker and application configuration"
+    print_final_summary
+    if ! confirm "继续安装？"; then
+        echo "安装已取消。未写入文件，未启动容器。"
+        exit 0
+    fi
+
+    progress_step 1 "生成 .env"
+    prepare_overwrite "$ENV_FILE"
     write_env_file
     if [ "$HTTPS_ENABLED" = "true" ]; then
         write_https_compose_override
     else
         remove_https_compose_override
     fi
+
+    progress_step 2 "生成配置文件"
     prepare_config_file
     prepare_appprofile_file
     write_config_file
@@ -594,53 +779,64 @@ main() {
 
     trap restore_build_files EXIT
 
-    step "Building Docker image"
+    progress_step 3 "构建 Docker 镜像"
     stash_for_build "$ENV_FILE"
     stash_for_build "$APP_CONFIG_FILE"
     stash_for_build "$APP_PROFILE_FILE"
-    docker compose build
+    if ! docker compose build; then
+        die "Docker 镜像构建失败。请查看上方 Composer/PHP/Docker 错误输出。"
+    fi
     restore_build_files
 
-    step "Starting MariaDB and Redis"
-    docker compose up -d mariadb redis
+    progress_step 4 "启动 MariaDB / Redis"
+    docker_compose_up mariadb redis
+
+    progress_step 5 "等待数据库和 Redis 就绪"
     wait_for_health mariadb 240
     wait_for_health redis 120
 
-    step "Starting application services"
-    docker compose up -d app nginx caddy scheduler
+    progress_step 6 "启动应用服务"
+    docker_compose_up app nginx caddy scheduler
 
-    step "Checking Composer dependencies"
+    progress_step 7 "初始化数据库"
     ensure_app_autoload
-
-    step "Initializing database"
     run_init_command Migration new
     run_init_command Migration latest
     run_init_command Tool importSetting
 
-    step "Creating admin user"
+    progress_step 8 "创建管理员账号"
     if docker compose exec -T app php xcat Tool createAdmin "$ADMIN_EMAIL" "$ADMIN_PASSWORD"; then
-        echo "Admin user creation command completed."
+        echo "管理员账号创建命令已完成。"
     else
-        echo "WARNING: Admin user creation failed. If the admin already exists, you can continue; otherwise check: docker compose logs app" >&2
+        echo "WARNING: 管理员创建失败。如果管理员已存在可以继续使用；否则请查看：docker compose logs app" >&2
     fi
 
-    step "Installation complete"
-    echo "Access URL: ${BASE_URL}"
-    echo "HTTPS enabled: ${HTTPS_ENABLED}"
-    echo "Admin email: ${ADMIN_EMAIL}"
+    step "安装完成"
+    echo "访问地址: ${BASE_URL}"
+    echo "HTTPS 状态: $([ "$HTTPS_ENABLED" = "true" ] && echo "已启用" || echo "未启用")"
+    echo "管理员邮箱: ${ADMIN_EMAIL}"
     if [ "$CONFIG_WRITE" = "true" ]; then
-        echo "muKey: configured in ${APP_CONFIG_FILE}; keep this file backed up."
+        echo "muKey: 已写入 ${APP_CONFIG_FILE}，请妥善备份。"
     else
-        echo "muKey: existing ${APP_CONFIG_FILE} was kept unchanged."
+        echo "muKey: 现有 ${APP_CONFIG_FILE} 保持不变。"
     fi
     echo
-    echo "Useful commands:"
+    echo "常用命令:"
     echo "  docker compose ps"
     echo "  docker compose logs -f app"
     echo "  docker compose logs -f nginx"
     echo "  docker compose logs -f caddy"
     echo "  docker compose logs -f scheduler"
     echo "  docker compose down"
+    echo
+    echo "备份提醒:"
+    echo "  - 备份 .env"
+    echo "  - 备份 config/.config.php"
+    echo "  - 备份 config/appprofile.php"
+    echo "  - 定期备份数据库"
+    echo
+    echo "重要警告: 不要运行 docker compose down -v，除非你明确要删除数据库、Redis 数据和 Caddy 证书。"
+    echo "节点提醒: config/.config.php 内的 muKey 用于节点通信，请妥善保存。"
 }
 
 main "$@"

@@ -57,6 +57,8 @@ git checkout docker-one-click-install
 bash install.sh
 ```
 
+脚本会以分步向导形式运行，并在写入文件或启动容器前显示一次最终确认。确认前不会生成 `.env`、不会修改 `config/.config.php`，也不会启动 Docker 服务。
+
 脚本会依次询问以下内容：
 
 - 是否启用 Caddy 自动 HTTPS。
@@ -69,7 +71,7 @@ bash install.sh
 - 数据库 root 密码。
 - Redis 密码，可留空。
 - 管理员邮箱。
-- 管理员密码。
+- 管理员密码，并要求再次输入确认。
 - 时区，默认 `Asia/Shanghai`。
 - `muKey`，用于节点通信。可以自定义；留空则自动生成强随机值。
 
@@ -99,6 +101,8 @@ Timezone [Asia/Shanghai]: Asia/Shanghai
 如果选择 HTTPS 模式，脚本会把访问地址生成为 `https://域名`，固定发布 80/443 端口，生成 `docker-compose.override.yml`，Caddy 会自动申请和续期证书，并开启 Secure Cookie。
 
 `muKey` 会写入 `config/.config.php`，不会写入 `.env`，安装完成后也不会在终端输出明文。请妥善备份 `config/.config.php`。节点已经接入后，不要随意修改 `muKey`，除非同步更新所有节点侧配置。
+
+最终确认页只会显示脱敏信息：数据库密码、Redis 密码、管理员密码和 `muKey` 都不会以明文输出。如果选择不继续，脚本会安全退出，不写入文件、不启动容器。
 
 如果 `.env` 已存在，脚本会询问是否备份并覆盖；如果拒绝，安装会停止。
 如果 `config/.config.php` 已存在，脚本会询问是否备份并重新生成；如果拒绝，脚本不会修改该文件，并会提示当前模式需要手动确认的 `baseUrl`、`cookie_secure`，现有 `muKey` 也会保持不变。
