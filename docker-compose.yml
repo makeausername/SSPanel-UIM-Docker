@@ -5,6 +5,10 @@ services:
       dockerfile: Dockerfile
     image: sspanel-uim:php83-fpm
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     environment:
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
       APP_NAME: ${APP_NAME:-SSPanel-UIM}
@@ -17,6 +21,12 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       TZ: ${TZ:-Asia/Shanghai}
+      PHP_FPM_PM: ${PHP_FPM_PM:-dynamic}
+      PHP_FPM_MAX_CHILDREN: ${PHP_FPM_MAX_CHILDREN:-20}
+      PHP_FPM_START_SERVERS: ${PHP_FPM_START_SERVERS:-4}
+      PHP_FPM_MIN_SPARE_SERVERS: ${PHP_FPM_MIN_SPARE_SERVERS:-2}
+      PHP_FPM_MAX_SPARE_SERVERS: ${PHP_FPM_MAX_SPARE_SERVERS:-8}
+      PHP_FPM_MAX_REQUESTS: ${PHP_FPM_MAX_REQUESTS:-500}
     volumes:
       - ./config/.config.php:/var/www/html/config/.config.php:ro
       - ./config/appprofile.php:/var/www/html/config/appprofile.php:ro
@@ -33,6 +43,10 @@ services:
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     depends_on:
       - app
     volumes:
@@ -45,6 +59,10 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     depends_on:
       - nginx
     environment:
@@ -62,18 +80,19 @@ services:
   mariadb:
     image: mariadb:10.11
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     environment:
       MARIADB_DATABASE: ${DB_DATABASE:-sspanel}
       MARIADB_USER: ${DB_USERNAME:-sspanel}
       MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
       TZ: ${TZ:-Asia/Shanghai}
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-      - --sql-mode=NO_ENGINE_SUBSTITUTION
     volumes:
       - mariadb_data:/var/lib/mysql
+      - ./docker/mariadb/99-sspanel.cnf:/etc/mysql/conf.d/99-sspanel.cnf:ro
     healthcheck:
       test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u root --password=\"$${MARIADB_ROOT_PASSWORD}\" --silent"]
       interval: 10s
@@ -86,17 +105,22 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       TZ: ${TZ:-Asia/Shanghai}
     command: >
       sh -c 'if [ -n "$${REDIS_PASSWORD:-}" ]; then
-        exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}";
+        exec redis-server /usr/local/etc/redis/redis.conf --requirepass "$${REDIS_PASSWORD}";
       else
-        exec redis-server --appendonly yes;
+        exec redis-server /usr/local/etc/redis/redis.conf;
       fi'
     volumes:
       - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "if [ -n \"$${REDIS_PASSWORD:-}\" ]; then redis-cli -a \"$${REDIS_PASSWORD}\" ping; else redis-cli ping; fi"]
       interval: 10s
@@ -109,6 +133,10 @@ services:
   scheduler:
     image: sspanel-uim:php83-fpm
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     command: ["/var/www/html/docker/cron/scheduler"]
     environment:
       APP_DOMAIN: ${APP_DOMAIN:-localhost}

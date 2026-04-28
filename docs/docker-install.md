@@ -29,6 +29,8 @@
 - Docker Compose 默认使用 Redis 7 Alpine，满足 Redis 7.0+ 要求。
 - Docker Compose 使用 Caddy 作为公开入口，Caddy 反向代理到内部 nginx，nginx 继续负责 `public/` 静态文件和 PHP-FPM 转发。
 
+性能调优、容器 ulimit、MariaDB/Redis 配置和 OPcache 行为请参考 [Docker 性能优化说明](docker-performance.md)。
+
 安全说明：
 
 - MariaDB 和 Redis 默认只在 Docker 内部网络中使用，不会把数据库端口公开到公网。

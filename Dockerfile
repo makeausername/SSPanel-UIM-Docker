@@ -50,6 +50,17 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/zz-sspanel.ini
 COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/zz-opcache.ini
+COPY docker/php/www.conf /usr/local/etc/php-fpm.d/www.conf.template
+
+RUN set -eux; \
+    sed \
+        -e 's/{{PHP_FPM_PM}}/dynamic/g' \
+        -e 's/{{PHP_FPM_MAX_CHILDREN}}/20/g' \
+        -e 's/{{PHP_FPM_START_SERVERS}}/4/g' \
+        -e 's/{{PHP_FPM_MIN_SPARE_SERVERS}}/2/g' \
+        -e 's/{{PHP_FPM_MAX_SPARE_SERVERS}}/8/g' \
+        -e 's/{{PHP_FPM_MAX_REQUESTS}}/500/g' \
+        /usr/local/etc/php-fpm.d/www.conf.template > /usr/local/etc/php-fpm.d/www.conf
 
 COPY . /var/www/html
 
