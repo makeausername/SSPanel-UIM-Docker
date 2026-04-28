@@ -35,6 +35,7 @@
 - 安装脚本会生成 `.env`、`config/.config.php`、`config/appprofile.php`，这些文件包含本地部署配置或敏感信息，不要提交到 Git。
 - HTTP-only 模式下，安装脚本会在生成的 `config/.config.php` 中设置 `cookie_secure=false`，保证浏览器可以在 HTTP 下保存登录 Cookie。
 - HTTPS 模式下，安装脚本会设置 `cookie_secure=true`。如果后续更换反向代理或 TLS 终止方式，应重新检查 Cookie Secure 设置。
+- Docker nginx 会根据 Caddy 传入的 `X-Forwarded-Proto` 为 PHP 设置 HTTPS 状态，并在 HTTPS 模式下让 PHP session cookie 使用 Secure。
 - Caddy 的证书和账号数据保存在 Docker volume 中。不要在不了解后果的情况下删除 `caddy_data` 或执行 `docker compose down -v`。
 - HTTPS 模式会生成被 Git 忽略的 `docker-compose.override.yml`，用于额外发布 443 端口；HTTP-only 模式会移除安装脚本生成的该文件。
 
@@ -68,6 +69,7 @@ bash install.sh
 - 管理员邮箱。
 - 管理员密码。
 - 时区，默认 `Asia/Shanghai`。
+- `muKey`，用于节点通信。可以自定义；留空则自动生成强随机值。
 
 示例输入：
 
@@ -87,11 +89,18 @@ Redis password (optional):
 Admin email: admin@example.com
 Admin password:
 Timezone [Asia/Shanghai]: Asia/Shanghai
+请输入 muKey（用于节点通信，留空则自动生成强随机值）:
 ```
 
 如果选择 HTTP-only 模式，脚本会把访问地址生成为 `http://域名` 或 `http://域名:端口`，并关闭 Secure Cookie。
 
 如果选择 HTTPS 模式，脚本会把访问地址生成为 `https://域名`，固定发布 80/443 端口，生成 `docker-compose.override.yml`，Caddy 会自动申请和续期证书，并开启 Secure Cookie。
+
+`muKey` 会写入 `config/.config.php`，不会写入 `.env`，安装完成后也不会在终端输出明文。请妥善备份 `config/.config.php`。节点已经接入后，不要随意修改 `muKey`，除非同步更新所有节点侧配置。
+
+如果 `.env` 已存在，脚本会询问是否备份并覆盖；如果拒绝，安装会停止。
+如果 `config/.config.php` 已存在，脚本会询问是否备份并重新生成；如果拒绝，脚本不会修改该文件，并会提示当前模式需要手动确认的 `baseUrl`、`cookie_secure`，现有 `muKey` 也会保持不变。
+如果 `config/appprofile.php` 已存在，脚本会询问是否备份并重新生成；如果拒绝，脚本会继续使用现有文件。
 
 ## install.sh 会做什么
 
@@ -208,6 +217,8 @@ docker compose exec app php xcat Tool importSetting
 - `config/.config.php`。
 - `config/appprofile.php`。
 - 如有需要，备份 `public/clients` 和相关存储文件。
+
+`config/.config.php` 内包含 `key`、`muKey`、数据库密码和 Redis 密码。请把它作为敏感文件保存，不要公开。
 
 导出数据库示例：
 
@@ -350,6 +361,29 @@ docker compose up -d app
 
 ```bash
 docker compose exec app php xcat Tool createAdmin "admin@example.com" "your_admin_password"
+```
+
+### 登录 Cookie 或 HTTPS 状态异常
+
+HTTP-only 模式下，`config/.config.php` 应包含：
+
+```php
+$_ENV['baseUrl'] = 'http://example.com';
+$_ENV['cookie_secure'] = false;
+```
+
+HTTPS 模式下，`config/.config.php` 应包含：
+
+```php
+$_ENV['baseUrl'] = 'https://example.com';
+$_ENV['cookie_secure'] = true;
+```
+
+如果登录后跳转或 Cookie 行为异常，先确认 `baseUrl` 和 `cookie_secure` 与当前部署模式一致，再查看 Caddy 和 nginx 日志：
+
+```bash
+docker compose logs -f caddy
+docker compose logs -f nginx
 ```
 
 ## 当前限制
