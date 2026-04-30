@@ -147,10 +147,10 @@
                         {/foreach}
                     </div>
                 </div>
-                
-                <div class="col-12">
-                    <div class="row row-cards">
-                <div class="col-lg-7 col-xl-7 col-sm-12">
+            </div>
+
+            <div class="row row-cards align-items-start">
+                <div class="col-12 col-lg-7">
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">{trans key='user.dashboard.quick_config'}</h3>
@@ -297,10 +297,9 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="col-lg-5 col-xl-5 col-sm-12">
-                    <div class="vstack">
+                <div class="col-12 col-lg-5">
+                    <div class="vstack gap-3">
                         <div class="card">
                             <div class="card-body">
                                 <h3 class="card-title">{trans key='user.dashboard.traffic_usage'}</h3>
@@ -345,14 +344,14 @@
                             </div>
                         </div>
                         {if $public_setting['traffic_log']}
-                        <div class="card my-3 mb-0">
+                        <div class="card">
                             <div class="card-body">
                                 <h3 class="card-title">{trans key='user.dashboard.hourly_usage'}</h3>
                                 <div id="traffic-log"></div>
                             </div>
                         </div>
                         {/if}
-                        <div class="card my-3 mb-0">
+                        <div class="card">
                             <div class="ribbon ribbon-top bg-yellow">
                                 <i class="ti ti-bell-ringing icon"></i>
                             </div>
@@ -374,9 +373,9 @@
                         </div>
                     </div>
                 </div>
-                    </div>
-                </div>
+            </div>
                 {if $public_setting['enable_checkin']}
+            <div class="row row-cards">
                 <div class="col-lg-8 col-sm-12">
                     <div class="card">
                         <div class="card-stamp">
@@ -423,8 +422,8 @@
                         </div>
                     </div>
                 </div>
-                {/if}
             </div>
+            {/if}
         </div>
     </div>
 
