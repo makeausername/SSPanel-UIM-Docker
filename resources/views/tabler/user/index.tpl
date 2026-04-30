@@ -148,7 +148,9 @@
                     </div>
                 </div>
                 
-                <div class="col-lg-8 col-sm-12">
+                <div class="col-12">
+                    <div class="row row-cards">
+                <div class="col-lg-7 col-xl-7 col-sm-12">
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">{trans key='user.dashboard.quick_config'}</h3>
@@ -297,7 +299,7 @@
                     </div>
                 </div>
 
-                <div class="col-lg-4 col-sm-12">
+                <div class="col-lg-5 col-xl-5 col-sm-12">
                     <div class="vstack">
                         <div class="card">
                             <div class="card-body">
@@ -370,6 +372,8 @@
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </div>
                     </div>
                 </div>
                 {if $public_setting['enable_checkin']}
