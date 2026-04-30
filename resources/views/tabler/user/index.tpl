@@ -1,4 +1,10 @@
 {include file='user/header.tpl'}
+{assign var=eziplcWindowsDownloadUrl value='/downloads/eziplc-windows.zip'}
+{assign var=eziplcAndroidDownloadUrl value='/downloads/eziplc-android.apk'}
+{assign var=eziplcWindowsGuideUrl value='/docs/windows'}
+{assign var=eziplcAndroidGuideUrl value='/docs/android'}
+{assign var=eziplcAppleGuideUrl value='/docs/shadowrocket'}
+{assign var=eziplcV2raySubUrl value="{$UniversalSub}/v2ray"}
 
 <style>
 /* Animation classes for collapsible sections */
@@ -29,11 +35,6 @@
     border-color: var(--tblr-success) !important;
 }
 
-.recommended-section {
-    background: rgba(var(--tblr-primary-rgb), 0.1);
-    border: 1px solid rgba(var(--tblr-primary-rgb), 0.2);
-}
-
 .client-item {
     transition: all 0.3s;
 }
@@ -50,10 +51,6 @@
     
     .client-item .btn-group-vertical {
         margin-top: 0.5rem;
-    }
-    
-    .recommended-section h4 {
-        font-size: 1rem;
     }
     
     .page-title {
@@ -80,26 +77,6 @@
         padding: 1rem !important;
     }
     
-    /* Recommended client cards on mobile */
-    .recommended-section .card-body {
-        padding: 1rem;
-    }
-    
-    .recommended-section .btn-group {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        justify-content: center;
-    }
-    
-    .recommended-section .btn-group-vertical {
-        align-items: stretch;
-        width: 100%;
-    }
-    
-    .recommended-section .btn {
-        flex: 1 1 auto;
-        min-width: 100px;
-    }
 }
 
 /* 手风琴样式 */
@@ -183,9 +160,9 @@
                                     <i class="ti ti-link"></i> {trans key='user.dashboard.subscription_address'}
                                 </h4>
                                 <div class="input-group mb-2">
-                                    <input type="text" class="form-control" value="{$UniversalSub}" readonly id="universal-sub-link">
-                                    <button class="btn btn-primary copy" data-clipboard-text="{$UniversalSub}">
-                                        <i class="ti ti-copy"></i> {trans key='common.copy'}
+                                    <input type="text" class="form-control" value="{$eziplcV2raySubUrl}" readonly id="universal-sub-link">
+                                    <button class="btn btn-primary copy" data-clipboard-text="{$eziplcV2raySubUrl}">
+                                        <i class="ti ti-copy"></i> {trans key='user.dashboard.copy_subscription'}
                                     </button>
                                 </div>
                                 <p class="text-muted mb-0">
@@ -193,70 +170,105 @@
                                 </p>
                             </div>
 
-                            <div class="recommended-section p-3 bg-primary-lt rounded mb-3">
-                                <h4 class="mb-3">
-                                    <i class="ti ti-rocket"></i> 
-                                    {trans key='user.dashboard.recommended_client_prefix'} <span id="detected-os" class="text-primary">Windows</span> {trans key='user.dashboard.recommended_client_suffix'}
-                                </h4>
-                                <div class="row g-3" id="recommended-clients">
+                            <div class="accordion" id="eziplc-platform-accordion">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button" type="button"
+                                                data-bs-toggle="collapse" data-bs-target="#eziplc-windows"
+                                                aria-expanded="true" aria-controls="eziplc-windows">
+                                            <i class="ti ti-brand-windows me-2"></i> Windows
+                                        </button>
+                                    </h2>
+                                    <div id="eziplc-windows" class="accordion-collapse collapse show"
+                                         data-bs-parent="#eziplc-platform-accordion">
+                                        <div class="accordion-body">
+                                            <div class="client-item d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between p-3 border rounded gap-3">
+                                                <div class="flex-fill">
+                                                    <h5 class="mb-1">EzIPLC</h5>
+                                                    <small class="text-muted">{trans key='user.dashboard.eziplc_windows_description'}</small>
+                                                </div>
+                                                <div class="d-flex flex-column flex-sm-row gap-2">
+                                                    <a class="btn btn-primary" href="{$eziplcWindowsDownloadUrl}">
+                                                        <i class="ti ti-download"></i> {trans key='common.download'}
+                                                    </a>
+                                                    <a class="btn btn-outline-primary" href="{$eziplcWindowsGuideUrl}">
+                                                        <i class="ti ti-book"></i> {trans key='user.dashboard.setup_guide'}
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button"
+                                                data-bs-toggle="collapse" data-bs-target="#eziplc-android"
+                                                aria-expanded="false" aria-controls="eziplc-android">
+                                            <i class="ti ti-brand-android me-2"></i> Android
+                                        </button>
+                                    </h2>
+                                    <div id="eziplc-android" class="accordion-collapse collapse"
+                                         data-bs-parent="#eziplc-platform-accordion">
+                                        <div class="accordion-body">
+                                            <div class="client-item d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between p-3 border rounded gap-3">
+                                                <div class="flex-fill">
+                                                    <h5 class="mb-1">EzIPLC</h5>
+                                                    <small class="text-muted">{trans key='user.dashboard.eziplc_android_description'}</small>
+                                                </div>
+                                                <div class="d-flex flex-column flex-sm-row gap-2">
+                                                    <a class="btn btn-primary" href="{$eziplcAndroidDownloadUrl}">
+                                                        <i class="ti ti-download"></i> {trans key='common.download'}
+                                                    </a>
+                                                    <a class="btn btn-outline-primary" href="{$eziplcAndroidGuideUrl}">
+                                                        <i class="ti ti-book"></i> {trans key='user.dashboard.setup_guide'}
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button"
+                                                data-bs-toggle="collapse" data-bs-target="#eziplc-apple"
+                                                aria-expanded="false" aria-controls="eziplc-apple">
+                                            <i class="ti ti-brand-apple me-2"></i> {trans key='user.dashboard.apple_platform'}
+                                        </button>
+                                    </h2>
+                                    <div id="eziplc-apple" class="accordion-collapse collapse"
+                                         data-bs-parent="#eziplc-platform-accordion">
+                                        <div class="accordion-body">
+                                            <div class="client-item d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between p-3 border rounded gap-3">
+                                                <div class="flex-fill">
+                                                    <h5 class="mb-1">Shadowrocket</h5>
+                                                    <small class="text-muted d-block">{trans key='user.dashboard.shadowrocket_description_1'}</small>
+                                                    <small class="text-muted d-block">{trans key='user.dashboard.shadowrocket_description_2'}</small>
+                                                    <small class="text-muted d-block">{trans key='user.dashboard.shadowrocket_description_3'}</small>
+                                                </div>
+                                                <div class="d-flex flex-column flex-sm-row gap-2">
+                                                    <a class="btn btn-outline-primary" href="{$eziplcAppleGuideUrl}">
+                                                        <i class="ti ti-book"></i> {trans key='user.dashboard.setup_guide'}
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="text-center">
-                                <button class="btn btn-ghost-primary" type="button" data-bs-toggle="collapse" 
-                                        data-bs-target="#all-platforms" aria-expanded="false">
-                                    <i class="ti ti-package"></i> 
-                                    {trans key='user.dashboard.view_other_clients'}
+                            <div class="mt-3">
+                                <button class="btn btn-ghost-secondary w-100" type="button" data-bs-toggle="collapse"
+                                        data-bs-target="#connection-info" aria-expanded="false">
+                                    <i class="ti ti-info-circle"></i>
+                                    {trans key='user.dashboard.connection_info'}
                                     <i class="ti ti-chevron-down ms-1"></i>
                                 </button>
-                            </div>
-                            
-                            <div class="collapse mt-3" id="all-platforms">
-                                <div class="accordion" id="platform-accordion">
-                                </div>
-                                
-                                <div class="mt-3 p-3 bg-secondary-lt rounded">
-                                    <h5 class="mb-2">{trans key='user.dashboard.advanced_subscription_formats'}</h5>
-                                    <div class="small text-muted mb-2">{trans key='user.dashboard.advanced_subscription_hint'}</div>
-                                    <div class="btn-group btn-group-sm flex-wrap">
-                                        <button class="btn btn-outline-secondary copy" data-clipboard-text="{$UniversalSub}/json">
-                                            {trans key='user.dashboard.json_format'}
-                                        </button>
-                                        <button class="btn btn-outline-secondary copy" data-clipboard-text="{$UniversalSub}/v2rayjson">
-                                            V2Ray JSON
-                                        </button>
-                                        {if $public_setting['enable_ss_sub']}
-                                        <button class="btn btn-outline-secondary copy" data-clipboard-text="{$UniversalSub}/sip008">
-                                            SIP008
-                                        </button>
-                                        <button class="btn btn-outline-secondary copy" data-clipboard-text="{$UniversalSub}/ss">
-                                            Shadowsocks
-                                        </button>
-                                        {/if}
-                                        {if $public_setting['enable_v2_sub']}
-                                        <button class="btn btn-outline-secondary copy" data-clipboard-text="{$UniversalSub}/v2ray">
-                                            V2Ray
-                                        </button>
-                                        {/if}
-                                        {if $public_setting['enable_trojan_sub']}
-                                        <button class="btn btn-outline-secondary copy" data-clipboard-text="{$UniversalSub}/trojan">
-                                            Trojan
-                                        </button>
-                                        {/if}
-                                    </div>
-                                </div>
-                                
-                                <div class="mt-3">
-                                    <button class="btn btn-ghost-secondary w-100" type="button" data-bs-toggle="collapse" 
-                                            data-bs-target="#connection-info" aria-expanded="false">
-                                        <i class="ti ti-info-circle"></i> 
-                                        {trans key='user.dashboard.connection_info'}
-                                        <i class="ti ti-chevron-down ms-1"></i>
-                                    </button>
-                                    <div class="collapse mt-2" id="connection-info">
-                                        <div class="p-3 bg-light rounded">
-                                            <div class="table-responsive">
-                                                <table class="table table-sm mb-0">
+                                <div class="collapse mt-2" id="connection-info">
+                                    <div class="p-3 bg-light rounded">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm mb-0">
                                                     <tbody>
                                                     <tr>
                                                         <td class="text-muted" style="width: 100px;">{trans key='user.dashboard.port'}</td>
@@ -275,11 +287,11 @@
                                                         <td><code>{$user->method}</code></td>
                                                     </tr>
                                                     </tbody>
-                                                </table>
-                                            </div>
+                                            </table>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
                                 
                             </div>
                         </div>
@@ -513,59 +525,16 @@
     {/if}
 
     <script>
-    window.APP_CONFIG = {
-        enableR2Download: {if $config['enable_r2_client_download']}true{else}false{/if},
-        universalSubUrl: "{$UniversalSub}",
-        appName: "{$config['appName']}",
-        enableSsSub: {if $public_setting['enable_ss_sub']}true{else}false{/if},
-        enableV2Sub: {if $public_setting['enable_v2_sub']}true{else}false{/if},
-        enableTrojanSub: {if $public_setting['enable_trojan_sub']}true{else}false{/if}
-    };
-    
-    const platformIcons = {$platformIcons};
-
-    const clientRecommendations = {$clientData};
     window.USER_DASHBOARD_I18N = {
         clipboardSuccess: "{trans key='common.copied'}",
-        clipboardError: "{trans key='common.copy_failed_select'}",
-        download: "{trans key='common.download'}",
-        copySubscription: "{trans key='user.dashboard.copy_subscription'}",
-        import: "{trans key='user.dashboard.import'}",
-        importRecommended: "{trans key='user.dashboard.import'}"
+        clipboardError: "{trans key='common.copy_failed_select'}"
     };
     
     {literal}
-    function detectOS() {
-        const userAgent = navigator.userAgent;
-        if (userAgent.indexOf("Win") !== -1) return "Windows";
-        if (userAgent.indexOf("Mac") !== -1) return "macOS";
-        if (userAgent.indexOf("Android") !== -1) return "Android";
-        if (userAgent.match(/iPhone|iPad|iPod/i)) return "iOS";
-        if (userAgent.indexOf("Linux") !== -1) return "Linux";
-        return "Windows"; // default
-    }
-    
-
     const CONFIG = {
-        ANIMATION_DURATION: 350,        // 动画持续时间（毫秒）
         FEEDBACK_TIMEOUT: 2000,         // 反馈提示持续时间（毫秒）
         CLIPBOARD_SUCCESS_TEXT: window.USER_DASHBOARD_I18N.clipboardSuccess,
-        CLIPBOARD_ERROR_TEXT: window.USER_DASHBOARD_I18N.clipboardError,
-        CLASSES: {
-            BTN_GROUP_MOBILE: 'btn-group-vertical',
-            BTN_GROUP_DESKTOP: 'btn-group btn-group-sm', 
-            MOBILE_ONLY: 'd-md-none w-100',
-            DESKTOP_ONLY: 'd-none d-md-flex',
-            MOBILE_SM: 'd-sm-none w-100',
-            DESKTOP_SM: 'd-none d-sm-flex'
-        },
-        BUTTONS: {
-            download: { icon: 'ti-download', text: window.USER_DASHBOARD_I18N.download, class: 'btn-primary' },
-            downloadAppStore: { icon: 'ti-brand-appstore', text: 'App Store', class: 'btn-primary' },
-            copy: { icon: 'ti-copy', text: window.USER_DASHBOARD_I18N.copySubscription, class: 'btn-info copy' },
-            import: { icon: 'ti-link', text: window.USER_DASHBOARD_I18N.import, class: 'btn-success' },
-            importRecommended: { icon: 'ti-rocket', text: window.USER_DASHBOARD_I18N.importRecommended, class: 'btn-success' }
-        }
+        CLIPBOARD_ERROR_TEXT: window.USER_DASHBOARD_I18N.clipboardError
     };
     
     function safeInit(fn, name) {
@@ -586,186 +555,6 @@
     function createIcon(iconClass) {
         const icon = createElement('i', 'ti ' + iconClass);
         return icon;
-    }
-    
-    function createButton(type, options = {}) {
-        const { client, url, isMobile, isRecommended } = options;
-        const btnConfig = CONFIG.BUTTONS[type];
-        
-        let config = { ...btnConfig };
-        if (type === 'download' && client?.isAppStore) {
-            config = CONFIG.BUTTONS.downloadAppStore;
-        } else if (type === 'import' && isRecommended) {
-            config = CONFIG.BUTTONS.importRecommended;
-        }
-        
-        const btn = createElement(type === 'copy' ? 'button' : 'a', 'btn ' + config.class);
-        
-        if (type === 'copy') {
-            btn.setAttribute('data-clipboard-text', url);
-        } else {
-            btn.href = url;
-            if (type === 'download' && client?.isAppStore) {
-                btn.target = '_blank';
-            }
-        }
-        
-        btn.appendChild(createIcon(config.icon));
-        btn.appendChild(document.createTextNode(' ' + config.text));
-        
-        return btn;
-    }
-    
-    function createResponsiveButtonGroups(client, urls, isRecommended = false) {
-        const { downloadUrl, subUrl, importUrl } = urls;
-        const buttons = [];
-        
-        const buttonConfigs = [
-            { type: 'download', url: downloadUrl, needsClient: true },
-            { type: 'copy', url: subUrl },
-            { type: 'import', url: importUrl }
-        ];
-        
-        const variants = [
-            { 
-                isMobile: true, 
-                classes: isRecommended ? 
-                    `${CONFIG.CLASSES.BTN_GROUP_MOBILE} ${CONFIG.CLASSES.MOBILE_ONLY}` :
-                    `${CONFIG.CLASSES.BTN_GROUP_MOBILE} ${CONFIG.CLASSES.MOBILE_SM}`
-            },
-            { 
-                isMobile: false, 
-                classes: isRecommended ?
-                    `${CONFIG.CLASSES.BTN_GROUP_DESKTOP.replace('btn-group-sm', '')} ${CONFIG.CLASSES.DESKTOP_ONLY}` :
-                    `${CONFIG.CLASSES.BTN_GROUP_DESKTOP} ${CONFIG.CLASSES.DESKTOP_SM}`
-            }
-        ];
-        
-        variants.forEach(variant => {
-            const group = createElement('div', variant.classes);
-            
-            buttonConfigs.forEach(btnConfig => {
-                const options = {
-                    client: btnConfig.needsClient ? client : null,
-                    url: btnConfig.url,
-                    isMobile: variant.isMobile,
-                    isRecommended
-                };
-                group.appendChild(createButton(btnConfig.type, options));
-            });
-            
-            buttons.push(group);
-        });
-        
-        return buttons;
-    }
-    
-    function createClientCardContent(client) {
-        const content = createElement('div');
-        
-        const title = createElement('h4', 'mb-1', client.name);
-        const desc = createElement('p', 'text-secondary mb-0', client.description);
-        
-        content.appendChild(title);
-        content.appendChild(desc);
-        
-        return content;
-    }
-    
-    function generateClientHtml(client, isRecommended) {
-        const config = window.APP_CONFIG;
-        
-        let downloadUrl = client.downloadUrl;
-        if (!client.isAppStore && downloadUrl.includes('/clients/')) {
-            downloadUrl = config.enableR2Download ? '/user' + downloadUrl : downloadUrl;
-        }
-        
-        const subUrl = config.universalSubUrl + '/' + client.format;
-        const importUrl = client.importUrl;
-        
-        const container = createElement('div', 'col-12');
-        
-        if (isRecommended) {
-            const card = createElement('div', 'card');
-            const cardBody = createElement('div', 'card-body');
-            const flexContainer = createElement('div', 'd-flex flex-column flex-md-row align-items-center justify-content-between gap-3');
-            
-            const contentDiv = createClientCardContent(client);
-            
-            const buttonsContainer = createElement('div');
-            const urls = { downloadUrl, subUrl, importUrl };
-            const buttonGroups = createResponsiveButtonGroups(client, urls, true);
-            buttonGroups.forEach(group => buttonsContainer.appendChild(group));
-            
-            flexContainer.appendChild(contentDiv);
-            flexContainer.appendChild(buttonsContainer);
-            cardBody.appendChild(flexContainer);
-            card.appendChild(cardBody);
-            container.appendChild(card);
-        } else {
-            const item = createElement('div', 'client-item d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between p-3 border rounded gap-2');
-            
-            const contentDiv = createElement('div', 'flex-fill');
-            const title = createElement('h5', 'mb-0', client.name);
-            const desc = createElement('small', 'text-muted', client.description);
-            contentDiv.appendChild(title);
-            contentDiv.appendChild(desc);
-            
-            const urls = { downloadUrl, subUrl, importUrl };
-            const buttonGroups = createResponsiveButtonGroups(client, urls, false);
-            
-            item.appendChild(contentDiv);
-            buttonGroups.forEach(group => item.appendChild(group));
-            
-            container.appendChild(item);
-        }
-        
-        return container.outerHTML;
-    }
-    
-    function initClientSelector() {
-        const os = detectOS();
-        document.getElementById('detected-os').textContent = os;
-        
-        const recommendations = clientRecommendations[os] || clientRecommendations["Windows"];
-        const recommendedContainer = document.getElementById('recommended-clients');
-        
-        if (recommendedContainer) {
-            recommendations.forEach(function(client) {
-                const clientHtml = generateClientHtml(client, true);
-            recommendedContainer.insertAdjacentHTML('beforeend', clientHtml);
-            });
-        }
-        
-        const accordionContainer = document.getElementById('platform-accordion');
-        
-        if (accordionContainer) {
-            Object.keys(clientRecommendations).forEach(function(platform) {
-                const clients = clientRecommendations[platform];
-                const platformId = 'platform-' + platform.toLowerCase();
-                const icon = platformIcons[platform] || CONFIG.BUTTONS.download.icon.replace('ti-', 'ti-device-');
-                
-                const accordionHtml = `
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" 
-                                    data-bs-toggle="collapse" data-bs-target="#${platformId}">
-                                <i class="ti ${icon} me-2"></i> ${platform}
-                            </button>
-                        </h2>
-                        <div id="${platformId}" class="accordion-collapse collapse" 
-                             data-bs-parent="#platform-accordion">
-                            <div class="accordion-body">
-                                <div class="row g-3">
-                                    ${clients.map(client => generateClientHtml(client, false)).join('')}
-                                </div>
-                            </div>
-                        </div>
-                    </div>`;
-                    
-                accordionContainer.insertAdjacentHTML('beforeend', accordionHtml.trim());
-            });
-        }
     }
     
     function initClipboard() {
@@ -794,32 +583,8 @@
         });
     }
     
-    function initCollapseAnimations() {
-        const allPlatforms = document.getElementById('all-platforms');
-        const recommendedSection = document.querySelector('.recommended-section');
-        
-        if (!allPlatforms || !recommendedSection) return;
-        
-        recommendedSection.classList.add('collapsible-section');
-        
-        allPlatforms.addEventListener('show.bs.collapse', function (e) {
-            if (e.target !== allPlatforms) return;
-            recommendedSection.classList.add('collapsing');
-        });
-        
-        allPlatforms.addEventListener('hide.bs.collapse', function (e) {
-            if (e.target !== allPlatforms) return;
-            recommendedSection.classList.remove('collapsing');
-            setTimeout(function() {
-                recommendedSection.classList.add('expanded');
-            }, CONFIG.ANIMATION_DURATION);
-        });
-    }
-    
     document.addEventListener('DOMContentLoaded', function() {
-        safeInit(initClientSelector, '客户端选择器');
         safeInit(initClipboard, '剪贴板功能');
-        safeInit(initCollapseAnimations, '折叠动画');
     });
     {/literal}
     </script>
