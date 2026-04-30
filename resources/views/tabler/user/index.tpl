@@ -148,7 +148,7 @@
                     </div>
                 </div>
                 
-                <div class="col-lg-6 col-sm-12">
+                <div class="col-lg-8 col-sm-12">
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">{trans key='user.dashboard.quick_config'}</h3>
@@ -172,13 +172,13 @@
                             <div class="accordion" id="eziplc-platform-accordion">
                                 <div class="accordion-item">
                                     <h2 class="accordion-header">
-                                        <button class="accordion-button" type="button"
+                                        <button class="accordion-button collapsed" type="button"
                                                 data-bs-toggle="collapse" data-bs-target="#eziplc-windows"
-                                                aria-expanded="true" aria-controls="eziplc-windows">
+                                                aria-expanded="false" aria-controls="eziplc-windows">
                                             <i class="ti ti-brand-windows me-2"></i> Windows
                                         </button>
                                     </h2>
-                                    <div id="eziplc-windows" class="accordion-collapse collapse show"
+                                    <div id="eziplc-windows" class="accordion-collapse collapse"
                                          data-bs-parent="#eziplc-platform-accordion">
                                         <div class="accordion-body">
                                             <div class="client-item d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between p-3 border rounded gap-3">
@@ -297,7 +297,7 @@
                     </div>
                 </div>
 
-                <div class="col-lg-6 col-sm-12">
+                <div class="col-lg-4 col-sm-12">
                     <div class="vstack">
                         <div class="card">
                             <div class="card-body">
@@ -350,10 +350,30 @@
                             </div>
                         </div>
                         {/if}
+                        <div class="card my-3 mb-0">
+                            <div class="ribbon ribbon-top bg-yellow">
+                                <i class="ti ti-bell-ringing icon"></i>
+                            </div>
+                            <div class="card-body">
+                                <h3 class="card-title">
+                                    {trans key='user.dashboard.pinned_announcement'}
+                                    {if $ann !== null}
+                                    <span class="card-subtitle">{$ann->date}</span>
+                                    {/if}
+                                </h3>
+                                <p class="text-secondary">
+                                    {if $ann !== null}
+                                    {$ann->content}
+                                    {else}
+                                    {trans key='user.dashboard.no_announcement'}
+                                    {/if}
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 {if $public_setting['enable_checkin']}
-                <div class="col-lg-6 col-sm-12">
+                <div class="col-lg-8 col-sm-12">
                     <div class="card">
                         <div class="card-stamp">
                             <div class="card-stamp-icon bg-green">
@@ -400,28 +420,6 @@
                     </div>
                 </div>
                 {/if}
-                <div class="col-lg-6 col-sm-12">
-                    <div class="card">
-                        <div class="ribbon ribbon-top bg-yellow">
-                            <i class="ti ti-bell-ringing icon"></i>
-                        </div>
-                        <div class="card-body">
-                            <h3 class="card-title">
-                                {trans key='user.dashboard.pinned_announcement'}
-                                {if $ann !== null}
-                                <span class="card-subtitle">{$ann->date}</span>
-                                {/if}
-                            </h3>
-                            <p class="text-secondary">
-                                {if $ann !== null}
-                                {$ann->content}
-                                {else}
-                                {trans key='user.dashboard.no_announcement'}
-                                {/if}
-                            </p>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
