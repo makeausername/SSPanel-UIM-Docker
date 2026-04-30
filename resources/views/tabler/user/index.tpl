@@ -4,7 +4,6 @@
 {assign var=eziplcWindowsGuideUrl value='/docs/windows'}
 {assign var=eziplcAndroidGuideUrl value='/docs/android'}
 {assign var=eziplcAppleGuideUrl value='/docs/shadowrocket'}
-{assign var=eziplcV2raySubUrl value="{$UniversalSub}/v2ray"}
 
 <style>
 /* Animation classes for collapsible sections */
@@ -160,8 +159,8 @@
                                     <i class="ti ti-link"></i> {trans key='user.dashboard.subscription_address'}
                                 </h4>
                                 <div class="input-group mb-2">
-                                    <input type="text" class="form-control" value="{$eziplcV2raySubUrl}" readonly id="universal-sub-link">
-                                    <button class="btn btn-primary copy" data-clipboard-text="{$eziplcV2raySubUrl}">
+                                    <input type="text" class="form-control" value="{$UniversalSub}/v2ray" readonly id="universal-sub-link">
+                                    <button class="btn btn-primary copy" data-clipboard-text="{$UniversalSub}/v2ray">
                                         <i class="ti ti-copy"></i> {trans key='user.dashboard.copy_subscription'}
                                     </button>
                                 </div>
