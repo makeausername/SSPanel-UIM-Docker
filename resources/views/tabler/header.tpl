@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{$config['locale']}" data-bs-theme="auto">
+<html lang="{$config['locale']}" data-bs-theme="{$theme_mode}">
 
 <head>
     <meta charset="utf-8"/>

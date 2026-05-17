@@ -193,7 +193,7 @@ final class Locale
 
     public static function isFrontendPath(string $path): bool
     {
-        if (in_array($path, ['/', '/tos', '/staff', '/404', '/405', '/500', '/locale'], true)) {
+        if (in_array($path, ['/', '/tos', '/staff', '/404', '/405', '/500', '/locale', '/switch_theme_mode'], true)) {
             return true;
         }
 

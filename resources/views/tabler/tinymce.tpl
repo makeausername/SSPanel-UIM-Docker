@@ -14,7 +14,7 @@
             toolbar: 'undo redo | bold italic backcolor link | styles | fontsize | lineheight | alignleft aligncenter ' +
                 'alignright alignjustify | bullist numlist outdent indent | removeformat',
             content_style: 'body { font-size: 14px; }',
-            {if $user->is_dark_mode}
+            {if $theme_mode === 'dark'}
             skin: 'oxide-dark',
             content_css: 'dark',
             {/if}

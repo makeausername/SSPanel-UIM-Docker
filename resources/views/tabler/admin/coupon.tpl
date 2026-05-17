@@ -1,7 +1,7 @@
 {include file='admin/header.tpl'}
 
 <link rel="stylesheet" href="//{$config['jsdelivr_url']}/npm/flatpickr/dist/flatpickr.min.css">
-{if $user->is_dark_mode}
+{if $theme_mode === 'dark'}
     <link rel="stylesheet" href="//{$config['jsdelivr_url']}/npm/flatpickr/dist/themes/dark.min.css">
 {/if}
 <script src="//{$config['jsdelivr_url']}/npm/flatpickr"></script>
