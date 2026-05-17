@@ -15,7 +15,7 @@ final class ThemeController extends BaseController
 {
     public function switchThemeMode(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $themeMode = Theme::toggle($this->user);
+        $themeMode = Theme::MODE_LIGHT;
         Theme::store($themeMode);
 
         return ResponseHelper::successWithData($response, FrontendI18n::trans('common.success'), [
