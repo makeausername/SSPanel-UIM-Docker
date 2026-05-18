@@ -18,12 +18,24 @@ final class Theme
 
     public static function current(User $user): string
     {
-        return self::MODE_LIGHT;
+        $cookieMode = self::normalize(Cookie::get(self::COOKIE_KEY));
+
+        if ($cookieMode !== null) {
+            return $cookieMode;
+        }
+
+        if ($user->isLogin) {
+            return self::fromUserThemeMode((int) $user->is_dark_mode);
+        }
+
+        return self::MODE_AUTO;
     }
 
     public static function toggle(User $user): string
     {
-        return self::MODE_LIGHT;
+        return self::current($user) === self::MODE_DARK
+            ? self::MODE_LIGHT
+            : self::MODE_DARK;
     }
 
     public static function store(string $mode): void
