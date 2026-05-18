@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Services\Auth;
 use App\Services\Cache;
 use App\Services\Filter;
-use App\Services\Theme;
 use App\Utils\Hash;
 use App\Utils\ResponseHelper;
 use App\Utils\Tools;
@@ -300,8 +299,6 @@ final class InfoController extends BaseController
         if (! $user->save()) {
             return ResponseHelper::error($response, '切换失败');
         }
-
-        Theme::store(Theme::fromUserThemeMode((int) $user->is_dark_mode));
 
         return $response->withHeader('HX-Refresh', 'true');
     }

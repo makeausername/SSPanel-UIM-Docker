@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{$config['locale']}" data-bs-theme="{$theme_mode}">
+<html lang="{$config['locale']}">
 
 <head>
     <meta charset="utf-8"/>
@@ -8,22 +8,6 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <meta name="referrer" content="never">
     <title>{$config['appName']}</title>
-    <!-- Auto dark mode -->
-    <script>
-        ;(function () {
-            const htmlElement = document.querySelector("html")
-            const theme = htmlElement.getAttribute("data-bs-theme");
-
-            if(theme === 'dark-auto' || theme === 'auto') {
-                function updateTheme() {
-                    htmlElement.setAttribute("data-bs-theme",
-                        window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-                }
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme)
-                updateTheme()
-            }
-        })()
-    </script>
     <!-- CSS files -->
     <link href="//{$config['jsdelivr_url']}/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
     <link href="//{$config['jsdelivr_url']}/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet"/>
@@ -50,7 +34,11 @@
     </style>
 </head>
 
+{if $user->is_dark_mode}
+<body data-bs-theme="dark">
+{else}
 <body>
+{/if}
 <div class="page">
     <header class="navbar navbar-expand-md navbar-overlap d-print-none" data-bs-theme="dark">
         <div class="container-xl" style="background-image: none;">
@@ -93,12 +81,12 @@
                         </div>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                        {if $theme_mode === 'dark'}
-                            <a class="dropdown-item" hx-post="/switch_theme_mode" hx-swap="none">
+                        {if $user->is_dark_mode}
+                            <a class="dropdown-item" hx-post="/user/switch_theme_mode" hx-swap="none">
                                 {trans key='user.nav.light_mode'}
                             </a>
                         {else}
-                            <a class="dropdown-item" hx-post="/switch_theme_mode" hx-swap="none">
+                            <a class="dropdown-item" hx-post="/user/switch_theme_mode" hx-swap="none">
                                 {trans key='user.nav.dark_mode'}
                             </a>
                         {/if}

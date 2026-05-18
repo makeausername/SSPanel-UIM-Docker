@@ -15,8 +15,6 @@ return static function (Slim\App $app): void {
     $app->get('/staff', App\Controllers\HomeController::class . ':staff');
     // Frontend locale switch
     $app->post('/locale', App\Controllers\LocaleController::class . ':switchLocale');
-    // Frontend theme switch
-    $app->post('/switch_theme_mode', App\Controllers\ThemeController::class . ':switchThemeMode');
     // Error Page
     $app->get('/404', App\Controllers\HomeController::class . ':notFound');
     $app->get('/405', App\Controllers\HomeController::class . ':methodNotAllowed');
@@ -34,8 +32,6 @@ return static function (Slim\App $app): void {
         $group->get('/', App\Controllers\UserController::class . ':index');
         // 签到
         $group->post('/checkin', App\Controllers\UserController::class . ':checkin');
-        // Frontend theme switch compatibility route
-        $group->post('/switch_theme_mode', App\Controllers\ThemeController::class . ':switchThemeMode');
         // 公告
         $group->get('/announcement', App\Controllers\UserController::class . ':announcement');
         // 文档

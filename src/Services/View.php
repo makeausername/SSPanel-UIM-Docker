@@ -46,7 +46,6 @@ final class View
         $smarty->assign('public_setting', Config::getPublicConfig());
         $smarty->assign('current_locale', Locale::current());
         $smarty->assign('frontend_locales', Locale::supportedLocales());
-        $smarty->assign('theme_mode', Theme::current($user));
         $smarty->assign('user', $user);
 
         return $smarty;
@@ -65,7 +64,6 @@ final class View
         $twig->addGlobal('public_setting', Config::getPublicConfig());
         $twig->addGlobal('current_locale', Locale::current());
         $twig->addGlobal('frontend_locales', Locale::supportedLocales());
-        $twig->addGlobal('theme_mode', Theme::current($user));
         $twig->addGlobal('user', $user);
 
         return $twig;
