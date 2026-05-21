@@ -77,15 +77,6 @@
                         </div>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                        {if $user->is_dark_mode}
-                            <a class="dropdown-item" hx-post="/user/switch_theme_mode" hx-swap="none">
-                                {trans key='user.nav.light_mode'}
-                            </a>
-                        {else}
-                            <a class="dropdown-item" hx-post="/user/switch_theme_mode" hx-swap="none">
-                                {trans key='user.nav.dark_mode'}
-                            </a>
-                        {/if}
                         <div class="dropdown-divider"></div>
                         <a href="/user/logout" class="dropdown-item">{trans key='user.nav.logout'}</a>
                     </div>
