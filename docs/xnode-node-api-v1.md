@@ -149,6 +149,14 @@ curl -sS -X POST https://panel.example.com/node/api/v1/heartbeat \
   -d '{"node_id":1001,"state":"running","config_hash":"stub-config-v1","last_error":""}'
 ```
 
+## V2Ray subscription compatibility
+
+`GET /sub/{token}/v2ray` can include XNode `vless://` Reality links alongside the existing legacy VMess lines. The `/v2ray` name is kept for client compatibility.
+
+XNode subscription links require safe runtime metadata in `node_runtimes.public_key` and `node_runtimes.short_ids_json`. If the runtime row is missing, the public key is empty, or the short IDs are malformed, the XNode link is skipped.
+
+The Reality private key never leaves the node and is not included in panel subscription output.
+
 ## Current data behavior
 
 - `/runtime` upserts safe runtime metadata in `node_runtimes`.
