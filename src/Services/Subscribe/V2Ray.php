@@ -41,9 +41,9 @@ final class V2Ray extends Base
                 $links .= $this->buildLegacyVmessUrl($user, $node_raw, $node_custom_config) . PHP_EOL;
             }
 
-            $vless_url = $this->buildXNodeVlessRealityUrl($user, $node_raw);
-            if ($vless_url !== null) {
-                $links .= $vless_url . PHP_EOL;
+            $xnodeUrl = $this->buildXNodeVlessRealityUrl($user, $node_raw);
+            if ($xnodeUrl !== null) {
+                $links .= $xnodeUrl . PHP_EOL;
             }
         }
 
