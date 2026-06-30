@@ -7,13 +7,16 @@ namespace App\Command;
 use App\Models\Config;
 use App\Models\Link;
 use App\Models\Node;
+use App\Models\NodeToken;
 use App\Models\User as ModelsUser;
+use App\Services\NodeEnrollmentService;
 use App\Utils\Hash;
 use App\Utils\Tools;
 use danielsreichenbach\GeoIP2Update\Client;
 use Exception;
 use Ramsey\Uuid\Uuid;
 use function count;
+use function ctype_digit;
 use function date;
 use function fgets;
 use function file_get_contents;
@@ -21,6 +24,7 @@ use function fwrite;
 use function in_array;
 use function json_decode;
 use function method_exists;
+use function rtrim;
 use function strtolower;
 use function trim;
 use const BASE_PATH;
@@ -47,6 +51,7 @@ final class Tool extends Command
 │ ├─ setTheme            - 为所有用户设置新的主题
 │ ├─ setLocale           - 为所有用户设置新的语言
 │ ├─ createAdmin         - 创建管理员帐号
+│ ├─ generateXNodeEnrollToken <node_id> [ttl_seconds] - Generate one-time XNode enroll token
 │ └─ updateGeoIP2        - 更新 GeoIP2 数据库
 
 EOL;
@@ -374,6 +379,73 @@ EOL;
         } else {
             echo '已取消创建' . PHP_EOL;
         }
+    }
+
+    public function generateXNodeEnrollToken(): void
+    {
+        if (count($this->argv) < 4 || count($this->argv) > 5) {
+            echo 'Usage: php xcat Tool generateXNodeEnrollToken <node_id> [ttl_seconds]' . PHP_EOL;
+            return;
+        }
+
+        $nodeIdArgument = trim((string) $this->argv[3]);
+
+        if (! ctype_digit($nodeIdArgument) || (int) $nodeIdArgument <= 0) {
+            echo 'node_id must be a positive integer.' . PHP_EOL;
+            return;
+        }
+
+        $ttlSeconds = 600;
+
+        if (isset($this->argv[4])) {
+            $ttlArgument = trim((string) $this->argv[4]);
+
+            if (! ctype_digit($ttlArgument) || (int) $ttlArgument <= 0) {
+                echo 'ttl_seconds must be a positive integer.' . PHP_EOL;
+                return;
+            }
+
+            $ttlSeconds = (int) $ttlArgument;
+        }
+
+        $nodeId = (int) $nodeIdArgument;
+        $node = (new Node())->where('id', $nodeId)->first();
+
+        if ($node === null) {
+            echo 'Node not found: ' . $nodeId . PHP_EOL;
+            return;
+        }
+
+        $token = NodeEnrollmentService::createEnrollTokenForNode($nodeId, $ttlSeconds);
+        $service = new NodeEnrollmentService();
+        $tokenRecord = (new NodeToken())
+            ->where('token_hash', $service->hashToken($token))
+            ->where('token_type', 'enroll')
+            ->where('node_id', $nodeId)
+            ->first();
+
+        if ($tokenRecord === null) {
+            echo 'Enroll token was created, but the saved token record could not be verified.' . PHP_EOL;
+            return;
+        }
+
+        $expiresAt = (int) $tokenRecord->expires_at;
+        $panelUrl = $_ENV['baseUrl'] ?? '';
+        $panelUrl = $panelUrl === '' ? 'https://panel.example.com' : trim((string) $panelUrl);
+        $panelUrl = rtrim($panelUrl, '/');
+        $payload = '{"node_id":' . $nodeId . ',"domain":"node1.example.com","agent_version":"dev","install_fingerprint":"manual-test","host":{"os":"linux","arch":"amd64"}}';
+
+        echo 'XNode enroll token created.' . PHP_EOL;
+        echo 'Node ID: ' . $nodeId . PHP_EOL;
+        echo 'Expires in: ' . $ttlSeconds . ' seconds' . PHP_EOL;
+        echo 'Expires at: ' . date('Y-m-d H:i:s T', $expiresAt) . ' (' . $expiresAt . ')' . PHP_EOL;
+        echo 'Token: ' . $token . PHP_EOL;
+        echo 'Use this token only once.' . PHP_EOL . PHP_EOL;
+        echo 'Example enroll request:' . PHP_EOL;
+        echo 'curl -X POST ' . $panelUrl . '/node/api/v1/enroll \\' . PHP_EOL;
+        echo '  -H "Authorization: Bearer <token above>" \\' . PHP_EOL;
+        echo '  -H "Content-Type: application/json" \\' . PHP_EOL;
+        echo "  -d '" . $payload . "'" . PHP_EOL;
     }
 
     public function updateGeoIP2(): void

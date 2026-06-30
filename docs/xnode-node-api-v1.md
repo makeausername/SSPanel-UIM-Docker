@@ -24,7 +24,7 @@ Authorization: Bearer xne_...
 
 The enroll token is stored in `node_tokens.token_hash` with `token_type = "enroll"`. It must match the enrolling `node_id`, must not be used or revoked, and must not be expired. After successful enrollment, the panel marks it with `used_at`.
 
-All other `/node/api/v1` endpoints require a node token:
+All other protected `/node/api/v1` endpoints require a node token:
 
 ```http
 Authorization: Bearer xn_...
@@ -34,15 +34,42 @@ Authorization: Bearer xn_...
 
 The node token is stored only as `node_tokens.token_hash` with `token_type = "node"`. The plaintext `node_token` is returned only once from `/enroll` and must be stored only on the node side.
 
-## Temporary enroll-token helper
+## Generate a temporary enroll token
 
-There is no admin UI or CLI wrapper yet. For local development, future admin or CLI code can call:
+Until an admin UI exists, operators can generate an enroll token from the existing `Tool` command:
 
-```php
-$token = App\Services\NodeEnrollmentService::createEnrollTokenForNode(1, 600);
+```bash
+php xcat Tool generateXNodeEnrollToken 1001
 ```
 
-Show the returned `xne_...` token once to the operator, then discard it. The helper stores only the token hash and sets `expires_at` to `time() + $ttlSeconds`.
+The optional second argument is the TTL in seconds. It defaults to `600`:
+
+```bash
+php xcat Tool generateXNodeEnrollToken 1001 600
+```
+
+In Docker installs, run it inside the app container:
+
+```bash
+docker compose exec app php xcat Tool generateXNodeEnrollToken 1001 600
+```
+
+The command validates that `node_id` is a positive integer and exists in the `node` table. It stores only the enroll token hash in `node_tokens.token_hash` with `token_type = "enroll"`, prints the plaintext `xne_...` token once, and sets `expires_at` to `time() + ttl_seconds`.
+
+Use the enroll token once:
+
+```bash
+curl -X POST https://panel.example.com/node/api/v1/enroll \
+  -H "Authorization: Bearer xne_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"node_id":1001,"domain":"node1.example.com","agent_version":"dev","install_fingerprint":"manual-test","host":{"os":"linux","arch":"amd64"}}'
+```
+
+After successful enrollment, `/enroll` returns the plaintext `node_token` once to the agent. The agent must use that token for protected endpoints:
+
+```http
+Authorization: Bearer xn_...
+```
 
 ## Current data behavior
 

@@ -100,11 +100,9 @@ final class NodeEnrollmentService
     }
 
     /**
-     * Temporary developer helper until an admin action or CLI wrapper exists.
+     * Temporary developer helper used by the CLI until an admin action exists.
      *
-     * Example future CLI/admin usage:
-     * $token = NodeEnrollmentService::createEnrollTokenForNode(1, 600);
-     * Show $token once to the operator, then discard it.
+     * Show the returned token once to the operator, then discard it.
      */
     public static function createEnrollTokenForNode(int $nodeId, ?int $ttlSeconds = 600): string
     {

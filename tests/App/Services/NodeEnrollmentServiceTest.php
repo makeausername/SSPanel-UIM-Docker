@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use function hash;
 use function strlen;
@@ -31,5 +32,16 @@ class NodeEnrollmentServiceTest extends TestCase
 
         $this->assertStringStartsWith('xn_', $token);
         $this->assertGreaterThan(32, strlen($token));
+    }
+
+    /**
+     * @covers App\Services\NodeEnrollmentService::createEnrollTokenForNode
+     */
+    public function testCreateEnrollTokenRejectsInvalidNodeId(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('node_id must be a positive integer.');
+
+        NodeEnrollmentService::createEnrollTokenForNode(0);
     }
 }
