@@ -34,9 +34,17 @@ Authorization: Bearer xn_...
 
 The node token is stored only as `node_tokens.token_hash` with `token_type = "node"`. The plaintext `node_token` is returned only once from `/enroll` and must be stored only on the node side.
 
-## Generate a temporary enroll token
+## Admin runtime status and enroll command
 
-Until an admin UI exists, operators can generate an enroll token from the existing `Tool` command:
+The admin node edit page (`GET /admin/node/{id}/edit`) now shows the latest XNode runtime metadata from `node_runtimes`, including state, last heartbeat, agent/core versions, config hash, last error, public key, and short IDs. If a node has not reported runtime data yet, the page shows it as unregistered / no heartbeat.
+
+Admins can generate a one-time enroll token and early integration command from the same edit page. The action returns PowerShell and Bash `xnode-agent --check` command text for current integration testing. The plaintext `xne_...` enroll token is stored only as `node_tokens.token_hash`, is shown only in that admin action response, defaults to a 10 minute TTL, and is consumed after successful enrollment.
+
+The final one-click `/node/install.sh` installer endpoint is not implemented in this step and remains future work.
+
+## Generate a temporary enroll token from CLI
+
+Operators can also generate an enroll token from the existing `Tool` command:
 
 ```bash
 php xcat Tool generateXNodeEnrollToken 1001

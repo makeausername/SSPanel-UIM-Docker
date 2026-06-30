@@ -221,7 +221,127 @@
                             </div>
                         </div>
                     </div>
+                    <div class="card mt-3">
+                        <div class="card-header card-header-light">
+                            <h3 class="card-title">XNode 状态</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">状态</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext">
+                                        {if $xnode_runtime}
+                                            {if $xnode_runtime->state}{$xnode_runtime->state|escape}{else}-{/if}
+                                        {else}
+                                            未注册 / 暂无心跳
+                                        {/if}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">最近心跳</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext">
+                                        {if $xnode_runtime_last_seen}{$xnode_runtime_last_seen|escape}{else}-{/if}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">Agent 版本</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext">
+                                        {if $xnode_runtime}{if $xnode_runtime->agent_version}{$xnode_runtime->agent_version|escape}{else}-{/if}{else}-{/if}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">Xray 版本</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext">
+                                        {if $xnode_runtime}{if $xnode_runtime->core_version}{$xnode_runtime->core_version|escape}{else}-{/if}{else}-{/if}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">Config Hash</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext text-break">
+                                        {if $xnode_runtime}{if $xnode_runtime->config_hash}{$xnode_runtime->config_hash|escape}{else}-{/if}{else}-{/if}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">Last Error</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext text-break">
+                                        {if $xnode_runtime}{if $xnode_runtime->last_error}{$xnode_runtime->last_error|escape}{else}-{/if}{else}-{/if}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">Public Key</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext text-break">
+                                        {if $xnode_runtime}{if $xnode_runtime->public_key}{$xnode_runtime->public_key|escape}{else}-{/if}{else}-{/if}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">Short ID</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext text-break">
+                                        {if $xnode_runtime}{if $xnode_runtime->short_ids_json}{$xnode_runtime->short_ids_json|escape}{else}-{/if}{else}-{/if}
+                                    </div>
+                                </div>
+                            </div>
+                            <button id="generate-xnode-install-command" class="btn btn-primary" type="button">
+                                <i class="icon ti ti-terminal"></i>
+                                生成 XNode 安装/联调命令
+                            </button>
+                        </div>
+                    </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal modal-blur fade" id="xnode-install-command-dialog" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">XNode 安装/联调命令</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    此 token 只显示一次，10 分钟内有效，用后即失效。
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Enroll Token</label>
+                    <div class="input-group">
+                        <input id="xnode-enroll-token" type="text" class="form-control" readonly>
+                        <button class="copy btn btn-primary" type="button" data-clipboard-target="#xnode-enroll-token">
+                            <i class="icon ti ti-copy"></i>
+                            复制
+                        </button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">有效期</label>
+                    <input id="xnode-token-expires" type="text" class="form-control" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">xnode-agent --check 命令</label>
+                    <textarea id="xnode-command-text" class="form-control font-monospace" rows="18" readonly></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn me-auto" data-bs-dismiss="modal">关闭</button>
+                <button class="copy btn btn-primary" type="button" data-clipboard-target="#xnode-command-text">
+                    <i class="icon ti ti-copy"></i>
+                    复制命令
+                </button>
             </div>
         </div>
     </div>
@@ -271,6 +391,43 @@
                     $('#fail-message').text(data.msg);
                     $('#fail-dialog').modal('show');
                 }
+            }
+        })
+    });
+
+    $("#generate-xnode-install-command").click(function () {
+        let button = $(this);
+        button.prop('disabled', true);
+
+        $.ajax({
+            url: '/admin/node/{$node->id}/xnode_install_command',
+            type: 'POST',
+            dataType: "json",
+            success: function (data) {
+                if (data.ret === 1) {
+                    let command = data.command || [
+                        'PowerShell:',
+                        data.powershell_check || '',
+                        '',
+                        'Bash:',
+                        data.bash_check || ''
+                    ].join("\n");
+
+                    $('#xnode-enroll-token').val(data.token || '');
+                    $('#xnode-token-expires').val((data.expires_in || 600) + ' 秒，expires_at=' + (data.expires_at || '-'));
+                    $('#xnode-command-text').val(command);
+                    $('#xnode-install-command-dialog').modal('show');
+                } else {
+                    $('#fail-message').text(data.msg);
+                    $('#fail-dialog').modal('show');
+                }
+            },
+            error: function () {
+                $('#fail-message').text('生成 XNode 命令失败');
+                $('#fail-dialog').modal('show');
+            },
+            complete: function () {
+                button.prop('disabled', false);
             }
         })
     });

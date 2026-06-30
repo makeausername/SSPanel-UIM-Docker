@@ -7,7 +7,10 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Models\Config;
 use App\Models\Node;
+use App\Models\NodeRuntime;
+use App\Models\NodeToken;
 use App\Services\I18n;
+use App\Services\NodeEnrollmentService;
 use App\Services\Notification;
 use App\Utils\Tools;
 use GuzzleHttp\Exception\GuzzleException;
@@ -16,10 +19,16 @@ use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Smarty\Exception as SmartyException;
 use Telegram\Bot\Exceptions\TelegramSDKException;
+use function date;
+use function explode;
+use function implode;
+use function is_string;
 use function json_decode;
 use function json_encode;
 use function round;
+use function rtrim;
 use function str_replace;
+use function time;
 use function trim;
 
 final class NodeController extends BaseController
@@ -165,6 +174,8 @@ final class NodeController extends BaseController
     public function edit(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $node = (new Node())->find($args['id']);
+        $runtime = (new NodeRuntime())->where('node_id', (int) $args['id'])->first();
+        $runtimeLastSeen = null;
 
         $dynamic_rate_config = json_decode($node->dynamic_rate_config);
         $node->max_rate = $dynamic_rate_config?->max_rate ?? 1;
@@ -175,9 +186,15 @@ final class NodeController extends BaseController
         $node->node_bandwidth = Tools::autoBytes($node->node_bandwidth);
         $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
 
+        if ($runtime !== null && (int) $runtime->last_seen > 0) {
+            $runtimeLastSeen = date('Y-m-d H:i:s', (int) $runtime->last_seen);
+        }
+
         return $response->write(
             $this->view()
                 ->assign('node', $node)
+                ->assign('xnode_runtime', $runtime)
+                ->assign('xnode_runtime_last_seen', $runtimeLastSeen)
                 ->assign('update_field', self::$update_field)
                 ->fetch('admin/node/edit.tpl')
         );
@@ -272,6 +289,56 @@ final class NodeController extends BaseController
         ]);
     }
 
+    public function generateXNodeInstallCommand(
+        ServerRequest $request,
+        Response $response,
+        array $args
+    ): ResponseInterface {
+        $nodeId = (int) $args['id'];
+        $node = (new Node())->where('id', $nodeId)->first();
+
+        if ($node === null) {
+            return $response->withStatus(404)->withJson([
+                'ret' => 0,
+                'msg' => 'Node not found',
+            ]);
+        }
+
+        $ttlSeconds = 600;
+        $token = NodeEnrollmentService::createEnrollTokenForNode($nodeId, $ttlSeconds);
+        $enrollmentService = new NodeEnrollmentService();
+        $tokenRecord = (new NodeToken())
+            ->where('token_hash', $enrollmentService->hashToken($token))
+            ->where('token_type', 'enroll')
+            ->where('node_id', $nodeId)
+            ->first();
+
+        if ($tokenRecord === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => 'Enroll token was created, but the saved token record could not be verified.',
+            ]);
+        }
+
+        $panelUrl = $this->resolvePanelUrl($request);
+        $nodeDomain = trim((string) $node->server);
+        $expiresAt = (int) ($tokenRecord->expires_at ?? (time() + $ttlSeconds));
+        $powershellCheck = $this->buildXNodePowerShellCheckCommand($panelUrl, $nodeId, $nodeDomain, $token);
+        $bashCheck = $this->buildXNodeBashCheckCommand($panelUrl, $nodeId, $nodeDomain, $token);
+        $command = "PowerShell:\n" . $powershellCheck . "\n\nBash:\n" . $bashCheck;
+
+        return $response->withJson([
+            'ret' => 1,
+            'msg' => 'XNode enroll token created',
+            'token' => $token,
+            'expires_in' => $ttlSeconds,
+            'expires_at' => $expiresAt,
+            'command' => $command,
+            'powershell_check' => $powershellCheck,
+            'bash_check' => $bashCheck,
+        ]);
+    }
+
     /**
      * 后台删除指定节点
      */
@@ -330,6 +397,75 @@ final class NodeController extends BaseController
             'ret' => 1,
             'msg' => '复制成功',
         ]);
+    }
+
+    private function resolvePanelUrl(ServerRequest $request): string
+    {
+        $panelUrl = $_ENV['baseUrl'] ?? '';
+
+        if (is_string($panelUrl) && trim($panelUrl) !== '') {
+            return rtrim(trim($panelUrl), '/');
+        }
+
+        $uri = $request->getUri();
+        $scheme = trim($request->getHeaderLine('X-Forwarded-Proto'));
+        $scheme = $scheme === '' ? $uri->getScheme() : trim(explode(',', $scheme)[0]);
+        $scheme = $scheme === '' ? 'https' : $scheme;
+        $authority = trim($request->getHeaderLine('X-Forwarded-Host'));
+        $authority = $authority === '' ? $uri->getAuthority() : trim(explode(',', $authority)[0]);
+        $authority = $authority === '' ? trim($request->getHeaderLine('Host')) : $authority;
+
+        if ($authority === '') {
+            return 'https://panel.example.com';
+        }
+
+        return rtrim($scheme . '://' . $authority, '/');
+    }
+
+    private function buildXNodePowerShellCheckCommand(
+        string $panelUrl,
+        int $nodeId,
+        string $nodeDomain,
+        string $token
+    ): string {
+        return implode("\n", [
+            '$env:XNODE_MOCK_PANEL=' . $this->quotePowerShellValue('false'),
+            '$env:PANEL_URL=' . $this->quotePowerShellValue($panelUrl),
+            '$env:NODE_ID=' . $this->quotePowerShellValue((string) $nodeId),
+            '$env:NODE_DOMAIN=' . $this->quotePowerShellValue($nodeDomain),
+            '$env:ENROLL_TOKEN=' . $this->quotePowerShellValue($token),
+            '$env:DATA_DIR=' . $this->quotePowerShellValue('.xnode-real\\data'),
+            '$env:LOG_DIR=' . $this->quotePowerShellValue('.xnode-real\\logs'),
+            '.\\bin\\xnode.exe --check',
+        ]);
+    }
+
+    private function buildXNodeBashCheckCommand(
+        string $panelUrl,
+        int $nodeId,
+        string $nodeDomain,
+        string $token
+    ): string {
+        return implode("\n", [
+            'export XNODE_MOCK_PANEL=' . $this->quoteShellValue('false'),
+            'export PANEL_URL=' . $this->quoteShellValue($panelUrl),
+            'export NODE_ID=' . $this->quoteShellValue((string) $nodeId),
+            'export NODE_DOMAIN=' . $this->quoteShellValue($nodeDomain),
+            'export ENROLL_TOKEN=' . $this->quoteShellValue($token),
+            'export DATA_DIR=' . $this->quoteShellValue('.xnode-real/data'),
+            'export LOG_DIR=' . $this->quoteShellValue('.xnode-real/logs'),
+            './xnode --check',
+        ]);
+    }
+
+    private function quotePowerShellValue(string $value): string
+    {
+        return "'" . str_replace("'", "''", $value) . "'";
+    }
+
+    private function quoteShellValue(string $value): string
+    {
+        return "'" . str_replace("'", "'\"'\"'", $value) . "'";
     }
 
     /**
