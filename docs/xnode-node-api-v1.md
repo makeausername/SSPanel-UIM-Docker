@@ -56,10 +56,41 @@ docker compose exec app php xcat Tool generateXNodeEnrollToken 1001 600
 
 The command validates that `node_id` is a positive integer and exists in the `node` table. It stores only the enroll token hash in `node_tokens.token_hash` with `token_type = "enroll"`, prints the plaintext `xne_...` token once, and sets `expires_at` to `time() + ttl_seconds`.
 
-Use the enroll token once:
+## Response envelope
+
+Normal responses use this JSON envelope:
+
+```json
+{
+  "ret": 1,
+  "data": {},
+  "request_id": "xn_..."
+}
+```
+
+Error responses use this JSON envelope:
+
+```json
+{
+  "ret": 0,
+  "msg": "Invalid node token",
+  "code": "AUTH_INVALID_TOKEN",
+  "request_id": "xn_..."
+}
+```
+
+## Curl examples
+
+Generate a one-time enroll token:
 
 ```bash
-curl -X POST https://panel.example.com/node/api/v1/enroll \
+docker compose exec app php xcat Tool generateXNodeEnrollToken 1001 600
+```
+
+Enroll the node with that token:
+
+```bash
+curl -sS -X POST https://panel.example.com/node/api/v1/enroll \
   -H "Authorization: Bearer xne_xxx" \
   -H "Content-Type: application/json" \
   -d '{"node_id":1001,"domain":"node1.example.com","agent_version":"dev","install_fingerprint":"manual-test","host":{"os":"linux","arch":"amd64"}}'
@@ -69,6 +100,45 @@ After successful enrollment, `/enroll` returns the plaintext `node_token` once t
 
 ```http
 Authorization: Bearer xn_...
+```
+
+Fetch the node config:
+
+```bash
+curl -sS https://panel.example.com/node/api/v1/config \
+  -H "Authorization: Bearer xn_xxx"
+```
+
+Fetch the users DTO list:
+
+```bash
+curl -sS https://panel.example.com/node/api/v1/users \
+  -H "Authorization: Bearer xn_xxx"
+```
+
+Fetch detect rules:
+
+```bash
+curl -sS https://panel.example.com/node/api/v1/detect-rules \
+  -H "Authorization: Bearer xn_xxx"
+```
+
+Report runtime metadata:
+
+```bash
+curl -sS -X POST https://panel.example.com/node/api/v1/runtime \
+  -H "Authorization: Bearer xn_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"node_id":1001,"agent_version":"dev","core_version":"","state":"running","public_key":"public-key-example","short_ids":["0123456789abcdef"],"capabilities":["vless","reality","vision"],"config_hash":"stub-config-v1","last_error":""}'
+```
+
+Send a heartbeat:
+
+```bash
+curl -sS -X POST https://panel.example.com/node/api/v1/heartbeat \
+  -H "Authorization: Bearer xn_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"node_id":1001,"state":"running","config_hash":"stub-config-v1","last_error":""}'
 ```
 
 ## Current data behavior

@@ -17,7 +17,6 @@ use function is_array;
 use function is_numeric;
 use function is_string;
 use function json_decode;
-use function time;
 use function trim;
 use function uniqid;
 
@@ -77,7 +76,7 @@ final class NodeApiV1Controller extends BaseController
      */
     public function users(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $data = (new NodeProfileService())->buildMockUsers(time(), $this->authenticatedNodeId($request));
+        $data = (new NodeProfileService())->buildMockUsers(0, $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
     }

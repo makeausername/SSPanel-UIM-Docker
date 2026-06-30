@@ -72,8 +72,7 @@ final class NodeProfileService
             if ($rules->isNotEmpty()) {
                 return $rules->map(static fn (DetectRule $rule): array => [
                     'id' => (int) $rule->id,
-                    'name' => $rule->name,
-                    'type' => (int) $rule->type,
+                    'type' => 'protocol',
                     'pattern' => $rule->regex,
                 ])->toArray();
             }
