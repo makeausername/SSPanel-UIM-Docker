@@ -41,12 +41,7 @@ final class V2Ray extends Base
                 $links .= $this->buildLegacyVmessUrl($user, $node_raw, $node_custom_config) . PHP_EOL;
             }
 
-            $runtime = $this->getRuntimeForNode((int) $node_raw->id);
-            if ($runtime === null) {
-                continue;
-            }
-
-            $vless_url = $this->buildXNodeVlessRealityUrl($user, $node_raw, $runtime);
+            $vless_url = $this->buildXNodeVlessRealityUrl($user, $node_raw);
             if ($vless_url !== null) {
                 $links .= $vless_url . PHP_EOL;
             }
@@ -122,12 +117,19 @@ final class V2Ray extends Base
         return null;
     }
 
-    private function buildXNodeVlessRealityUrl($user, $node, NodeRuntime $runtime): ?string
+    private function buildXNodeVlessRealityUrl($user, $node): ?string
     {
+        $runtime = $this->getRuntimeForNode((int) ($node->id ?? 0));
+        if ($runtime === null) {
+            return null;
+        }
+
         $uuid = isset($user->uuid) ? trim((string) $user->uuid) : '';
         $server = isset($node->server) ? trim((string) $node->server) : '';
         $public_key = isset($runtime->public_key) ? trim((string) $runtime->public_key) : '';
-        $short_id = $this->parseFirstShortId(is_string($runtime->short_ids_json ?? null) ? $runtime->short_ids_json : null);
+        $short_id = $this->parseFirstShortId(
+            is_string($runtime->short_ids_json ?? null) ? $runtime->short_ids_json : null
+        );
 
         if ($uuid === '' || $server === '' || $public_key === '' || $short_id === null) {
             return null;
@@ -153,6 +155,6 @@ final class V2Ray extends Base
 
     private function isValidShortId(string $shortId): bool
     {
-        return preg_match('/^[0-9a-f]{16}$/', $shortId) === 1;
+        return preg_match('/^(?:[0-9a-fA-F]{2}){1,8}$/', $shortId) === 1;
     }
 }

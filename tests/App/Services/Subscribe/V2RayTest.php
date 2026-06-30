@@ -4,13 +4,40 @@ declare(strict_types=1);
 
 namespace App\Services\Subscribe;
 
-use App\Models\NodeRuntime;
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\Schema\Blueprint;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use stdClass;
 
 class V2RayTest extends TestCase
 {
+    private Capsule $db;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->db = new Capsule();
+        $this->db->addConnection([
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+        ], 'default');
+        $this->db->setAsGlobal();
+        $this->db->bootEloquent();
+
+        $this->createSchema();
+        $this->seedV2RayConfig();
+    }
+
+    protected function tearDown(): void
+    {
+        Capsule::connection()->disconnect();
+
+        parent::tearDown();
+    }
+
     public function testLegacyVmessUrlMatchesExistingSubscriptionShape(): void
     {
         $user = $this->makeObject([
@@ -54,18 +81,105 @@ class V2RayTest extends TestCase
         ], $payload);
     }
 
+    public function testSort14NodeWithValidRuntimeEmitsVlessRealityLink(): void
+    {
+        $this->seedNode([
+            'id' => 1401,
+            'name' => 'XNode14',
+            'server' => 'sort14.example.com',
+            'sort' => 14,
+        ]);
+        $this->seedRuntime(1401, 'public-key-sort14', '["0123456789abcdef"]', 'hidden-private-key');
+
+        $content = (new V2Ray())->getContent($this->user());
+
+        $this->assertSame([
+            'vless://11111111-2222-3333-4444-555555555555@sort14.example.com:443?'
+            . 'encryption=none&security=reality&sni=www.microsoft.com&fp=chrome'
+            . '&pbk=public-key-sort14&sid=0123456789abcdef&type=tcp'
+            . '&flow=xtls-rprx-vision#XNode14',
+        ], $this->subscriptionLines($content));
+        $this->assertStringNotContainsString('vmess://', $content);
+        $this->assertStringNotContainsString('hidden-private-key', $content);
+        $this->assertStringNotContainsString('private_key', $content);
+    }
+
+    public function testSort11NodeKeepsLegacyVmessAndCanAlsoEmitVlessRealityLink(): void
+    {
+        $this->seedNode([
+            'id' => 1101,
+            'name' => 'Sort11Node',
+            'server' => 'sort11.example.com',
+            'sort' => 11,
+            'custom_config' => json_encode([
+                'offset_port_user' => 8443,
+                'security' => 'tls',
+                'network' => 'ws',
+                'path' => '/ray',
+                'host' => 'host.example.com',
+            ]),
+        ]);
+        $this->seedRuntime(1101, 'public-key-sort11', '["fedcba9876543210"]');
+
+        $lines = $this->subscriptionLines((new V2Ray())->getContent($this->user()));
+
+        $this->assertCount(2, $lines);
+        $this->assertStringStartsWith('vmess://', $lines[0]);
+        $payload = json_decode(base64_decode(substr($lines[0], 8)), true);
+        $this->assertSame('Sort11Node', $payload['ps']);
+        $this->assertSame('sort11.example.com', $payload['add']);
+        $this->assertSame(8443, $payload['port']);
+        $this->assertSame(
+            'vless://11111111-2222-3333-4444-555555555555@sort11.example.com:443?'
+            . 'encryption=none&security=reality&sni=www.microsoft.com&fp=chrome'
+            . '&pbk=public-key-sort11&sid=fedcba9876543210&type=tcp'
+            . '&flow=xtls-rprx-vision#Sort11Node',
+            $lines[1]
+        );
+    }
+
+    public function testMissingRuntimeSkipsVlessWithoutDroppingLegacyVmess(): void
+    {
+        $this->seedNode([
+            'id' => 1102,
+            'name' => 'LegacyOnly',
+            'server' => 'legacy-only.example.com',
+            'sort' => 11,
+        ]);
+
+        $lines = $this->subscriptionLines((new V2Ray())->getContent($this->user()));
+
+        $this->assertCount(1, $lines);
+        $this->assertStringStartsWith('vmess://', $lines[0]);
+        $this->assertStringNotContainsString('vless://', $lines[0]);
+    }
+
+    public function testMalformedShortIdsJsonSkipsVlessLinkFromSubscription(): void
+    {
+        $this->seedNode([
+            'id' => 1402,
+            'name' => 'MalformedRuntime',
+            'server' => 'malformed-runtime.example.com',
+            'sort' => 14,
+        ]);
+        $this->seedRuntime(1402, 'public-key-example', '{malformed-json');
+
+        $this->assertSame('', (new V2Ray())->getContent($this->user()));
+    }
+
     public function testBuildXNodeVlessRealityUrlEmitsExpectedLink(): void
     {
         $user = $this->makeObject([
             'uuid' => '11111111-2222-3333-4444-555555555555',
         ]);
         $node = $this->makeObject([
+            'id' => 2001,
             'name' => 'XNode Alpha',
             'server' => 'node.example.com',
         ]);
-        $runtime = $this->runtime('public+key/example=', '["0123456789abcdef"]');
+        $this->seedRuntime(2001, 'public+key/example=', '["0123456789abcdef"]');
 
-        $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [$user, $node, $runtime]);
+        $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [$user, $node]);
 
         $this->assertSame(
             'vless://11111111-2222-3333-4444-555555555555@node.example.com:443?'
@@ -76,22 +190,21 @@ class V2RayTest extends TestCase
         );
     }
 
-    public function testParseFirstShortIdReturnsFirstValidLowercaseHexId(): void
+    public function testParseFirstShortIdReturnsFirstValidEvenLengthHexId(): void
     {
         $shortId = $this->invokeV2Ray('parseFirstShortId', [
-            '["", "0123456789ABCDEF", "0123456789abcdef"]',
+            '["", "not-hex", "abcd", "0123456789abcdef"]',
         ]);
 
-        $this->assertSame('0123456789abcdef', $shortId);
+        $this->assertSame('abcd', $shortId);
     }
 
     public function testMalformedShortIdsJsonSkipsXNodeLink(): void
     {
-        $runtime = $this->runtime('public-key-example', '{malformed-json');
+        $this->seedRuntime(2002, 'public-key-example', '{malformed-json');
         $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [
             $this->makeObject(['uuid' => '11111111-2222-3333-4444-555555555555']),
-            $this->makeObject(['name' => 'XNode Alpha', 'server' => 'node.example.com']),
-            $runtime,
+            $this->makeObject(['id' => 2002, 'name' => 'XNode Alpha', 'server' => 'node.example.com']),
         ]);
 
         $this->assertNull($url);
@@ -99,11 +212,10 @@ class V2RayTest extends TestCase
 
     public function testEmptyPublicKeySkipsXNodeLink(): void
     {
-        $runtime = $this->runtime('   ', '["0123456789abcdef"]');
+        $this->seedRuntime(2003, '   ', '["0123456789abcdef"]');
         $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [
             $this->makeObject(['uuid' => '11111111-2222-3333-4444-555555555555']),
-            $this->makeObject(['name' => 'XNode Alpha', 'server' => 'node.example.com']),
-            $runtime,
+            $this->makeObject(['id' => 2003, 'name' => 'XNode Alpha', 'server' => 'node.example.com']),
         ]);
 
         $this->assertNull($url);
@@ -111,18 +223,116 @@ class V2RayTest extends TestCase
 
     public function testXNodeUrlDoesNotExposePrivateKeyData(): void
     {
-        $runtime = $this->runtime('public-key-example', '["0123456789abcdef"]');
-        $runtime->private_key = 'hidden-private-key';
+        $this->seedRuntime(2004, 'public-key-example', '["0123456789abcdef"]', 'hidden-private-key');
 
         $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [
             $this->makeObject(['uuid' => '11111111-2222-3333-4444-555555555555']),
-            $this->makeObject(['name' => 'XNode Alpha', 'server' => 'node.example.com']),
-            $runtime,
+            $this->makeObject(['id' => 2004, 'name' => 'XNode Alpha', 'server' => 'node.example.com']),
         ]);
 
         $this->assertIsString($url);
         $this->assertStringNotContainsString('hidden-private-key', $url);
         $this->assertStringNotContainsString('private_key', $url);
+    }
+
+    private function createSchema(): void
+    {
+        Capsule::schema()->create('config', static function (Blueprint $table): void {
+            $table->increments('id');
+            $table->string('item');
+            $table->text('value')->nullable();
+            $table->string('class')->default('');
+            $table->string('is_public')->default('0');
+            $table->string('type')->default('string');
+            $table->text('default')->nullable();
+            $table->text('mark')->nullable();
+        });
+
+        Capsule::schema()->create('node', static function (Blueprint $table): void {
+            $table->integer('id')->primary();
+            $table->string('name');
+            $table->integer('type')->default(1);
+            $table->string('server');
+            $table->text('custom_config')->nullable();
+            $table->integer('sort')->default(14);
+            $table->integer('node_class')->default(0);
+            $table->integer('node_group')->default(0);
+            $table->integer('node_bandwidth')->default(0);
+            $table->integer('node_bandwidth_limit')->default(0);
+        });
+
+        Capsule::schema()->create('node_runtimes', static function (Blueprint $table): void {
+            $table->increments('id');
+            $table->integer('node_id');
+            $table->string('public_key')->nullable();
+            $table->text('short_ids_json')->nullable();
+            $table->string('private_key')->nullable();
+        });
+    }
+
+    private function seedV2RayConfig(): void
+    {
+        Capsule::table('config')->insert([
+            'item' => 'enable_v2_sub',
+            'value' => '1',
+            'class' => '',
+            'is_public' => '0',
+            'type' => 'bool',
+            'default' => '',
+            'mark' => '',
+        ]);
+    }
+
+    private function seedNode(array $overrides): void
+    {
+        Capsule::table('node')->insert(array_merge([
+            'id' => 1001,
+            'name' => 'XNode',
+            'type' => 1,
+            'server' => 'node.example.com',
+            'custom_config' => '{}',
+            'sort' => 14,
+            'node_class' => 0,
+            'node_group' => 0,
+            'node_bandwidth' => 0,
+            'node_bandwidth_limit' => 0,
+        ], $overrides));
+    }
+
+    private function seedRuntime(
+        int $nodeId,
+        string $publicKey,
+        string $shortIdsJson,
+        ?string $privateKey = null
+    ): void {
+        Capsule::table('node_runtimes')->insert([
+            'node_id' => $nodeId,
+            'public_key' => $publicKey,
+            'short_ids_json' => $shortIdsJson,
+            'private_key' => $privateKey,
+        ]);
+    }
+
+    private function user(array $overrides = []): stdClass
+    {
+        return $this->makeObject(array_merge([
+            'uuid' => '11111111-2222-3333-4444-555555555555',
+            'class' => 1,
+            'node_group' => 0,
+            'is_admin' => false,
+        ], $overrides));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function subscriptionLines(string $content): array
+    {
+        if (trim($content) === '') {
+            return [];
+        }
+
+        return array_values(array_filter(explode(PHP_EOL, trim($content))));
     }
 
     private function invokeV2Ray(string $method, array $args): mixed
@@ -140,14 +350,5 @@ class V2RayTest extends TestCase
         }
 
         return $object;
-    }
-
-    private function runtime(string $publicKey, string $shortIdsJson): NodeRuntime
-    {
-        $runtime = new NodeRuntime();
-        $runtime->public_key = $publicKey;
-        $runtime->short_ids_json = $shortIdsJson;
-
-        return $runtime;
     }
 }
