@@ -8,13 +8,13 @@ use App\Controllers\BaseController;
 use App\Services\NodeEnrollmentService;
 use App\Services\NodeProfileService;
 use App\Services\NodeRuntimeService;
+use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
+use RuntimeException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
-use function array_key_exists;
 use function is_array;
 use function is_numeric;
-use function is_scalar;
 use function is_string;
 use function json_decode;
 use function time;
@@ -34,23 +34,27 @@ final class NodeApiV1Controller extends BaseController
             return $this->validationError($request, $response, 'Invalid JSON body.', 'invalid_json');
         }
 
-        if (! array_key_exists('node_id', $payload) || ! is_scalar($payload['node_id']) || $payload['node_id'] === '') {
-            return $this->validationError($request, $response, 'node_id is required.', 'missing_node_id');
-        }
+        $enrollmentService = new NodeEnrollmentService();
 
-        if (
-            ! array_key_exists('domain', $payload) ||
-            ! is_string($payload['domain']) ||
-            trim($payload['domain']) === ''
-        ) {
-            return $this->validationError($request, $response, 'domain is required.', 'missing_domain');
-        }
+        try {
+            $data = $enrollmentService->enroll($payload, $enrollmentService->extractBearerToken($request));
+        } catch (InvalidArgumentException $e) {
+            return $this->validationError(
+                $request,
+                $response,
+                $e->getMessage(),
+                $this->validationCodeForMessage($e->getMessage())
+            );
+        } catch (RuntimeException $e) {
+            $isMissingToken = $e->getMessage() === 'Missing enroll token.';
 
-        // TODO: Real enroll token validation and token persistence will be implemented next.
-        $data = (new NodeEnrollmentService())->buildStubEnrollment(
-            $payload['node_id'],
-            trim($payload['domain'])
-        );
+            return $this->authError(
+                $request,
+                $response,
+                $isMissingToken ? 'Missing enroll token' : 'Invalid enroll token',
+                $isMissingToken ? 'AUTH_MISSING_ENROLL_TOKEN' : 'AUTH_INVALID_ENROLL_TOKEN'
+            );
+        }
 
         return $this->success($request, $response, $data);
     }
@@ -60,23 +64,10 @@ final class NodeApiV1Controller extends BaseController
      */
     public function config(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $nodeId = $request->getQueryParam('node_id', 1001);
+        $nodeId = $this->authenticatedNodeId($request) ?? $this->queryNodeId($request, 1001);
+        $domain = $request->getQueryParam('domain', '');
 
-        if ($nodeId === null || $nodeId === '') {
-            $nodeId = 1001;
-        }
-
-        if (is_numeric($nodeId)) {
-            $nodeId = (int) $nodeId;
-        }
-
-        $domain = $request->getQueryParam('domain', 'node1.example.com');
-
-        if (! is_string($domain) || trim($domain) === '') {
-            $domain = 'node1.example.com';
-        }
-
-        $data = (new NodeProfileService())->buildDefaultConfig($nodeId, trim($domain));
+        $data = (new NodeProfileService())->buildDefaultConfig($nodeId, is_string($domain) ? trim($domain) : '');
 
         return $this->success($request, $response, $data);
     }
@@ -86,7 +77,7 @@ final class NodeApiV1Controller extends BaseController
      */
     public function users(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $data = (new NodeProfileService())->buildMockUsers(time());
+        $data = (new NodeProfileService())->buildMockUsers(time(), $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
     }
@@ -107,7 +98,7 @@ final class NodeApiV1Controller extends BaseController
     public function runtime(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $payload = $this->readJsonBody($request) ?? [];
-        $data = (new NodeRuntimeService())->acceptRuntime($payload);
+        $data = (new NodeRuntimeService())->acceptRuntime($payload, $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
     }
@@ -118,7 +109,7 @@ final class NodeApiV1Controller extends BaseController
     public function traffic(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $payload = $this->readJsonBody($request) ?? [];
-        $data = (new NodeRuntimeService())->acceptTraffic($payload);
+        $data = (new NodeRuntimeService())->acceptTraffic($payload, $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
     }
@@ -129,7 +120,7 @@ final class NodeApiV1Controller extends BaseController
     public function online(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $payload = $this->readJsonBody($request) ?? [];
-        $data = (new NodeRuntimeService())->acceptOnline($payload);
+        $data = (new NodeRuntimeService())->acceptOnline($payload, $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
     }
@@ -140,7 +131,7 @@ final class NodeApiV1Controller extends BaseController
     public function detectLog(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $payload = $this->readJsonBody($request) ?? [];
-        $data = (new NodeRuntimeService())->acceptDetectLog($payload);
+        $data = (new NodeRuntimeService())->acceptDetectLog($payload, $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
     }
@@ -151,7 +142,7 @@ final class NodeApiV1Controller extends BaseController
     public function heartbeat(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $payload = $this->readJsonBody($request) ?? [];
-        $data = (new NodeRuntimeService())->acceptHeartbeat($payload);
+        $data = (new NodeRuntimeService())->acceptHeartbeat($payload, $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
     }
@@ -169,14 +160,57 @@ final class NodeApiV1Controller extends BaseController
         ServerRequest $request,
         Response $response,
         string $message,
-        string $code
+        string $code,
+        int $status = 400
     ): ResponseInterface {
-        return $response->withJson([
+        return $response->withStatus($status)->withJson([
             'ret' => 0,
             'msg' => $message,
             'code' => $code,
             'request_id' => $this->getRequestId($request),
         ]);
+    }
+
+    private function authError(
+        ServerRequest $request,
+        Response $response,
+        string $message,
+        string $code
+    ): ResponseInterface {
+        return $this->validationError($request, $response, $message, $code, 401);
+    }
+
+    private function validationCodeForMessage(string $message): string
+    {
+        return match ($message) {
+            'node_id is required.' => 'missing_node_id',
+            'domain is required.' => 'missing_domain',
+            'node_id does not exist.' => 'invalid_node_id',
+            'domain does not match node.' => 'invalid_domain',
+            default => 'invalid_enroll_payload',
+        };
+    }
+
+    private function authenticatedNodeId(ServerRequest $request): ?int
+    {
+        $nodeId = $request->getAttribute('xnode_node_id');
+
+        if (is_numeric($nodeId) && (int) $nodeId > 0) {
+            return (int) $nodeId;
+        }
+
+        return null;
+    }
+
+    private function queryNodeId(ServerRequest $request, int $default): int
+    {
+        $nodeId = $request->getQueryParam('node_id', $default);
+
+        if ($nodeId === null || $nodeId === '' || ! is_numeric($nodeId)) {
+            return $default;
+        }
+
+        return (int) $nodeId;
     }
 
     private function getRequestId(ServerRequest $request): string

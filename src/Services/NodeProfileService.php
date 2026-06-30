@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\DetectRule;
+use App\Models\Node;
+use Throwable;
+use function is_string;
+use function trim;
+
 final class NodeProfileService
 {
     /**
@@ -11,6 +17,8 @@ final class NodeProfileService
      */
     public function buildDefaultConfig($nodeId, string $domain): array
     {
+        $domain = $this->resolveDomain($nodeId, $domain);
+
         return [
             'schema_version' => 1,
             'node_id' => $nodeId,
@@ -41,7 +49,7 @@ final class NodeProfileService
         ];
     }
 
-    public function buildMockUsers(int $updatedAt): array
+    public function buildMockUsers(int $updatedAt, ?int $nodeId = null): array
     {
         return [
             [
@@ -58,6 +66,21 @@ final class NodeProfileService
 
     public function buildMockDetectRules(): array
     {
+        try {
+            $rules = (new DetectRule())->get();
+
+            if ($rules->isNotEmpty()) {
+                return $rules->map(static fn (DetectRule $rule): array => [
+                    'id' => (int) $rule->id,
+                    'name' => $rule->name,
+                    'type' => (int) $rule->type,
+                    'pattern' => $rule->regex,
+                ])->toArray();
+            }
+        } catch (Throwable) {
+            // Keep the endpoint available during early XNode rollout even if detect_list is not migrated.
+        }
+
         return [
             [
                 'id' => 1,
@@ -65,5 +88,28 @@ final class NodeProfileService
                 'pattern' => 'bittorrent',
             ],
         ];
+    }
+
+    /**
+     * @param int|string $nodeId
+     */
+    private function resolveDomain($nodeId, string $domain): string
+    {
+        if (trim($domain) !== '') {
+            return trim($domain);
+        }
+
+        try {
+            $node = (new Node())->where('id', $nodeId)->first();
+            $server = $node?->getAttribute('server');
+
+            if (is_string($server) && trim($server) !== '') {
+                return trim($server);
+            }
+        } catch (Throwable) {
+            // Fallback keeps the skeleton config endpoint usable without widening data dependencies.
+        }
+
+        return 'node1.example.com';
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Middleware\Admin;
 use App\Middleware\Guest;
+use App\Middleware\NodeApiToken;
 use App\Middleware\NodeToken;
 use App\Middleware\User;
 use Slim\Routing\RouteCollectorProxy;
@@ -343,17 +344,18 @@ return static function (Slim\App $app): void {
     //    $group->post('/{action}', App\Controllers\Api\UserApiV1Controller::class . ':actionHandler');
     //})->add(new UserApi());
 
-    // XNode Node API V1 skeleton
+    // XNode Node API V1
     $app->group('/node/api/v1', static function (RouteCollectorProxy $group): void {
-        // TODO: Enable NodeApiToken middleware after token persistence and validation are implemented.
+        $nodeApiToken = new NodeApiToken();
+
         $group->post('/enroll', App\Controllers\Api\NodeApiV1Controller::class . ':enroll');
-        $group->get('/config', App\Controllers\Api\NodeApiV1Controller::class . ':config');
-        $group->get('/users', App\Controllers\Api\NodeApiV1Controller::class . ':users');
-        $group->get('/detect-rules', App\Controllers\Api\NodeApiV1Controller::class . ':detectRules');
-        $group->post('/runtime', App\Controllers\Api\NodeApiV1Controller::class . ':runtime');
-        $group->post('/traffic', App\Controllers\Api\NodeApiV1Controller::class . ':traffic');
-        $group->post('/online', App\Controllers\Api\NodeApiV1Controller::class . ':online');
-        $group->post('/detect-log', App\Controllers\Api\NodeApiV1Controller::class . ':detectLog');
-        $group->post('/heartbeat', App\Controllers\Api\NodeApiV1Controller::class . ':heartbeat');
+        $group->get('/config', App\Controllers\Api\NodeApiV1Controller::class . ':config')->add($nodeApiToken);
+        $group->get('/users', App\Controllers\Api\NodeApiV1Controller::class . ':users')->add($nodeApiToken);
+        $group->get('/detect-rules', App\Controllers\Api\NodeApiV1Controller::class . ':detectRules')->add($nodeApiToken);
+        $group->post('/runtime', App\Controllers\Api\NodeApiV1Controller::class . ':runtime')->add($nodeApiToken);
+        $group->post('/traffic', App\Controllers\Api\NodeApiV1Controller::class . ':traffic')->add($nodeApiToken);
+        $group->post('/online', App\Controllers\Api\NodeApiV1Controller::class . ':online')->add($nodeApiToken);
+        $group->post('/detect-log', App\Controllers\Api\NodeApiV1Controller::class . ':detectLog')->add($nodeApiToken);
+        $group->post('/heartbeat', App\Controllers\Api\NodeApiV1Controller::class . ':heartbeat')->add($nodeApiToken);
     });
 };
