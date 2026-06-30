@@ -343,14 +343,17 @@ return static function (Slim\App $app): void {
     //    $group->post('/{action}', App\Controllers\Api\UserApiV1Controller::class . ':actionHandler');
     //})->add(new UserApi());
 
-    // WebAPI V2(Aka Node API V1)
-    //$app->group('/node/api/v1', function (RouteCollectorProxy $group): void {
-    //    $group->put('/heartbeat', App\Controllers\Api\NodeApiV1Controller::class . ':getHeartbeat');
-    //    $group->get('/info', App\Controllers\Api\NodeApiV1Controller::class . ':getInfo');
-    //    $group->get('/user', App\Controllers\Api\NodeApiV1Controller::class . ':getUser');
-    //    $group->get('/detect_rule', App\Controllers\Api\NodeApiV1Controller::class . ':getDetectRule');
-    //    $group->post('/user/traffic', App\Controllers\Api\NodeApiV1Controller::class . ':addUserTraffic');
-    //    $group->post('/user/online_ip', App\Controllers\Api\NodeApiV1Controller::class . ':addUserOnlineIp');
-    //    $group->post('/user/detect_log', App\Controllers\Api\NodeApiV1Controller::class . ':addUserDetectLog');
-    //})->add(new NodeApi());
+    // XNode Node API V1 skeleton
+    $app->group('/node/api/v1', static function (RouteCollectorProxy $group): void {
+        // TODO: Enable NodeApiToken middleware after token persistence and validation are implemented.
+        $group->post('/enroll', App\Controllers\Api\NodeApiV1Controller::class . ':enroll');
+        $group->get('/config', App\Controllers\Api\NodeApiV1Controller::class . ':config');
+        $group->get('/users', App\Controllers\Api\NodeApiV1Controller::class . ':users');
+        $group->get('/detect-rules', App\Controllers\Api\NodeApiV1Controller::class . ':detectRules');
+        $group->post('/runtime', App\Controllers\Api\NodeApiV1Controller::class . ':runtime');
+        $group->post('/traffic', App\Controllers\Api\NodeApiV1Controller::class . ':traffic');
+        $group->post('/online', App\Controllers\Api\NodeApiV1Controller::class . ':online');
+        $group->post('/detect-log', App\Controllers\Api\NodeApiV1Controller::class . ':detectLog');
+        $group->post('/heartbeat', App\Controllers\Api\NodeApiV1Controller::class . ':heartbeat');
+    });
 };
