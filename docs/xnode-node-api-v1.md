@@ -124,6 +124,8 @@ curl -sS https://panel.example.com/node/api/v1/users \
   -H "Authorization: Bearer xn_xxx"
 ```
 
+`GET /node/api/v1/users` returns real eligible users for the authenticated node. The UUIDs in this response must match the UUIDs emitted in `/sub/{token}/v2ray` VLESS Reality links because xnode-agent uses them to render Xray `clients[].id`. The mock user UUID is retained only as a test/helper fallback and is no longer used for normal authenticated nodes.
+
 Fetch detect rules:
 
 ```bash
@@ -159,6 +161,7 @@ The Reality private key never leaves the node and is not included in panel subsc
 
 ## Current data behavior
 
+- `/users` reads real eligible users from the `user` table for the authenticated node and does not use the mock user for normal node-token requests.
 - `/runtime` upserts safe runtime metadata in `node_runtimes`.
 - `/heartbeat` updates safe runtime heartbeat metadata in `node_runtimes`.
 - `/traffic`, `/online`, and `/detect-log` are accepted-only for now.

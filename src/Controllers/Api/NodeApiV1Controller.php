@@ -76,7 +76,8 @@ final class NodeApiV1Controller extends BaseController
      */
     public function users(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $data = (new NodeProfileService())->buildMockUsers(0, $this->authenticatedNodeId($request));
+        $nodeId = $this->authenticatedNodeId($request);
+        $data = $nodeId === null ? [] : (new NodeProfileService())->buildUsersForNode($nodeId);
 
         return $this->success($request, $response, $data);
     }

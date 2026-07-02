@@ -4,10 +4,37 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\Schema\Blueprint;
 use PHPUnit\Framework\TestCase;
 
 class NodeProfileServiceTest extends TestCase
 {
+    private Capsule $db;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->db = new Capsule();
+        $this->db->addConnection([
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+        ], 'default');
+        $this->db->setAsGlobal();
+        $this->db->bootEloquent();
+
+        $this->createSchema();
+    }
+
+    protected function tearDown(): void
+    {
+        Capsule::connection()->disconnect();
+
+        parent::tearDown();
+    }
+
     public function testBuildDefaultConfigUsesAgentContractShape(): void
     {
         $config = (new NodeProfileService())->buildDefaultConfig(1001, 'node1.example.com');
@@ -39,6 +66,115 @@ class NodeProfileServiceTest extends TestCase
         ], $users);
     }
 
+    public function testBuildUsersForNodeReturnsOnlyEligibleRealUsers(): void
+    {
+        $this->seedNode([
+            'id' => 1001,
+            'node_class' => 2,
+            'node_group' => 3,
+        ]);
+        $this->seedUser([
+            'id' => 1,
+            'uuid' => '01b60f94-488b-4dc2-ab9b-73aafc48317a',
+            'class' => 2,
+            'node_group' => 3,
+            'transfer_enable' => 1000,
+            'u' => 100,
+            'd' => 200,
+        ]);
+        $this->seedUser([
+            'id' => 2,
+            'uuid' => '22222222-2222-2222-2222-222222222222',
+            'is_banned' => 1,
+            'class' => 2,
+            'node_group' => 3,
+            'transfer_enable' => 1000,
+        ]);
+        $this->seedUser([
+            'id' => 3,
+            'uuid' => '33333333-3333-3333-3333-333333333333',
+            'class' => 2,
+            'node_group' => 3,
+            'transfer_enable' => 300,
+            'u' => 100,
+            'd' => 200,
+        ]);
+        $this->seedUser([
+            'id' => 4,
+            'uuid' => '44444444-4444-4444-4444-444444444444',
+            'class' => 1,
+            'node_group' => 3,
+            'transfer_enable' => 1000,
+        ]);
+        $this->seedUser([
+            'id' => 5,
+            'uuid' => '55555555-5555-5555-5555-555555555555',
+            'class' => 2,
+            'node_group' => 4,
+            'transfer_enable' => 1000,
+        ]);
+        $this->seedUser([
+            'id' => 6,
+            'uuid' => '',
+            'class' => 2,
+            'node_group' => 3,
+            'transfer_enable' => 1000,
+        ]);
+
+        $users = (new NodeProfileService())->buildUsersForNode(1001);
+
+        $this->assertSame([
+            [
+                'id' => 1,
+                'uuid' => '01b60f94-488b-4dc2-ab9b-73aafc48317a',
+                'email' => 'user-1@panel.local',
+                'speed_limit_mbps' => 0,
+                'ip_limit' => 0,
+                'enabled' => true,
+                'updated_at' => 0,
+            ],
+        ], $users);
+        $this->assertNotContains('11111111-1111-1111-1111-111111111111', array_column($users, 'uuid'));
+    }
+
+    public function testBuildUsersForNodeAllowsAnyUserGroupForGroupZeroNode(): void
+    {
+        $this->seedNode([
+            'id' => 1002,
+            'node_group' => 0,
+        ]);
+        $this->seedUser([
+            'id' => 7,
+            'uuid' => '77777777-7777-7777-7777-777777777777',
+            'node_group' => 0,
+            'transfer_enable' => 1000,
+        ]);
+        $this->seedUser([
+            'id' => 8,
+            'uuid' => '88888888-8888-8888-8888-888888888888',
+            'node_group' => 8,
+            'transfer_enable' => 1000,
+        ]);
+
+        $users = (new NodeProfileService())->buildUsersForNode(1002);
+
+        $this->assertSame([
+            '77777777-7777-7777-7777-777777777777',
+            '88888888-8888-8888-8888-888888888888',
+        ], array_column($users, 'uuid'));
+    }
+
+    public function testBuildUsersForNodeReturnsEmptyArrayForMissingNode(): void
+    {
+        $this->seedUser([
+            'id' => 9,
+            'uuid' => '99999999-9999-9999-9999-999999999999',
+            'transfer_enable' => 1000,
+        ]);
+
+        $this->assertSame([], (new NodeProfileService())->buildUsersForNode(404));
+    }
+
     public function testBuildMockDetectRulesUsesAgentContractShape(): void
     {
         $rules = (new NodeProfileService())->buildMockDetectRules();
@@ -51,5 +187,48 @@ class NodeProfileServiceTest extends TestCase
             $this->assertSame('protocol', $rule['type']);
             $this->assertIsString($rule['pattern']);
         }
+    }
+
+    private function createSchema(): void
+    {
+        Capsule::schema()->create('node', static function (Blueprint $table): void {
+            $table->integer('id')->primary();
+            $table->integer('node_class')->default(0);
+            $table->integer('node_group')->default(0);
+        });
+
+        Capsule::schema()->create('user', static function (Blueprint $table): void {
+            $table->integer('id')->primary();
+            $table->string('uuid')->nullable();
+            $table->integer('is_banned')->default(0);
+            $table->integer('class')->default(0);
+            $table->integer('node_group')->default(0);
+            $table->integer('transfer_enable')->default(0);
+            $table->integer('u')->default(0);
+            $table->integer('d')->default(0);
+        });
+    }
+
+    private function seedNode(array $overrides): void
+    {
+        Capsule::table('node')->insert(array_merge([
+            'id' => 1001,
+            'node_class' => 0,
+            'node_group' => 0,
+        ], $overrides));
+    }
+
+    private function seedUser(array $overrides): void
+    {
+        Capsule::table('user')->insert(array_merge([
+            'id' => 1,
+            'uuid' => '00000000-0000-0000-0000-000000000000',
+            'is_banned' => 0,
+            'class' => 0,
+            'node_group' => 0,
+            'transfer_enable' => 0,
+            'u' => 0,
+            'd' => 0,
+        ], $overrides));
     }
 }

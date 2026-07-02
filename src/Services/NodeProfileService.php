@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\DetectRule;
 use App\Models\Node;
+use App\Models\User;
 use Throwable;
 use function is_string;
 use function trim;
@@ -62,6 +63,43 @@ final class NodeProfileService
                 'updated_at' => $updatedAt,
             ],
         ];
+    }
+
+    public function buildUsersForNode(int $nodeId): array
+    {
+        $node = (new Node())->find($nodeId);
+
+        if ($node === null) {
+            return [];
+        }
+
+        $query = (new User())
+            ->where('is_banned', 0)
+            ->whereNotNull('uuid')
+            ->where('uuid', '<>', '')
+            ->where('class', '>=', (int) $node->node_class)
+            ->whereRaw('transfer_enable > (u + d)');
+
+        $nodeGroup = (int) $node->node_group;
+        if ($nodeGroup !== 0) {
+            $query->where('node_group', $nodeGroup);
+        }
+
+        return $query
+            ->orderBy('id')
+            ->get(['id', 'uuid'])
+            ->filter(static fn (User $user): bool => trim((string) $user->uuid) !== '')
+            ->map(static fn (User $user): array => [
+                'id' => (int) $user->id,
+                'uuid' => trim((string) $user->uuid),
+                'email' => 'user-' . (int) $user->id . '@panel.local',
+                'speed_limit_mbps' => 0,
+                'ip_limit' => 0,
+                'enabled' => true,
+                'updated_at' => 0,
+            ])
+            ->values()
+            ->toArray();
     }
 
     public function buildMockDetectRules(): array
