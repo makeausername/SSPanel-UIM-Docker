@@ -66,12 +66,13 @@ class NodeProfileServiceTest extends TestCase
         ], $users);
     }
 
-    public function testBuildUsersForNodeReturnsOnlyEligibleRealUsers(): void
+    public function testBuildUsersForNodeReturnsEligibleRealUsersForRollout(): void
     {
         $subscriptionUserUuid = '01b60f94-488b-4dc2-ab9b-73aafc48317a';
+        $zeroTransferUserUuid = '33333333-3333-3333-3333-333333333333';
 
         $this->seedNode([
-            'id' => 1001,
+            'id' => 1,
             'node_class' => 2,
             'node_group' => 3,
         ]);
@@ -94,10 +95,10 @@ class NodeProfileServiceTest extends TestCase
         ]);
         $this->seedUser([
             'id' => 3,
-            'uuid' => '33333333-3333-3333-3333-333333333333',
+            'uuid' => $zeroTransferUserUuid,
             'class' => 2,
             'node_group' => 3,
-            'transfer_enable' => 300,
+            'transfer_enable' => 0,
             'u' => 100,
             'd' => 200,
         ]);
@@ -122,10 +123,17 @@ class NodeProfileServiceTest extends TestCase
             'node_group' => 3,
             'transfer_enable' => 1000,
         ]);
+        $this->seedUser([
+            'id' => 10,
+            'uuid' => '11111111-1111-1111-1111-111111111111',
+            'class' => 10,
+            'node_group' => 3,
+            'transfer_enable' => 1000,
+        ]);
 
         Capsule::connection()->enableQueryLog();
 
-        $users = (new NodeProfileService())->buildUsersForNode(1001);
+        $users = (new NodeProfileService())->buildUsersForNode(1);
 
         $this->assertSame([
             [
@@ -137,12 +145,23 @@ class NodeProfileServiceTest extends TestCase
                 'enabled' => true,
                 'updated_at' => 0,
             ],
+            [
+                'id' => 3,
+                'uuid' => $zeroTransferUserUuid,
+                'email' => 'user-3@panel.local',
+                'speed_limit_mbps' => 0,
+                'ip_limit' => 0,
+                'enabled' => true,
+                'updated_at' => 0,
+            ],
         ], $users);
         $this->assertSame($subscriptionUserUuid, $users[0]['uuid']);
+        $this->assertSame('user-1@panel.local', $users[0]['email']);
         $this->assertNotContains('11111111-1111-1111-1111-111111111111', array_column($users, 'uuid'));
 
         $executedSql = implode("\n", array_column(Capsule::connection()->getQueryLog(), 'query'));
         $this->assertSame(0, preg_match('/["`]uuid["`]\s*(?:<>|!=)\s*\?/', $executedSql), $executedSql);
+        $this->assertStringNotContainsString('transfer_enable', $executedSql);
     }
 
     public function testBuildUsersForNodeAllowsAnyUserGroupForGroupZeroNode(): void

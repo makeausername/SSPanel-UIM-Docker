@@ -9,10 +9,13 @@ use App\Models\Node;
 use App\Models\User;
 use Throwable;
 use function is_string;
+use function strcasecmp;
 use function trim;
 
 final class NodeProfileService
 {
+    private const MOCK_USER_UUID = '11111111-1111-1111-1111-111111111111';
+
     /**
      * @param int|string $nodeId
      */
@@ -55,7 +58,7 @@ final class NodeProfileService
         return [
             [
                 'id' => 10001,
-                'uuid' => '11111111-1111-1111-1111-111111111111',
+                'uuid' => self::MOCK_USER_UUID,
                 'email' => 'user-10001@panel.local',
                 'speed_limit_mbps' => 0,
                 'ip_limit' => 0,
@@ -73,21 +76,25 @@ final class NodeProfileService
             return [];
         }
 
-        $query = (new User())
-            ->where('is_banned', 0)
-            ->whereNotNull('uuid')
-            ->where('class', '>=', (int) $node->node_class)
-            ->whereRaw('transfer_enable > (u + d)');
-
+        $nodeClass = (int) $node->node_class;
         $nodeGroup = (int) $node->node_group;
-        if ($nodeGroup !== 0) {
-            $query->where('node_group', $nodeGroup);
-        }
 
-        return $query
+        return (new User())
             ->orderBy('id')
-            ->get(['id', 'uuid'])
-            ->filter(static fn (User $user): bool => trim((string) $user->uuid) !== '')
+            ->get(['id', 'uuid', 'is_banned', 'class', 'node_group'])
+            ->filter(static function (User $user) use ($nodeClass, $nodeGroup): bool {
+                $uuid = trim((string) $user->uuid);
+
+                if ($uuid === '' || strcasecmp($uuid, self::MOCK_USER_UUID) === 0) {
+                    return false;
+                }
+
+                if ((int) $user->is_banned !== 0 || (int) $user->class < $nodeClass) {
+                    return false;
+                }
+
+                return $nodeGroup === 0 || (int) $user->node_group === $nodeGroup;
+            })
             ->map(static fn (User $user): array => [
                 'id' => (int) $user->id,
                 'uuid' => trim((string) $user->uuid),
