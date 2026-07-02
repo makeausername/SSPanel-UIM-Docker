@@ -15,6 +15,7 @@ use function trim;
 final class NodeProfileService
 {
     private const MOCK_USER_UUID = '11111111-1111-1111-1111-111111111111';
+    private const DEFAULT_REALITY_SERVER_NAME = 'www.cloudflare.com';
 
     /**
      * @param int|string $nodeId
@@ -37,9 +38,9 @@ final class NodeProfileService
                 'port' => 443,
             ],
             'reality' => [
-                'target' => 'www.microsoft.com:443',
+                'target' => self::DEFAULT_REALITY_SERVER_NAME . ':443',
                 'server_names' => [
-                    'www.microsoft.com',
+                    self::DEFAULT_REALITY_SERVER_NAME,
                 ],
                 'fingerprint' => 'chrome',
             ],

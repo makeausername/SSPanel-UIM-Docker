@@ -95,7 +95,7 @@ class V2RayTest extends TestCase
 
         $this->assertSame([
             'vless://11111111-2222-3333-4444-555555555555@sort14.example.com:443?'
-            . 'encryption=none&security=reality&sni=www.microsoft.com&fp=chrome'
+            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
             . '&pbk=public-key-sort14&sid=0123456789abcdef&type=tcp'
             . '&flow=xtls-rprx-vision#XNode14',
         ], $this->subscriptionLines($content));
@@ -131,7 +131,7 @@ class V2RayTest extends TestCase
         $this->assertSame(8443, $payload['port']);
         $this->assertSame(
             'vless://11111111-2222-3333-4444-555555555555@sort11.example.com:443?'
-            . 'encryption=none&security=reality&sni=www.microsoft.com&fp=chrome'
+            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
             . '&pbk=public-key-sort11&sid=fedcba9876543210&type=tcp'
             . '&flow=xtls-rprx-vision#Sort11Node',
             $lines[1]
@@ -183,7 +183,7 @@ class V2RayTest extends TestCase
 
         $this->assertSame(
             'vless://11111111-2222-3333-4444-555555555555@node.example.com:443?'
-            . 'encryption=none&security=reality&sni=www.microsoft.com&fp=chrome'
+            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
             . '&pbk=public%2Bkey%2Fexample%3D&sid=0123456789abcdef&type=tcp'
             . '&flow=xtls-rprx-vision#XNode%20Alpha',
             $url

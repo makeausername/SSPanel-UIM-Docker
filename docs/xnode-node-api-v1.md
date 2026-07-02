@@ -117,6 +117,8 @@ curl -sS https://panel.example.com/node/api/v1/config \
   -H "Authorization: Bearer xn_xxx"
 ```
 
+During this rollout, the default Reality upstream is `www.cloudflare.com:443` and the default Reality SNI/server name is `www.cloudflare.com`. The Xray server config should render this as `realitySettings.target = "www.cloudflare.com:443"` and `realitySettings.serverNames = ["www.cloudflare.com"]`.
+
 Fetch the users DTO list:
 
 ```bash
@@ -158,6 +160,8 @@ curl -sS -X POST https://panel.example.com/node/api/v1/heartbeat \
 `GET /sub/{token}/v2ray` can include XNode `vless://` Reality links alongside the existing legacy VMess lines. The `/v2ray` name is kept for client compatibility.
 
 XNode subscription links require safe runtime metadata in `node_runtimes.public_key` and `node_runtimes.short_ids_json`. If the runtime row is missing, the public key is empty, or the short IDs are malformed, the XNode link is skipped.
+
+The VLESS Reality subscription SNI must match the node config `reality.server_names` / Xray `realitySettings.serverNames`. Xray client JSON uses `realitySettings.password` for the Reality public key, while share links use `pbk=<public key>`. Short IDs are emitted as `sid=<short id>`.
 
 The Reality private key never leaves the node and is not included in panel subscription output.
 

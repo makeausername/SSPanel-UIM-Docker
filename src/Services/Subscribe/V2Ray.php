@@ -23,6 +23,8 @@ use const PHP_QUERY_RFC3986;
 
 final class V2Ray extends Base
 {
+    private const DEFAULT_REALITY_SNI = 'www.cloudflare.com';
+
     public function getContent($user): string
     {
         $links = '';
@@ -138,7 +140,7 @@ final class V2Ray extends Base
         $query = [
             'encryption' => 'none',
             'security' => 'reality',
-            'sni' => 'www.microsoft.com',
+            'sni' => self::DEFAULT_REALITY_SNI,
             'fp' => 'chrome',
             'pbk' => $public_key,
             'sid' => $short_id,
