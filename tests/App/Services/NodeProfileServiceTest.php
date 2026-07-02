@@ -68,6 +68,8 @@ class NodeProfileServiceTest extends TestCase
 
     public function testBuildUsersForNodeReturnsOnlyEligibleRealUsers(): void
     {
+        $subscriptionUserUuid = '01b60f94-488b-4dc2-ab9b-73aafc48317a';
+
         $this->seedNode([
             'id' => 1001,
             'node_class' => 2,
@@ -75,7 +77,7 @@ class NodeProfileServiceTest extends TestCase
         ]);
         $this->seedUser([
             'id' => 1,
-            'uuid' => '01b60f94-488b-4dc2-ab9b-73aafc48317a',
+            'uuid' => $subscriptionUserUuid,
             'class' => 2,
             'node_group' => 3,
             'transfer_enable' => 1000,
@@ -121,12 +123,14 @@ class NodeProfileServiceTest extends TestCase
             'transfer_enable' => 1000,
         ]);
 
+        Capsule::connection()->enableQueryLog();
+
         $users = (new NodeProfileService())->buildUsersForNode(1001);
 
         $this->assertSame([
             [
                 'id' => 1,
-                'uuid' => '01b60f94-488b-4dc2-ab9b-73aafc48317a',
+                'uuid' => $subscriptionUserUuid,
                 'email' => 'user-1@panel.local',
                 'speed_limit_mbps' => 0,
                 'ip_limit' => 0,
@@ -134,7 +138,11 @@ class NodeProfileServiceTest extends TestCase
                 'updated_at' => 0,
             ],
         ], $users);
+        $this->assertSame($subscriptionUserUuid, $users[0]['uuid']);
         $this->assertNotContains('11111111-1111-1111-1111-111111111111', array_column($users, 'uuid'));
+
+        $executedSql = implode("\n", array_column(Capsule::connection()->getQueryLog(), 'query'));
+        $this->assertSame(0, preg_match('/["`]uuid["`]\s*(?:<>|!=)\s*\?/', $executedSql), $executedSql);
     }
 
     public function testBuildUsersForNodeAllowsAnyUserGroupForGroupZeroNode(): void

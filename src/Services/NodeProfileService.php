@@ -76,7 +76,6 @@ final class NodeProfileService
         $query = (new User())
             ->where('is_banned', 0)
             ->whereNotNull('uuid')
-            ->where('uuid', '<>', '')
             ->where('class', '>=', (int) $node->node_class)
             ->whereRaw('transfer_enable > (u + d)');
 
