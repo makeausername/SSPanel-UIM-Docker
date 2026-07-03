@@ -7,8 +7,10 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Models\Config;
 use App\Models\Node;
+use App\Models\NodeReportReceipt;
 use App\Models\NodeRuntime;
 use App\Models\NodeToken;
+use App\Models\OnlineLog;
 use App\Services\I18n;
 use App\Services\NodeEnrollmentService;
 use App\Services\Notification;
@@ -184,7 +186,7 @@ final class NodeController extends BaseController
     {
         $node = (new Node())->find($args['id']);
         $runtime = (new NodeRuntime())->where('node_id', (int) $args['id'])->first();
-        $runtimeLastSeen = null;
+        $nodeBandwidth = (int) $node->node_bandwidth;
 
         $dynamic_rate_config = json_decode($node->dynamic_rate_config);
         $node->max_rate = $dynamic_rate_config?->max_rate ?? 1;
@@ -196,15 +198,10 @@ final class NodeController extends BaseController
         $node->node_bandwidth = Tools::autoBytes($node->node_bandwidth);
         $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
 
-        if ($runtime !== null && (int) $runtime->last_seen > 0) {
-            $runtimeLastSeen = date('Y-m-d H:i:s', (int) $runtime->last_seen);
-        }
-
         return $response->write(
             $this->view()
                 ->assign('node', $node)
-                ->assign('xnode_runtime', $runtime)
-                ->assign('xnode_runtime_last_seen', $runtimeLastSeen)
+                ->assign('xnode_summary', $this->buildXNodeEditSummary($runtime, (int) $node->id, $nodeBandwidth))
                 ->assign('update_field', self::$update_field)
                 ->fetch('admin/node/edit.tpl')
         );
@@ -476,6 +473,107 @@ final class NodeController extends BaseController
     private function quoteShellValue(string $value): string
     {
         return "'" . str_replace("'", "'\"'\"'", $value) . "'";
+    }
+
+    private function buildXNodeEditSummary(?NodeRuntime $runtime, int $nodeId, int $nodeBandwidth): array
+    {
+        $status = $this->buildXNodeEditStatus($runtime);
+        $lastError = trim((string) ($runtime->last_error ?? ''));
+
+        return [
+            'status_text' => $status['text'],
+            'status_class' => $status['class'],
+            'last_seen' => $this->formatXNodeLastSeen((int) ($runtime->last_seen ?? 0)),
+            'agent_version' => $this->formatXNodeSummaryValue($runtime->agent_version ?? null),
+            'core_version' => $this->formatXNodeSummaryValue($runtime->core_version ?? null),
+            'online_count' => (int) (new OnlineLog())
+                ->where('node_id', $nodeId)
+                ->where('last_time', '>', time() - 90)
+                ->count(),
+            'node_bandwidth' => Tools::autoBytes($nodeBandwidth),
+            'latest_traffic_report' => $this->latestXNodeReportTime($nodeId, 'traffic'),
+            'latest_online_report' => $this->latestXNodeReportTime($nodeId, 'online'),
+            'latest_detect_log_report' => $this->latestXNodeReportTime($nodeId, 'detect-log'),
+            'report_counts' => [
+                'traffic' => $this->countXNodeReports($nodeId, 'traffic'),
+                'online' => $this->countXNodeReports($nodeId, 'online'),
+                'detect-log' => $this->countXNodeReports($nodeId, 'detect-log'),
+            ],
+            'last_error' => $lastError,
+        ];
+    }
+
+    private function buildXNodeEditStatus(?NodeRuntime $runtime): array
+    {
+        if ($runtime === null) {
+            return [
+                'text' => '离线',
+                'class' => 'bg-red text-red-fg',
+            ];
+        }
+
+        $state = strtolower(trim((string) ($runtime->state ?? '')));
+        $lastSeen = (int) ($runtime->last_seen ?? 0);
+        $failedStates = ['failed', 'stopped', 'error'];
+        $isOnline = $lastSeen > time() - 90 && ! in_array($state, $failedStates, true);
+
+        if ($isOnline) {
+            return [
+                'text' => '在线',
+                'class' => 'bg-green text-green-fg',
+            ];
+        }
+
+        if (in_array($state, ['running', 'configured'], true)) {
+            return [
+                'text' => '心跳超时',
+                'class' => 'bg-yellow text-yellow-fg',
+            ];
+        }
+
+        return [
+            'text' => '离线',
+            'class' => 'bg-red text-red-fg',
+        ];
+    }
+
+    private function latestXNodeReportTime(int $nodeId, string $reportType): string
+    {
+        $receipt = (new NodeReportReceipt())
+            ->where('node_id', $nodeId)
+            ->where('report_type', $reportType)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        return $this->formatXNodeTimestamp((int) ($receipt->created_at ?? 0));
+    }
+
+    private function countXNodeReports(int $nodeId, string $reportType): int
+    {
+        return (int) (new NodeReportReceipt())
+            ->where('node_id', $nodeId)
+            ->where('report_type', $reportType)
+            ->count();
+    }
+
+    private function formatXNodeTimestamp(int $timestamp): string
+    {
+        if ($timestamp <= 0) {
+            return '-';
+        }
+
+        return date('Y-m-d H:i:s', $timestamp);
+    }
+
+    private function formatXNodeSummaryValue(mixed $value): string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            return '-';
+        }
+
+        return $value;
     }
 
     private function buildXNodeRuntimeListFields(?NodeRuntime $runtime): array

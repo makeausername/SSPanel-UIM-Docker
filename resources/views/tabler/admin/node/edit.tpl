@@ -230,83 +230,61 @@
                             </div>
                         </div>
                     </div>
-                    <div class="card mt-3">
+                </div>
+                <div class="col-12">
+                    <div class="card">
                         <div class="card-header card-header-light">
-                            <h3 class="card-title">XNode 状态</h3>
+                            <h3 class="card-title">XNode 节点状态</h3>
+                            <div class="card-actions">
+                                <button id="generate-xnode-install-command" class="btn btn-primary" type="button">
+                                    <i class="icon ti ti-terminal"></i>
+                                    生成 XNode 安装/检查命令
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body">
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">状态</label>
-                                <div class="col">
-                                    <div class="form-control-plaintext">
-                                        {if $xnode_runtime}
-                                            {if $xnode_runtime->state}{$xnode_runtime->state|escape}{else}-{/if}
-                                        {else}
-                                            未注册 / 暂无心跳
-                                        {/if}
+                            <div class="datagrid">
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">运行状态</div>
+                                    <div class="datagrid-content">
+                                        <span class="badge {$xnode_summary.status_class|escape}">{$xnode_summary.status_text|escape}</span>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">最近心跳</label>
-                                <div class="col">
-                                    <div class="form-control-plaintext">
-                                        {if $xnode_runtime_last_seen}{$xnode_runtime_last_seen|escape}{else}-{/if}
-                                    </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">最近心跳</div>
+                                    <div class="datagrid-content">{$xnode_summary.last_seen|escape}</div>
                                 </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">Agent 版本</label>
-                                <div class="col">
-                                    <div class="form-control-plaintext">
-                                        {if $xnode_runtime}{if $xnode_runtime->agent_version}{$xnode_runtime->agent_version|escape}{else}-{/if}{else}-{/if}
-                                    </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">Agent</div>
+                                    <div class="datagrid-content">{$xnode_summary.agent_version|escape}</div>
                                 </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">Xray 版本</label>
-                                <div class="col">
-                                    <div class="form-control-plaintext">
-                                        {if $xnode_runtime}{if $xnode_runtime->core_version}{$xnode_runtime->core_version|escape}{else}-{/if}{else}-{/if}
-                                    </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">Xray</div>
+                                    <div class="datagrid-content">{$xnode_summary.core_version|escape}</div>
                                 </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">Config Hash</label>
-                                <div class="col">
-                                    <div class="form-control-plaintext text-break">
-                                        {if $xnode_runtime}{if $xnode_runtime->config_hash}{$xnode_runtime->config_hash|escape}{else}-{/if}{else}-{/if}
-                                    </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">当前在线 IP</div>
+                                    <div class="datagrid-content">{$xnode_summary.online_count|escape}</div>
                                 </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">Last Error</label>
-                                <div class="col">
-                                    <div class="form-control-plaintext text-break">
-                                        {if $xnode_runtime}{if $xnode_runtime->last_error}{$xnode_runtime->last_error|escape}{else}-{/if}{else}-{/if}
-                                    </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">节点已用流量</div>
+                                    <div class="datagrid-content">{$xnode_summary.node_bandwidth|escape}</div>
                                 </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">Public Key</label>
-                                <div class="col">
-                                    <div class="form-control-plaintext text-break">
-                                        {if $xnode_runtime}{if $xnode_runtime->public_key}{$xnode_runtime->public_key|escape}{else}-{/if}{else}-{/if}
-                                    </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">最近 Traffic 上报</div>
+                                    <div class="datagrid-content">{$xnode_summary.latest_traffic_report|escape}</div>
                                 </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">Short ID</label>
-                                <div class="col">
-                                    <div class="form-control-plaintext text-break">
-                                        {if $xnode_runtime}{if $xnode_runtime->short_ids_json}{$xnode_runtime->short_ids_json|escape}{else}-{/if}{else}-{/if}
-                                    </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">最近 Online 上报</div>
+                                    <div class="datagrid-content">{$xnode_summary.latest_online_report|escape}</div>
                                 </div>
+                                {if $xnode_summary.last_error !== ''}
+                                    <div class="datagrid-item">
+                                        <div class="datagrid-title">Last Error</div>
+                                        <div class="datagrid-content text-break">{$xnode_summary.last_error|escape}</div>
+                                    </div>
+                                {/if}
                             </div>
-                            <button id="generate-xnode-install-command" class="btn btn-primary" type="button">
-                                <i class="icon ti ti-terminal"></i>
-                                生成 XNode 安装/检查命令
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -436,9 +414,38 @@
         })
     });
 
+    let xnodeTokenExpireTimer = null;
+
+    function clearXNodeInstallCommand() {
+        if (xnodeTokenExpireTimer !== null) {
+            window.clearTimeout(xnodeTokenExpireTimer);
+            xnodeTokenExpireTimer = null;
+        }
+
+        $('#xnode-enroll-token').val('');
+        $('#xnode-token-expires').val('');
+        $('#xnode-command-text').val('');
+    }
+
+    function scheduleXNodeTokenClear(expiresIn) {
+        let seconds = Number(expiresIn || 600);
+
+        if (!Number.isFinite(seconds) || seconds <= 0) {
+            seconds = 600;
+        }
+
+        xnodeTokenExpireTimer = window.setTimeout(function () {
+            $('#xnode-enroll-token').val('');
+            $('#xnode-token-expires').val('已过期，请重新生成');
+            $('#xnode-command-text').val('');
+            xnodeTokenExpireTimer = null;
+        }, seconds * 1000);
+    }
+
     $("#generate-xnode-install-command").click(function () {
         let button = $(this);
         button.prop('disabled', true);
+        clearXNodeInstallCommand();
 
         $.ajax({
             url: '/admin/node/{$node->id}/xnode_install_command',
@@ -453,11 +460,13 @@
                         'Bash:',
                         data.bash_check || ''
                     ].join("\n");
+                    let expiresIn = data.expires_in || 600;
 
                     $('#xnode-enroll-token').val(data.token || '');
-                    $('#xnode-token-expires').val((data.expires_in || 600) + ' 秒，expires_at=' + (data.expires_at || '-'));
+                    $('#xnode-token-expires').val(expiresIn + ' 秒，expires_at=' + (data.expires_at || '-'));
                     $('#xnode-command-text').val(command);
                     $('#xnode-install-command-dialog').modal('show');
+                    scheduleXNodeTokenClear(expiresIn);
                 } else {
                     $('#fail-message').text(data.msg);
                     $('#fail-dialog').modal('show');
@@ -471,6 +480,10 @@
                 button.prop('disabled', false);
             }
         })
+    });
+
+    $("#xnode-install-command-dialog").on('hidden.bs.modal', function () {
+        clearXNodeInstallCommand();
     });
 
     $("#save-node").click(function () {
