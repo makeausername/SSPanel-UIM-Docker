@@ -60,7 +60,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
-          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, mysql, redis, bcmath, curl, fileinfo, json, openssl, pdo, posix, yaml, zip
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, pdo_sqlite, mysql, redis, bcmath, curl, fileinfo, json, openssl, pdo, posix, yaml, zip
           coverage: pcov
           tools: composer:v2
           

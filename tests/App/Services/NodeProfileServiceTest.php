@@ -44,7 +44,8 @@ class NodeProfileServiceTest extends TestCase
         $this->assertSame('node1.example.com', $config['domain']);
         $this->assertSame('vless-reality-vision', $config['profile']['name']);
         $this->assertSame('reality', $config['profile']['security']);
-        $this->assertSame(['www.microsoft.com'], $config['reality']['server_names']);
+        $this->assertSame('www.cloudflare.com:443', $config['reality']['target']);
+        $this->assertSame(['www.cloudflare.com'], $config['reality']['server_names']);
         $this->assertSame(30, $config['report']['heartbeat_interval_sec']);
         $this->assertArrayHasKey('config_hash', $config);
     }
