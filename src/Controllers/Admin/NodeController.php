@@ -21,15 +21,20 @@ use Smarty\Exception as SmartyException;
 use Telegram\Bot\Exceptions\TelegramSDKException;
 use function date;
 use function explode;
+use function htmlspecialchars;
 use function implode;
+use function in_array;
 use function is_string;
 use function json_decode;
 use function json_encode;
 use function round;
 use function rtrim;
+use function strtolower;
 use function str_replace;
 use function time;
 use function trim;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 
 final class NodeController extends BaseController
 {
@@ -41,6 +46,10 @@ final class NodeController extends BaseController
             'server' => '地址',
             'type' => '状态',
             'sort' => '类型',
+            'xnode_status' => 'XNode',
+            'xnode_last_seen' => '最近心跳',
+            'xnode_agent' => 'Agent',
+            'xnode_error' => '错误',
             'traffic_rate' => '倍率',
             'is_dynamic_rate' => '动态倍率',
             'dynamic_rate_type' => '动态倍率计算方式',
@@ -469,12 +478,83 @@ final class NodeController extends BaseController
         return "'" . str_replace("'", "'\"'\"'", $value) . "'";
     }
 
+    private function buildXNodeRuntimeListFields(?NodeRuntime $runtime): array
+    {
+        if ($runtime === null) {
+            return [
+                'xnode_status' => '-',
+                'xnode_last_seen' => '-',
+                'xnode_agent' => '-',
+                'xnode_error' => '-',
+            ];
+        }
+
+        $state = strtolower(trim((string) ($runtime->state ?? '')));
+        $lastSeen = (int) ($runtime->last_seen ?? 0);
+        $failedStates = ['failed', 'stopped', 'error'];
+        $isOnline = $lastSeen > time() - 90 && ! in_array($state, $failedStates, true);
+
+        if ($isOnline) {
+            $status = $this->buildXNodeStatusBadge('bg-green text-green-fg', '在线');
+        } elseif (in_array($state, ['running', 'configured'], true)) {
+            $status = $this->buildXNodeStatusBadge('bg-yellow text-yellow-fg', '心跳超时');
+        } else {
+            $status = $this->buildXNodeStatusBadge('bg-red text-red-fg', '离线');
+        }
+
+        return [
+            'xnode_status' => $status,
+            'xnode_last_seen' => $this->formatXNodeLastSeen($lastSeen),
+            'xnode_agent' => $this->formatXNodeTextValue($runtime->agent_version ?? null),
+            'xnode_error' => $this->formatXNodeTextValue($runtime->last_error ?? null),
+        ];
+    }
+
+    private function buildXNodeStatusBadge(string $className, string $text): string
+    {
+        return '<span class="badge ' . $className . '">' . $text . '</span>';
+    }
+
+    private function formatXNodeLastSeen(int $lastSeen): string
+    {
+        if ($lastSeen <= 0) {
+            return '-';
+        }
+
+        $secondsAgo = time() - $lastSeen;
+
+        if ($secondsAgo < 0) {
+            $secondsAgo = 0;
+        }
+
+        return date('Y-m-d H:i:s', $lastSeen) . ' (' . $secondsAgo . '秒前)';
+    }
+
+    private function formatXNodeTextValue(mixed $value): string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            return '-';
+        }
+
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
     /**
      * 后台节点页面 AJAX
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $nodes = (new Node())->orderBy('id', 'desc')->get();
+        $runtimeByNodeId = [];
+        $nodeIds = $nodes->pluck('id')->toArray();
+
+        if ($nodeIds !== []) {
+            foreach ((new NodeRuntime())->whereIn('node_id', $nodeIds)->get() as $runtime) {
+                $runtimeByNodeId[(int) $runtime->node_id] = $runtime;
+            }
+        }
 
         foreach ($nodes as $node) {
             $node->op = '<button class="btn btn-red" id="delete-node-' . $node->id . '" 
@@ -482,8 +562,13 @@ final class NodeController extends BaseController
             <button class="btn btn-orange" id="copy-node-' . $node->id . '" 
             onclick="copyNode(' . $node->id . ')">复制</button>
             <a class="btn btn-primary" href="/admin/node/' . $node->id . '/edit">编辑</a>';
+            $xnodeFields = $this->buildXNodeRuntimeListFields($runtimeByNodeId[(int) $node->id] ?? null);
             $node->type = $node->type();
             $node->sort = $node->sort();
+            $node->xnode_status = $xnodeFields['xnode_status'];
+            $node->xnode_last_seen = $xnodeFields['xnode_last_seen'];
+            $node->xnode_agent = $xnodeFields['xnode_agent'];
+            $node->xnode_error = $xnodeFields['xnode_error'];
             $node->is_dynamic_rate = $node->isDynamicRate();
             $node->dynamic_rate_type = $node->dynamicRateType();
             $node->node_bandwidth = round(Tools::bToGB($node->node_bandwidth), 2);
