@@ -30,6 +30,7 @@ final class AdminController extends BaseController
         $active_user = Analytics::getActiveUser();
         $total_node = Analytics::getTotalNode();
         $alive_node = Analytics::getAliveNode();
+        $xnode_runtimes = Analytics::getXNodeRuntimeSummary();
         $raw_today_traffic = Analytics::getRawGbTodayTrafficUsage();
         $raw_last_traffic = Analytics::getRawGbLastTrafficUsage();
         $raw_unused_traffic = Analytics::getRawGbUnusedTrafficUsage();
@@ -50,6 +51,7 @@ final class AdminController extends BaseController
                 ->assign('active_user', $active_user)
                 ->assign('total_node', $total_node)
                 ->assign('alive_node', $alive_node)
+                ->assign('xnode_runtimes', $xnode_runtimes)
                 ->assign('raw_today_traffic', $raw_today_traffic)
                 ->assign('raw_last_traffic', $raw_last_traffic)
                 ->assign('raw_unused_traffic', $raw_unused_traffic)

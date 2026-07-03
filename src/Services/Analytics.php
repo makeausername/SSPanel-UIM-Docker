@@ -6,10 +6,16 @@ namespace App\Services;
 
 use App\Models\HourlyUsage;
 use App\Models\Node;
+use App\Models\NodeRuntime;
 use App\Models\Paylist;
 use App\Models\User;
 use App\Utils\Tools;
 use function array_fill;
+use function array_map;
+use function array_merge;
+use function array_unique;
+use function array_values;
+use function count;
 use function date;
 use function floatval;
 use function is_null;
@@ -125,12 +131,89 @@ final class Analytics
 
     public static function getTotalNode(): int
     {
-        return (new Node())->where('node_heartbeat', '>', 0)->count();
+        return count(array_unique(array_merge(
+            self::getLegacyTotalNodeIds(),
+            self::getXNodeTotalNodeIds()
+        )));
     }
 
     public static function getAliveNode(): int
     {
-        return (new Node())->where('node_heartbeat', '>', time() - 90)->count();
+        return count(array_unique(array_merge(
+            self::getLegacyAliveNodeIds(),
+            self::getXNodeAliveNodeIds()
+        )));
+    }
+
+    public static function getXNodeTotalNode(): int
+    {
+        return count(self::getXNodeTotalNodeIds());
+    }
+
+    public static function getXNodeAliveNode(): int
+    {
+        return count(self::getXNodeAliveNodeIds());
+    }
+
+    public static function getXNodeRuntimeSummary(int $limit = 10): array
+    {
+        $runtimes = (new NodeRuntime())
+            ->join('node', 'node.id', '=', 'node_runtimes.node_id')
+            ->orderBy('node_runtimes.last_seen', 'desc')
+            ->limit($limit)
+            ->get([
+                'node_runtimes.node_id',
+                'node.name',
+                'node.server',
+                'node_runtimes.state',
+                'node_runtimes.last_seen',
+                'node_runtimes.last_error',
+                'node_runtimes.agent_version',
+                'node_runtimes.core_version',
+            ]);
+
+        foreach ($runtimes as $runtime) {
+            $lastSeen = (int) ($runtime->last_seen ?? 0);
+            $runtime->last_seen_formatted = $lastSeen > 0 ? date('Y-m-d H:i:s', $lastSeen) : '-';
+        }
+
+        return $runtimes->all();
+    }
+
+    private static function getLegacyTotalNodeIds(): array
+    {
+        return self::toIntList((new Node())->where('node_heartbeat', '>', 0)->pluck('id')->toArray());
+    }
+
+    private static function getLegacyAliveNodeIds(): array
+    {
+        return self::toIntList((new Node())->where('node_heartbeat', '>', time() - 90)->pluck('id')->toArray());
+    }
+
+    private static function getXNodeTotalNodeIds(): array
+    {
+        return self::toIntList((new NodeRuntime())
+            ->join('node', 'node.id', '=', 'node_runtimes.node_id')
+            ->pluck('node_runtimes.node_id')
+            ->toArray());
+    }
+
+    private static function getXNodeAliveNodeIds(): array
+    {
+        return self::toIntList((new NodeRuntime())
+            ->join('node', 'node.id', '=', 'node_runtimes.node_id')
+            ->where('node_runtimes.last_seen', '>', time() - 90)
+            ->where(static function ($query): void {
+                $query->whereNull('node_runtimes.state')
+                    ->orWhere('node_runtimes.state', '!=', 'failed');
+            })
+            ->pluck('node_runtimes.node_id')
+            ->toArray());
+    }
+
+    private static function toIntList(array $values): array
+    {
+        return array_values(array_unique(array_map('intval', $values)));
     }
 
     public static function getInactiveUser(): int
