@@ -309,6 +309,83 @@
                             </button>
                         </div>
                     </div>
+                    <div class="card mt-3">
+                        <div class="card-header card-header-light">
+                            <h3 class="card-title">XNode 运行摘要</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">当前在线 IP</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext">
+                                        {$xnode_summary['online_ip_count']|escape}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">Traffic 上报</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext">
+                                        总数 {$xnode_summary['reports']['traffic']['count']|escape} / 最近 {$xnode_summary['reports']['traffic']['latest_at']|escape}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">Online 上报</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext">
+                                        总数 {$xnode_summary['reports']['online']['count']|escape} / 最近 {$xnode_summary['reports']['online']['latest_at']|escape}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">Detect 上报</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext">
+                                        总数 {$xnode_summary['reports']['detect_log']['count']|escape} / 最近 {$xnode_summary['reports']['detect_log']['latest_at']|escape}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">节点已用流量</label>
+                                <div class="col">
+                                    <div class="form-control-plaintext">
+                                        {$xnode_summary['node_bandwidth']|escape}
+                                        <span class="text-muted">({$xnode_summary['node_bandwidth_raw']|escape} B)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-0 row">
+                                <label class="form-label col-3 col-form-label">最近在线 IP</label>
+                                <div class="col">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-vcenter mb-0">
+                                            <thead>
+                                            <tr>
+                                                <th>user_id</th>
+                                                <th>ip</th>
+                                                <th>last_time</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            {foreach $xnode_summary['online_ips'] as $online_ip}
+                                                <tr>
+                                                    <td>{$online_ip['user_id']|escape}</td>
+                                                    <td class="text-break">{$online_ip['ip']|escape}</td>
+                                                    <td>{$online_ip['last_time']|escape}</td>
+                                                </tr>
+                                            {foreachelse}
+                                                <tr>
+                                                    <td colspan="3" class="text-muted">-</td>
+                                                </tr>
+                                            {/foreach}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -7,8 +7,10 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Models\Config;
 use App\Models\Node;
+use App\Models\NodeReportReceipt;
 use App\Models\NodeRuntime;
 use App\Models\NodeToken;
+use App\Models\OnlineLog;
 use App\Services\I18n;
 use App\Services\NodeEnrollmentService;
 use App\Services\Notification;
@@ -182,9 +184,11 @@ final class NodeController extends BaseController
      */
     public function edit(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $node = (new Node())->find($args['id']);
-        $runtime = (new NodeRuntime())->where('node_id', (int) $args['id'])->first();
+        $nodeId = (int) $args['id'];
+        $node = (new Node())->find($nodeId);
+        $runtime = (new NodeRuntime())->where('node_id', $nodeId)->first();
         $runtimeLastSeen = null;
+        $nodeBandwidthRaw = (int) $node->node_bandwidth;
 
         $dynamic_rate_config = json_decode($node->dynamic_rate_config);
         $node->max_rate = $dynamic_rate_config?->max_rate ?? 1;
@@ -193,21 +197,111 @@ final class NodeController extends BaseController
         $node->min_rate_time = $dynamic_rate_config?->min_rate_time ?? 3;
         $node->sort = (int) $node->sort;
 
-        $node->node_bandwidth = Tools::autoBytes($node->node_bandwidth);
+        $node->node_bandwidth = Tools::autoBytes($nodeBandwidthRaw);
         $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
 
         if ($runtime !== null && (int) $runtime->last_seen > 0) {
             $runtimeLastSeen = date('Y-m-d H:i:s', (int) $runtime->last_seen);
         }
 
+        $xnodeSummary = $this->buildXNodeSummary($nodeId, $runtime, $nodeBandwidthRaw);
+
         return $response->write(
             $this->view()
                 ->assign('node', $node)
                 ->assign('xnode_runtime', $runtime)
                 ->assign('xnode_runtime_last_seen', $runtimeLastSeen)
+                ->assign('xnode_summary', $xnodeSummary)
                 ->assign('update_field', self::$update_field)
                 ->fetch('admin/node/edit.tpl')
         );
+    }
+
+    private function buildXNodeSummary(int $nodeId, ?NodeRuntime $runtime, int $nodeBandwidthRaw): array
+    {
+        $onlineSince = time() - 90;
+        $onlineRows = (new OnlineLog())
+            ->where('node_id', $nodeId)
+            ->orderBy('last_time', 'desc')
+            ->limit(10)
+            ->get();
+        $onlineIps = [];
+
+        foreach ($onlineRows as $onlineRow) {
+            $onlineIps[] = [
+                'user_id' => (string) $onlineRow->user_id,
+                'ip' => $onlineRow->ip(),
+                'last_time' => $this->formatXNodeSummaryTimestamp($onlineRow->last_time ?? null),
+            ];
+        }
+
+        return [
+            'runtime' => [
+                'state' => $this->formatXNodeSummaryValue($runtime->state ?? null),
+                'last_seen' => $this->formatXNodeSummaryTimestamp($runtime->last_seen ?? null),
+                'last_error' => $this->formatXNodeSummaryValue($runtime->last_error ?? null),
+                'agent_version' => $this->formatXNodeSummaryValue($runtime->agent_version ?? null),
+                'core_version' => $this->formatXNodeSummaryValue($runtime->core_version ?? null),
+            ],
+            'reports' => [
+                'traffic' => $this->buildXNodeReportSummary($nodeId, 'traffic'),
+                'online' => $this->buildXNodeReportSummary($nodeId, 'online'),
+                'detect_log' => $this->buildXNodeReportSummary($nodeId, 'detect-log'),
+            ],
+            'online_ip_count' => (int) (new OnlineLog())
+                ->where('node_id', $nodeId)
+                ->where('last_time', '>', $onlineSince)
+                ->count(),
+            'online_ips' => $onlineIps,
+            'node_bandwidth' => Tools::autoBytes($nodeBandwidthRaw),
+            'node_bandwidth_raw' => (string) $nodeBandwidthRaw,
+        ];
+    }
+
+    private function buildXNodeReportSummary(int $nodeId, string $reportType): array
+    {
+        $latest = (new NodeReportReceipt())
+            ->where('node_id', $nodeId)
+            ->where('report_type', $reportType)
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        return [
+            'count' => (int) (new NodeReportReceipt())
+                ->where('node_id', $nodeId)
+                ->where('report_type', $reportType)
+                ->count(),
+            'latest' => $latest === null ? null : [
+                'report_id' => $this->formatXNodeSummaryValue($latest->report_id ?? null),
+                'created_at' => $this->formatXNodeSummaryTimestamp($latest->created_at ?? null),
+                'period_start' => $this->formatXNodeSummaryTimestamp($latest->period_start ?? null),
+                'period_end' => $this->formatXNodeSummaryTimestamp($latest->period_end ?? null),
+            ],
+            'latest_at' => $this->formatXNodeSummaryTimestamp($latest->created_at ?? null),
+        ];
+    }
+
+    private function formatXNodeSummaryTimestamp(mixed $value): string
+    {
+        $timestamp = (int) ($value ?? 0);
+
+        if ($timestamp <= 0) {
+            return '-';
+        }
+
+        return date('Y-m-d H:i:s', $timestamp);
+    }
+
+    private function formatXNodeSummaryValue(mixed $value): string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            return '-';
+        }
+
+        return $value;
     }
 
     /**
