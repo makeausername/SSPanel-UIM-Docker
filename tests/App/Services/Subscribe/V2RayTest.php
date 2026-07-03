@@ -104,6 +104,29 @@ class V2RayTest extends TestCase
         $this->assertStringNotContainsString('private_key', $content);
     }
 
+    public function testSort15NodeWithValidRuntimeEmitsVlessRealityLink(): void
+    {
+        $this->seedNode([
+            'id' => 1501,
+            'name' => 'XNode15',
+            'server' => 'sort15.example.com',
+            'sort' => 15,
+        ]);
+        $this->seedRuntime(1501, 'public-key-sort15', '["0123456789abcdef"]', 'hidden-private-key');
+
+        $content = (new V2Ray())->getContent($this->user());
+
+        $this->assertSame([
+            'vless://11111111-2222-3333-4444-555555555555@sort15.example.com:443?'
+            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
+            . '&pbk=public-key-sort15&sid=0123456789abcdef&type=tcp'
+            . '&flow=xtls-rprx-vision#XNode15',
+        ], $this->subscriptionLines($content));
+        $this->assertStringNotContainsString('vmess://', $content);
+        $this->assertStringNotContainsString('hidden-private-key', $content);
+        $this->assertStringNotContainsString('private_key', $content);
+    }
+
     public function testSort11NodeKeepsLegacyVmessAndCanAlsoEmitVlessRealityLink(): void
     {
         $this->seedNode([

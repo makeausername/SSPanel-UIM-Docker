@@ -71,11 +71,20 @@
                                 <div class="col">
                                     <select id="sort" class="col form-select" value="{$node->sort}">
                                         <option value="14" {if $node->sort === 14}selected{/if}>Trojan</option>
+                                        <option value="15" {if $node->sort === 15}selected{/if}>XNode / VLESS Reality Vision</option>
                                         <option value="11" {if $node->sort === 11}selected{/if}>Vmess</option>
                                         <option value="2" {if $node->sort === 2}selected{/if}>TUIC</option>
                                         <option value="1" {if $node->sort === 1}selected{/if}>Shadowsocks2022</option>
                                         <option value="0" {if $node->sort === 0}selected{/if}>Shadowsocks</option>
                                     </select>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <div class="col offset-3">
+                                    <button id="apply-xnode-reality-template" class="btn btn-outline-primary btn-sm" type="button">
+                                        <i class="icon ti ti-wand"></i>
+                                        使用 XNode Reality 模板
+                                    </button>
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
@@ -296,7 +305,7 @@
                             </div>
                             <button id="generate-xnode-install-command" class="btn btn-primary" type="button">
                                 <i class="icon ti ti-terminal"></i>
-                                生成 XNode 安装/联调命令
+                                生成 XNode 安装/检查命令
                             </button>
                         </div>
                     </div>
@@ -310,7 +319,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">XNode 安装/联调命令</h5>
+                <h5 class="modal-title">XNode 安装/检查命令</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -360,6 +369,38 @@
     };
     const editor = new JSONEditor(container, options);
     editor.set({$node->custom_config})
+
+    const xnodeRealityTemplate = {
+        xnode: {
+            enabled: true,
+            profile: 'vless-reality-vision',
+            port: 443,
+            network: 'raw',
+            security: 'reality',
+            flow: 'xtls-rprx-vision',
+            sni: 'www.cloudflare.com',
+            fingerprint: 'chrome'
+        }
+    };
+
+    function fillIfEmpty(selector, value) {
+        let input = $(selector);
+        if (String(input.val() || '').trim() === '') {
+            input.val(value);
+        }
+    }
+
+    $("#apply-xnode-reality-template").click(function () {
+        $('#sort').val('15');
+        fillIfEmpty('#traffic_rate', '1');
+        fillIfEmpty('#node_class', '0');
+        fillIfEmpty('#node_group', '0');
+        fillIfEmpty('#node_speedlimit', '0');
+        fillIfEmpty('#node_bandwidth_limit', '0');
+        fillIfEmpty('#bandwidthlimit_resetday', '0');
+        $('#is_dynamic_rate').prop('checked', false);
+        editor.set(xnodeRealityTemplate);
+    });
 
     $("#reset-bandwidth").click(function () {
         $.ajax({

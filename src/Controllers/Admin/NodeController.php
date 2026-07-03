@@ -128,7 +128,7 @@ final class NodeController extends BaseController
 
         $node->node_speedlimit = $request->getParam('node_speedlimit');
         $node->type = $request->getParam('type') === 'true' ? 1 : 0;
-        $node->sort = $request->getParam('sort');
+        $node->sort = (int) $request->getParam('sort');
         $node->node_class = $request->getParam('node_class');
         $node->node_bandwidth_limit = Tools::gbToB($request->getParam('node_bandwidth_limit'));
         $node->bandwidthlimit_resetday = $request->getParam('bandwidthlimit_resetday');
@@ -182,6 +182,7 @@ final class NodeController extends BaseController
         $node->max_rate_time = $dynamic_rate_config?->max_rate_time ?? 22;
         $node->min_rate = $dynamic_rate_config?->min_rate ?? 1;
         $node->min_rate_time = $dynamic_rate_config?->min_rate_time ?? 3;
+        $node->sort = (int) $node->sort;
 
         $node->node_bandwidth = Tools::autoBytes($node->node_bandwidth);
         $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
@@ -230,7 +231,7 @@ final class NodeController extends BaseController
 
         $node->node_speedlimit = $request->getParam('node_speedlimit');
         $node->type = $request->getParam('type') === 'true' ? 1 : 0;
-        $node->sort = $request->getParam('sort');
+        $node->sort = (int) $request->getParam('sort');
         $node->node_class = $request->getParam('node_class');
         $node->node_bandwidth_limit = Tools::gbToB($request->getParam('node_bandwidth_limit'));
         $node->bandwidthlimit_resetday = $request->getParam('bandwidthlimit_resetday');

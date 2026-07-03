@@ -59,11 +59,20 @@
                                 <div class="col">
                                     <select id="sort" class="col form-select">
                                         <option value="14">Trojan</option>
+                                        <option value="15">XNode / VLESS Reality Vision</option>
                                         <option value="11">Vmess</option>
                                         <option value="2">TUIC</option>
                                         <option value="1">Shadowsocks2022</option>
                                         <option value="0">Shadowsocks</option>
                                     </select>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <div class="col offset-3">
+                                    <button id="apply-xnode-reality-template" class="btn btn-outline-primary btn-sm" type="button">
+                                        <i class="icon ti ti-wand"></i>
+                                        使用 XNode Reality 模板
+                                    </button>
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
@@ -191,6 +200,38 @@
         modes: ['code', 'tree'],
     };
     const editor = new JSONEditor(container, options);
+
+    const xnodeRealityTemplate = {
+        xnode: {
+            enabled: true,
+            profile: 'vless-reality-vision',
+            port: 443,
+            network: 'raw',
+            security: 'reality',
+            flow: 'xtls-rprx-vision',
+            sni: 'www.cloudflare.com',
+            fingerprint: 'chrome'
+        }
+    };
+
+    function fillIfEmpty(selector, value) {
+        let input = $(selector);
+        if (String(input.val() || '').trim() === '') {
+            input.val(value);
+        }
+    }
+
+    $("#apply-xnode-reality-template").click(function () {
+        $('#sort').val('15');
+        fillIfEmpty('#traffic_rate', '1');
+        fillIfEmpty('#node_class', '0');
+        fillIfEmpty('#node_group', '0');
+        fillIfEmpty('#node_speedlimit', '0');
+        fillIfEmpty('#node_bandwidth_limit', '0');
+        fillIfEmpty('#bandwidthlimit_resetday', '0');
+        $('#is_dynamic_rate').prop('checked', false);
+        editor.set(xnodeRealityTemplate);
+    });
 
     $("#create-node").click(function () {
         $.ajax({
