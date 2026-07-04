@@ -41,8 +41,8 @@ use const ENT_SUBSTITUTE;
 final class NodeController extends BaseController
 {
     private const XNODE_INSTALLER_URL = 'https://raw.githubusercontent.com/makeausername/xnode-agent/'
-        . 'feature/xnode-release-installer/scripts/install.sh';
-    private const XNODE_INSTALL_VERSION = 'v0.1.0';
+        . 'main/scripts/install.sh';
+    private const XNODE_INSTALL_VERSION = 'v0.1.1';
 
     private static array $details = [
         'field' => [
