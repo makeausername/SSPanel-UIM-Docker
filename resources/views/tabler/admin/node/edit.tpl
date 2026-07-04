@@ -228,6 +228,21 @@
                                     通讯密钥用于 NodeAPI 鉴权，如需更改请点击重置
                                 </label>
                             </div>
+                            {if $node->sort === 15}
+                                <div class="hr-text">
+                                    <span>节点部署</span>
+                                </div>
+                                <div class="form-group mb-3 row">
+                                    <div class="col">
+                                        <div class="btn-list">
+                                            <button id="generate-xnode-install-command" class="btn btn-primary" type="button">
+                                                <i class="icon ti ti-terminal"></i>
+                                                生成 XNode 一键安装命令
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
                         </div>
                     </div>
                 </div>
@@ -235,12 +250,6 @@
                     <div class="card">
                         <div class="card-header card-header-light">
                             <h3 class="card-title">XNode 节点状态</h3>
-                            <div class="card-actions">
-                                <button id="generate-xnode-install-command" class="btn btn-primary" type="button">
-                                    <i class="icon ti ti-terminal"></i>
-                                    生成 XNode 一键安装命令
-                                </button>
-                            </div>
                         </div>
                         <div class="card-body">
                             <div class="datagrid">
@@ -315,7 +324,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn me-auto" data-bs-dismiss="modal">关闭</button>
-                <button class="copy btn btn-primary" type="button" data-clipboard-target="#xnode-command-text">
+                <button id="copy-xnode-install-command" class="copy btn btn-primary" type="button" data-clipboard-target="#xnode-command-text">
                     <i class="icon ti ti-copy"></i>
                     复制命令
                 </button>
@@ -327,6 +336,17 @@
 <script>
     let clipboard = new ClipboardJS('.copy');
     clipboard.on('success', function (e) {
+        if (e.trigger && e.trigger.id === 'copy-xnode-install-command') {
+            $('#success-message').text('命令已复制，正在返回节点列表');
+            $('#success-dialog').modal('show');
+            $('#xnode-install-command-dialog').modal('hide');
+            clearXNodeInstallCommand();
+            window.setTimeout(function () {
+                window.location.href = '/admin/node';
+            }, 800);
+            return;
+        }
+
         $('#success-message').text('已复制到剪切板');
         $('#success-dialog').modal('show');
     });
@@ -470,6 +490,21 @@
             }
         })
     });
+
+    let xnodeInstallButton = $("#generate-xnode-install-command");
+    if (xnodeInstallButton.length > 0) {
+        let shouldOpenXNodeInstall = false;
+
+        if (window.URLSearchParams) {
+            shouldOpenXNodeInstall = (new URLSearchParams(window.location.search)).get('open_xnode_install') === '1';
+        } else {
+            shouldOpenXNodeInstall = window.location.search.indexOf('open_xnode_install=1') !== -1;
+        }
+
+        if (shouldOpenXNodeInstall) {
+            xnodeInstallButton.click();
+        }
+    }
 
     $("#xnode-install-command-dialog").on('hidden.bs.modal', function () {
         clearXNodeInstallCommand();

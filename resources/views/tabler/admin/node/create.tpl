@@ -249,7 +249,13 @@
                 if (data.ret === 1) {
                     $('#success-message').text(data.msg);
                     $('#success-dialog').modal('show');
-                    window.setTimeout("location.href=top.document.referrer", {$config['jump_delay']});
+                    if ($('#sort').val() === '15' && data.node_id) {
+                        window.setTimeout(function () {
+                            location.href = '/admin/node/' + data.node_id + '/edit?open_xnode_install=1';
+                        }, {$config['jump_delay']});
+                    } else {
+                        window.setTimeout("location.href=top.document.referrer", {$config['jump_delay']});
+                    }
                 } else {
                     $('#fail-message').text(data.msg);
                     $('#fail-dialog').modal('show');
