@@ -40,6 +40,10 @@ use const ENT_SUBSTITUTE;
 
 final class NodeController extends BaseController
 {
+    private const XNODE_INSTALLER_URL = 'https://raw.githubusercontent.com/makeausername/xnode-agent/'
+        . 'feature/xnode-release-installer/scripts/install.sh';
+    private const XNODE_INSTALL_VERSION = 'v0.1.0';
+
     private static array $details = [
         'field' => [
             'op' => '操作',
@@ -311,6 +315,15 @@ final class NodeController extends BaseController
             ]);
         }
 
+        $nodeDomain = trim((string) $node->server);
+
+        if ($nodeDomain === '') {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '请先填写节点连接地址',
+            ]);
+        }
+
         $ttlSeconds = 600;
         $token = NodeEnrollmentService::createEnrollTokenForNode($nodeId, $ttlSeconds);
         $enrollmentService = new NodeEnrollmentService();
@@ -328,21 +341,18 @@ final class NodeController extends BaseController
         }
 
         $panelUrl = $this->resolvePanelUrl($request);
-        $nodeDomain = trim((string) $node->server);
         $expiresAt = (int) ($tokenRecord->expires_at ?? (time() + $ttlSeconds));
-        $powershellCheck = $this->buildXNodePowerShellCheckCommand($panelUrl, $nodeId, $nodeDomain, $token);
-        $bashCheck = $this->buildXNodeBashCheckCommand($panelUrl, $nodeId, $nodeDomain, $token);
-        $command = "PowerShell:\n" . $powershellCheck . "\n\nBash:\n" . $bashCheck;
+        $command = $this->buildXNodeOneClickInstallCommand($panelUrl, $nodeId, $nodeDomain, $token);
 
         return $response->withJson([
             'ret' => 1,
-            'msg' => 'XNode enroll token created',
+            'msg' => 'XNode one-click install command created',
             'token' => $token,
             'expires_in' => $ttlSeconds,
             'expires_at' => $expiresAt,
+            'expires_at_text' => date('Y-m-d H:i:s', $expiresAt),
+            'install_command' => $command,
             'command' => $command,
-            'powershell_check' => $powershellCheck,
-            'bash_check' => $bashCheck,
         ]);
     }
 
@@ -429,45 +439,20 @@ final class NodeController extends BaseController
         return rtrim($scheme . '://' . $authority, '/');
     }
 
-    private function buildXNodePowerShellCheckCommand(
+    private function buildXNodeOneClickInstallCommand(
         string $panelUrl,
         int $nodeId,
         string $nodeDomain,
         string $token
     ): string {
         return implode("\n", [
-            '$env:XNODE_MOCK_PANEL=' . $this->quotePowerShellValue('false'),
-            '$env:PANEL_URL=' . $this->quotePowerShellValue($panelUrl),
-            '$env:NODE_ID=' . $this->quotePowerShellValue((string) $nodeId),
-            '$env:NODE_DOMAIN=' . $this->quotePowerShellValue($nodeDomain),
-            '$env:ENROLL_TOKEN=' . $this->quotePowerShellValue($token),
-            '$env:DATA_DIR=' . $this->quotePowerShellValue('.xnode-real\\data'),
-            '$env:LOG_DIR=' . $this->quotePowerShellValue('.xnode-real\\logs'),
-            '.\\bin\\xnode.exe --check',
+            'curl -fsSL ' . $this->quoteShellValue(self::XNODE_INSTALLER_URL) . ' | bash -s -- ' . '\\',
+            '  --panel-url ' . $this->quoteShellValue($panelUrl) . ' ' . '\\',
+            '  --node-id ' . $this->quoteShellValue((string) $nodeId) . ' ' . '\\',
+            '  --node-domain ' . $this->quoteShellValue($nodeDomain) . ' ' . '\\',
+            '  --enroll-token ' . $this->quoteShellValue($token) . ' ' . '\\',
+            '  --version ' . $this->quoteShellValue(self::XNODE_INSTALL_VERSION),
         ]);
-    }
-
-    private function buildXNodeBashCheckCommand(
-        string $panelUrl,
-        int $nodeId,
-        string $nodeDomain,
-        string $token
-    ): string {
-        return implode("\n", [
-            'export XNODE_MOCK_PANEL=' . $this->quoteShellValue('false'),
-            'export PANEL_URL=' . $this->quoteShellValue($panelUrl),
-            'export NODE_ID=' . $this->quoteShellValue((string) $nodeId),
-            'export NODE_DOMAIN=' . $this->quoteShellValue($nodeDomain),
-            'export ENROLL_TOKEN=' . $this->quoteShellValue($token),
-            'export DATA_DIR=' . $this->quoteShellValue('.xnode-real/data'),
-            'export LOG_DIR=' . $this->quoteShellValue('.xnode-real/logs'),
-            './xnode --check',
-        ]);
-    }
-
-    private function quotePowerShellValue(string $value): string
-    {
-        return "'" . str_replace("'", "''", $value) . "'";
     }
 
     private function quoteShellValue(string $value): string

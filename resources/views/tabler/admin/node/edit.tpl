@@ -238,7 +238,7 @@
                             <div class="card-actions">
                                 <button id="generate-xnode-install-command" class="btn btn-primary" type="button">
                                     <i class="icon ti ti-terminal"></i>
-                                    生成 XNode 安装/检查命令
+                                    生成 XNode 一键安装命令
                                 </button>
                             </div>
                         </div>
@@ -297,29 +297,19 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">XNode 安装/检查命令</h5>
+                <h5 class="modal-title">XNode 一键安装命令</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-warning">
-                    此 token 只显示一次，10 分钟内有效，用后即失效。
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Enroll Token</label>
-                    <div class="input-group">
-                        <input id="xnode-enroll-token" type="text" class="form-control" readonly>
-                        <button class="copy btn btn-primary" type="button" data-clipboard-target="#xnode-enroll-token">
-                            <i class="icon ti ti-copy"></i>
-                            复制
-                        </button>
-                    </div>
+                    此一键安装命令 10 分钟内有效，请勿公开分享；请以 root 身份粘贴到目标 Linux 节点服务器执行。
                 </div>
                 <div class="mb-3">
                     <label class="form-label">有效期</label>
                     <input id="xnode-token-expires" type="text" class="form-control" readonly>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">xnode-agent --check 命令</label>
+                    <label class="form-label">Linux 一键安装命令</label>
                     <textarea id="xnode-command-text" class="form-control font-monospace" rows="18" readonly></textarea>
                 </div>
             </div>
@@ -422,7 +412,6 @@
             xnodeTokenExpireTimer = null;
         }
 
-        $('#xnode-enroll-token').val('');
         $('#xnode-token-expires').val('');
         $('#xnode-command-text').val('');
     }
@@ -435,8 +424,7 @@
         }
 
         xnodeTokenExpireTimer = window.setTimeout(function () {
-            $('#xnode-enroll-token').val('');
-            $('#xnode-token-expires').val('已过期，请重新生成');
+            $('#xnode-token-expires').val('已过期，请重新生成一键安装命令');
             $('#xnode-command-text').val('');
             xnodeTokenExpireTimer = null;
         }, seconds * 1000);
@@ -453,17 +441,18 @@
             dataType: "json",
             success: function (data) {
                 if (data.ret === 1) {
-                    let command = data.command || [
-                        'PowerShell:',
-                        data.powershell_check || '',
-                        '',
-                        'Bash:',
-                        data.bash_check || ''
-                    ].join("\n");
-                    let expiresIn = data.expires_in || 600;
+                    let command = data.install_command || data.command || '';
 
-                    $('#xnode-enroll-token').val(data.token || '');
-                    $('#xnode-token-expires').val(expiresIn + ' 秒，expires_at=' + (data.expires_at || '-'));
+                    if (String(command).trim() === '') {
+                        $('#fail-message').text('生成 XNode 命令失败：未返回安装命令');
+                        $('#fail-dialog').modal('show');
+                        return;
+                    }
+
+                    let expiresIn = data.expires_in || 600;
+                    let expiresAt = data.expires_at_text || data.expires_at || '-';
+
+                    $('#xnode-token-expires').val('10 分钟内有效，过期时间：' + expiresAt);
                     $('#xnode-command-text').val(command);
                     $('#xnode-install-command-dialog').modal('show');
                     scheduleXNodeTokenClear(expiresIn);
