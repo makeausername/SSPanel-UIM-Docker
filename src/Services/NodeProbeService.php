@@ -19,6 +19,7 @@ use function is_numeric;
 use function max;
 use function mb_substr;
 use function substr;
+use function strtolower;
 use function time;
 use function trim;
 
@@ -93,6 +94,15 @@ final class NodeProbeService
         }
 
         $oldStatus = self::normalizeStatus((string) ($state->status ?? self::STATUS_UNKNOWN));
+
+        if (
+            $oldStatus === self::STATUS_SUSPECTED_BLOCKED
+            && $status === self::STATUS_OK
+            && ! self::isMainlandProbeRegion($result->probe_region)
+        ) {
+            return self::summaryFromState($state);
+        }
+
         $statusChanged = $oldStatus !== $status;
 
         $state->status = $status;
@@ -143,6 +153,24 @@ final class NodeProbeService
         }
 
         return self::summaryFromState($state);
+    }
+
+    public static function isMainlandProbeRegion(string $region): bool
+    {
+        $region = strtolower(trim($region));
+
+        return $region === 'cn'
+            || substr($region, 0, 3) === 'cn-'
+            || $region === 'china'
+            || $region === 'mainland'
+            || substr($region, 0, 9) === 'mainland-';
+    }
+
+    public static function isSelfProbeRegion(string $region): bool
+    {
+        $region = strtolower(trim($region));
+
+        return in_array($region, ['node-self', 'self', 'local', 'agent-self'], true);
     }
 
     public static function summarizeNode(int $nodeId): array
