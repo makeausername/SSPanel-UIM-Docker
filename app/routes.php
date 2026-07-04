@@ -6,6 +6,7 @@ use App\Middleware\Admin;
 use App\Middleware\Guest;
 use App\Middleware\NodeApiToken;
 use App\Middleware\NodeToken;
+use App\Middleware\ProbeApiToken;
 use App\Middleware\User;
 use Slim\Routing\RouteCollectorProxy;
 
@@ -362,5 +363,12 @@ return static function (Slim\App $app): void {
         $group->post('/detect-log', App\Controllers\Api\NodeApiV1Controller::class . ':detectLog')->add($nodeApiToken);
         $group->post('/probe', App\Controllers\Api\NodeApiV1Controller::class . ':probe')->add($nodeApiToken);
         $group->post('/heartbeat', App\Controllers\Api\NodeApiV1Controller::class . ':heartbeat')->add($nodeApiToken);
+    });
+
+    // External Probe API V1
+    $app->group('/probe/api/v1', static function (RouteCollectorProxy $group): void {
+        $probeApiToken = new ProbeApiToken();
+
+        $group->post('/report', App\Controllers\Api\ProbeApiV1Controller::class . ':report')->add($probeApiToken);
     });
 };
