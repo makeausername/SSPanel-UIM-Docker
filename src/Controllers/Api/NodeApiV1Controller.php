@@ -7,12 +7,14 @@ namespace App\Controllers\Api;
 use App\Controllers\BaseController;
 use App\Services\NodeEnrollmentService;
 use App\Services\NodeProfileService;
+use App\Services\NodeProbeService;
 use App\Services\NodeRuntimeService;
 use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use Throwable;
 use function is_array;
 use function is_numeric;
 use function is_string;
@@ -145,6 +147,48 @@ final class NodeApiV1Controller extends BaseController
         $data = (new NodeRuntimeService())->acceptHeartbeat($payload, $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
+    }
+
+    /**
+     * POST /node/api/v1/probe
+     */
+    public function probe(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        $payload = $this->readJsonBody($request);
+
+        if ($payload === null) {
+            return $this->validationError($request, $response, 'Invalid JSON body.', 'invalid_json');
+        }
+
+        $nodeId = $this->authenticatedNodeId($request);
+
+        if ($nodeId === null) {
+            return $this->authError($request, $response, 'Missing node token', 'AUTH_MISSING_TOKEN');
+        }
+
+        $payload['node_id'] = $nodeId;
+        $payload['target_port'] = $payload['target_port'] ?? 443;
+
+        foreach (['probe_region', 'probe_type', 'target_host', 'status'] as $field) {
+            if (! is_string($payload[$field] ?? null) || trim($payload[$field]) === '') {
+                return $this->validationError(
+                    $request,
+                    $response,
+                    $field . ' is required.',
+                    'invalid_probe_payload'
+                );
+            }
+        }
+
+        try {
+            $summary = NodeProbeService::recordResult($payload, true);
+        } catch (InvalidArgumentException $e) {
+            return $this->validationError($request, $response, $e->getMessage(), 'invalid_probe_payload');
+        } catch (Throwable $e) {
+            return $this->validationError($request, $response, 'Probe report failed', 'probe_report_failed', 500);
+        }
+
+        return $this->success($request, $response, $summary);
     }
 
     private function success(ServerRequest $request, Response $response, array $data): ResponseInterface

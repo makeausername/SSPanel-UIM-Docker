@@ -360,6 +360,7 @@ return static function (Slim\App $app): void {
         $group->post('/traffic', App\Controllers\Api\NodeApiV1Controller::class . ':traffic')->add($nodeApiToken);
         $group->post('/online', App\Controllers\Api\NodeApiV1Controller::class . ':online')->add($nodeApiToken);
         $group->post('/detect-log', App\Controllers\Api\NodeApiV1Controller::class . ':detectLog')->add($nodeApiToken);
+        $group->post('/probe', App\Controllers\Api\NodeApiV1Controller::class . ':probe')->add($nodeApiToken);
         $group->post('/heartbeat', App\Controllers\Api\NodeApiV1Controller::class . ':heartbeat')->add($nodeApiToken);
     });
 };
