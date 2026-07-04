@@ -55,6 +55,8 @@ final class NodeProbeService
         self::STATUS_ERROR => 'bg-yellow text-yellow-fg',
     ];
 
+    private const SELF_PROBE_REGIONS = ['node-self', 'self', 'local', 'agent-self'];
+
     public static function recordResult(array $payload, bool $notify = true): array
     {
         $nodeId = (int) ($payload['node_id'] ?? 0);
@@ -99,6 +101,15 @@ final class NodeProbeService
             $oldStatus === self::STATUS_SUSPECTED_BLOCKED
             && $status === self::STATUS_OK
             && ! self::isMainlandProbeRegion($result->probe_region)
+        ) {
+            return self::summaryFromState($state);
+        }
+
+        if (
+            $oldStatus === self::STATUS_OK
+            && $status === self::STATUS_OK
+            && self::isMainlandProbeRegion((string) ($state->probe_region ?? ''))
+            && self::isSelfProbeRegion($result->probe_region)
         ) {
             return self::summaryFromState($state);
         }
@@ -170,7 +181,7 @@ final class NodeProbeService
     {
         $region = strtolower(trim($region));
 
-        return in_array($region, ['node-self', 'self', 'local', 'agent-self'], true);
+        return in_array($region, self::SELF_PROBE_REGIONS, true);
     }
 
     public static function summarizeNode(int $nodeId): array
@@ -207,6 +218,71 @@ final class NodeProbeService
         }
 
         return $summaries;
+    }
+
+    public static function summarizeNodeDetailed(int $nodeId): array
+    {
+        if ($nodeId <= 0) {
+            return self::defaultDetailedSummary();
+        }
+
+        return [
+            'overall' => self::summarizeNode($nodeId),
+            'mainland' => self::latestMainlandResultSummary($nodeId),
+            'self' => self::latestSelfResultSummary($nodeId),
+            'latest_results' => self::latestResultSummaries($nodeId, 5),
+        ];
+    }
+
+    public static function summarizeNodesDetailed(array $nodeIds): array
+    {
+        $nodeIds = array_values(array_unique(array_map('intval', $nodeIds)));
+        $nodeIds = array_values(array_filter($nodeIds, static fn (int $nodeId): bool => $nodeId > 0));
+        $summaries = [];
+
+        foreach ($nodeIds as $nodeId) {
+            $summaries[$nodeId] = self::defaultDetailedSummary();
+        }
+
+        if ($nodeIds === []) {
+            return $summaries;
+        }
+
+        $overallSummaries = self::summarizeNodes($nodeIds);
+
+        foreach ($nodeIds as $nodeId) {
+            $summaries[$nodeId] = [
+                'overall' => $overallSummaries[$nodeId] ?? self::defaultSummary(),
+                'mainland' => self::latestMainlandResultSummary($nodeId),
+                'self' => self::latestSelfResultSummary($nodeId),
+                'latest_results' => self::latestResultSummaries($nodeId, 5),
+            ];
+        }
+
+        return $summaries;
+    }
+
+    public static function summaryFromResult(NodeProbeResult $result): array
+    {
+        $status = self::normalizeStatus((string) $result->status);
+        $checkedAt = (int) ($result->checked_at ?? 0);
+        $latencyMs = $result->latency_ms;
+        $targetPort = $result->target_port;
+
+        return [
+            'status' => $status,
+            'label' => self::STATUS_LABELS[$status],
+            'badge_class' => self::BADGE_CLASSES[$status],
+            'probe_region' => self::summaryValue($result->probe_region ?? null),
+            'probe_provider' => self::summaryValue($result->probe_provider ?? null),
+            'probe_location' => self::summaryValue($result->probe_location ?? null),
+            'probe_type' => self::summaryValue($result->probe_type ?? null),
+            'target_host' => self::summaryValue($result->target_host ?? null),
+            'target_port' => is_numeric($targetPort) ? (string) max(0, (int) $targetPort) : '-',
+            'latency_ms' => is_numeric($latencyMs) ? (string) max(0, (int) $latencyMs) . ' ms' : '-',
+            'error' => trim((string) ($result->error ?? '')),
+            'checked_at_text' => $checkedAt > 0 ? date('Y-m-d H:i:s', $checkedAt) : '-',
+        ];
     }
 
     private static function updateNodeGfwBlock(Node $node, string $oldStatus, string $newStatus): void
@@ -262,6 +338,81 @@ final class NodeProbeService
             'latest_latency_ms' => '-',
             'latest_error' => '',
         ];
+    }
+
+    private static function defaultDetailedSummary(): array
+    {
+        return [
+            'overall' => self::defaultSummary(),
+            'mainland' => self::defaultResultSummary(),
+            'self' => self::defaultResultSummary(),
+            'latest_results' => [],
+        ];
+    }
+
+    private static function defaultResultSummary(): array
+    {
+        return [
+            'status' => self::STATUS_UNKNOWN,
+            'label' => self::STATUS_LABELS[self::STATUS_UNKNOWN],
+            'badge_class' => self::BADGE_CLASSES[self::STATUS_UNKNOWN],
+            'probe_region' => '-',
+            'probe_provider' => '-',
+            'probe_location' => '-',
+            'probe_type' => '-',
+            'target_host' => '-',
+            'target_port' => '-',
+            'latency_ms' => '-',
+            'error' => '',
+            'checked_at_text' => '-',
+        ];
+    }
+
+    private static function latestMainlandResultSummary(int $nodeId): array
+    {
+        $result = (new NodeProbeResult())
+            ->where('node_id', $nodeId)
+            ->where(static function ($query): void {
+                $query
+                    ->whereRaw('LOWER(probe_region) IN (?, ?, ?)', ['cn', 'china', 'mainland'])
+                    ->orWhereRaw('LOWER(probe_region) LIKE ?', ['cn-%'])
+                    ->orWhereRaw('LOWER(probe_region) LIKE ?', ['mainland-%']);
+            })
+            ->orderBy('checked_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        return $result === null ? self::defaultResultSummary() : self::summaryFromResult($result);
+    }
+
+    private static function latestSelfResultSummary(int $nodeId): array
+    {
+        $result = (new NodeProbeResult())
+            ->where('node_id', $nodeId)
+            ->whereRaw('LOWER(probe_region) IN (?, ?, ?, ?)', self::SELF_PROBE_REGIONS)
+            ->orderBy('checked_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        return $result === null ? self::defaultResultSummary() : self::summaryFromResult($result);
+    }
+
+    private static function latestResultSummaries(int $nodeId, int $limit): array
+    {
+        $summaries = [];
+
+        foreach (
+            (new NodeProbeResult())
+                ->where('node_id', $nodeId)
+                ->orderBy('checked_at', 'desc')
+                ->orderBy('id', 'desc')
+                ->limit($limit)
+                ->get() as $result
+        ) {
+            $summaries[] = self::summaryFromResult($result);
+        }
+
+        return $summaries;
     }
 
     private static function normalizeStatus(string $status): string

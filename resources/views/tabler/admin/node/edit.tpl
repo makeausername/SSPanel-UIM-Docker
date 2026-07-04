@@ -287,34 +287,6 @@
                                     <div class="datagrid-title">最近 Online 上报</div>
                                     <div class="datagrid-content">{$xnode_summary.latest_online_report|escape}</div>
                                 </div>
-                                <div class="datagrid-item">
-                                    <div class="datagrid-title">可达性</div>
-                                    <div class="datagrid-content">
-                                        <span class="badge {$xnode_probe_summary.badge_class|escape}">{$xnode_probe_summary.label|escape}</span>
-                                    </div>
-                                </div>
-                                <div class="datagrid-item">
-                                    <div class="datagrid-title">检测区域</div>
-                                    <div class="datagrid-content">{$xnode_probe_summary.latest_region|escape}</div>
-                                </div>
-                                <div class="datagrid-item">
-                                    <div class="datagrid-title">检测类型</div>
-                                    <div class="datagrid-content">{$xnode_probe_summary.latest_probe_type|escape}</div>
-                                </div>
-                                <div class="datagrid-item">
-                                    <div class="datagrid-title">检测时间</div>
-                                    <div class="datagrid-content">{$xnode_probe_summary.latest_checked_at|escape}</div>
-                                </div>
-                                <div class="datagrid-item">
-                                    <div class="datagrid-title">延迟</div>
-                                    <div class="datagrid-content">{$xnode_probe_summary.latest_latency_ms|escape}</div>
-                                </div>
-                                {if $xnode_probe_summary.latest_error !== ''}
-                                    <div class="datagrid-item">
-                                        <div class="datagrid-title">检测错误</div>
-                                        <div class="datagrid-content text-break">{$xnode_probe_summary.latest_error|escape}</div>
-                                    </div>
-                                {/if}
                                 {if $xnode_summary.last_error !== ''}
                                     <div class="datagrid-item">
                                         <div class="datagrid-title">Last Error</div>
@@ -322,6 +294,150 @@
                                     </div>
                                 {/if}
                             </div>
+                            <div class="hr-text mt-3">
+                                <span>综合可达性</span>
+                            </div>
+                            <div class="datagrid">
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">状态</div>
+                                    <div class="datagrid-content">
+                                        <span class="badge {$xnode_probe_detail.overall.badge_class|escape}">{$xnode_probe_detail.overall.label|escape}</span>
+                                    </div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测时间</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.overall.latest_checked_at|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测区域</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.overall.latest_region|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">探针来源</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.overall.latest_provider|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">探针位置</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.overall.latest_location|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测类型</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.overall.latest_probe_type|escape}</div>
+                                </div>
+                            </div>
+                            <div class="hr-text mt-3">
+                                <span>大陆探针</span>
+                            </div>
+                            <div class="datagrid">
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">状态</div>
+                                    <div class="datagrid-content">
+                                        <span class="badge {$xnode_probe_detail.mainland.badge_class|escape}">{$xnode_probe_detail.mainland.label|escape}</span>
+                                    </div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测区域</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.mainland.probe_region|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">探针来源</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.mainland.probe_provider|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">探针位置</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.mainland.probe_location|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测类型</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.mainland.probe_type|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测时间</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.mainland.checked_at_text|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">延迟</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.mainland.latency_ms|escape}</div>
+                                </div>
+                                {if $xnode_probe_detail.mainland.error !== ''}
+                                    <div class="datagrid-item">
+                                        <div class="datagrid-title">错误</div>
+                                        <div class="datagrid-content text-break">{$xnode_probe_detail.mainland.error|escape}</div>
+                                    </div>
+                                {/if}
+                            </div>
+                            <div class="hr-text mt-3">
+                                <span>本机自检</span>
+                            </div>
+                            <div class="datagrid">
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">状态</div>
+                                    <div class="datagrid-content">
+                                        <span class="badge {$xnode_probe_detail.self.badge_class|escape}">{$xnode_probe_detail.self.label|escape}</span>
+                                    </div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">探针来源</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.self.probe_provider|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">探针位置</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.self.probe_location|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测类型</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.self.probe_type|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测时间</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.self.checked_at_text|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">延迟</div>
+                                    <div class="datagrid-content">{$xnode_probe_detail.self.latency_ms|escape}</div>
+                                </div>
+                                {if $xnode_probe_detail.self.error !== ''}
+                                    <div class="datagrid-item">
+                                        <div class="datagrid-title">错误</div>
+                                        <div class="datagrid-content text-break">{$xnode_probe_detail.self.error|escape}</div>
+                                    </div>
+                                {/if}
+                            </div>
+                            <div class="hr-text mt-3">
+                                <span>最近探针记录</span>
+                            </div>
+                            {if $xnode_probe_detail.latest_results|@count > 0}
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-vcenter mb-0">
+                                        <thead>
+                                        <tr>
+                                            <th>检测时间</th>
+                                            <th>检测区域</th>
+                                            <th>检测类型</th>
+                                            <th>状态</th>
+                                            <th>延迟</th>
+                                            <th>错误</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        {foreach $xnode_probe_detail.latest_results as $probe_result}
+                                            <tr>
+                                                <td class="text-nowrap">{$probe_result.checked_at_text|escape}</td>
+                                                <td>{$probe_result.probe_region|escape}</td>
+                                                <td>{$probe_result.probe_type|escape}</td>
+                                                <td>
+                                                    <span class="badge {$probe_result.badge_class|escape}">{$probe_result.label|escape}</span>
+                                                </td>
+                                                <td class="text-nowrap">{$probe_result.latency_ms|escape}</td>
+                                                <td class="text-break">{$probe_result.error|escape}</td>
+                                            </tr>
+                                        {/foreach}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {else}
+                                <div class="text-muted small">-</div>
+                            {/if}
                         </div>
                     </div>
                 </div>

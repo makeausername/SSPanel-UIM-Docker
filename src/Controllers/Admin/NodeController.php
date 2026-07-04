@@ -210,6 +210,7 @@ final class NodeController extends BaseController
                 ->assign('node', $node)
                 ->assign('xnode_summary', $this->buildXNodeEditSummary($runtime, (int) $node->id, $nodeBandwidth))
                 ->assign('xnode_probe_summary', NodeProbeService::summarizeNode((int) $node->id))
+                ->assign('xnode_probe_detail', NodeProbeService::summarizeNodeDetailed((int) $node->id))
                 ->assign('update_field', self::$update_field)
                 ->fetch('admin/node/edit.tpl')
         );
