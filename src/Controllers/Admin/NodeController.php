@@ -13,6 +13,7 @@ use App\Models\NodeToken;
 use App\Models\OnlineLog;
 use App\Services\I18n;
 use App\Services\NodeEnrollmentService;
+use App\Services\NodeProbeService;
 use App\Services\Notification;
 use App\Utils\Tools;
 use GuzzleHttp\Exception\GuzzleException;
@@ -56,6 +57,8 @@ final class NodeController extends BaseController
             'xnode_last_seen' => '最近心跳',
             'xnode_agent' => 'Agent',
             'xnode_error' => '错误',
+            'probe_status' => '可达性',
+            'probe_checked_at' => '检测时间',
             'traffic_rate' => '倍率',
             'is_dynamic_rate' => '动态倍率',
             'dynamic_rate_type' => '动态倍率计算方式',
@@ -206,6 +209,7 @@ final class NodeController extends BaseController
             $this->view()
                 ->assign('node', $node)
                 ->assign('xnode_summary', $this->buildXNodeEditSummary($runtime, (int) $node->id, $nodeBandwidth))
+                ->assign('xnode_probe_summary', NodeProbeService::summarizeNode((int) $node->id))
                 ->assign('update_field', self::$update_field)
                 ->fetch('admin/node/edit.tpl')
         );
@@ -632,6 +636,7 @@ final class NodeController extends BaseController
         $nodes = (new Node())->orderBy('id', 'desc')->get();
         $runtimeByNodeId = [];
         $nodeIds = $nodes->pluck('id')->toArray();
+        $probeSummaries = NodeProbeService::summarizeNodes($nodeIds);
 
         if ($nodeIds !== []) {
             foreach ((new NodeRuntime())->whereIn('node_id', $nodeIds)->get() as $runtime) {
@@ -652,6 +657,12 @@ final class NodeController extends BaseController
             $node->xnode_last_seen = $xnodeFields['xnode_last_seen'];
             $node->xnode_agent = $xnodeFields['xnode_agent'];
             $node->xnode_error = $xnodeFields['xnode_error'];
+            $probeSummary = $probeSummaries[(int) $node->id] ?? NodeProbeService::summarizeNode((int) $node->id);
+            $node->probe_status = $this->buildProbeStatusBadge(
+                (string) $probeSummary['badge_class'],
+                (string) $probeSummary['label']
+            );
+            $node->probe_checked_at = $this->formatXNodeTextValue($probeSummary['latest_checked_at'] ?? '-');
             $node->is_dynamic_rate = $node->isDynamicRate();
             $node->dynamic_rate_type = $node->dynamicRateType();
             $node->node_bandwidth = round(Tools::bToGB($node->node_bandwidth), 2);
@@ -661,5 +672,14 @@ final class NodeController extends BaseController
         return $response->withJson([
             'nodes' => $nodes,
         ]);
+    }
+
+    private function buildProbeStatusBadge(string $className, string $text): string
+    {
+        return '<span class="badge '
+            . htmlspecialchars($className, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            . '">'
+            . htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            . '</span>';
     }
 }

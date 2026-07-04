@@ -287,6 +287,34 @@
                                     <div class="datagrid-title">最近 Online 上报</div>
                                     <div class="datagrid-content">{$xnode_summary.latest_online_report|escape}</div>
                                 </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">可达性</div>
+                                    <div class="datagrid-content">
+                                        <span class="badge {$xnode_probe_summary.badge_class|escape}">{$xnode_probe_summary.label|escape}</span>
+                                    </div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测区域</div>
+                                    <div class="datagrid-content">{$xnode_probe_summary.latest_region|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测类型</div>
+                                    <div class="datagrid-content">{$xnode_probe_summary.latest_probe_type|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测时间</div>
+                                    <div class="datagrid-content">{$xnode_probe_summary.latest_checked_at|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">延迟</div>
+                                    <div class="datagrid-content">{$xnode_probe_summary.latest_latency_ms|escape}</div>
+                                </div>
+                                {if $xnode_probe_summary.latest_error !== ''}
+                                    <div class="datagrid-item">
+                                        <div class="datagrid-title">检测错误</div>
+                                        <div class="datagrid-content text-break">{$xnode_probe_summary.latest_error|escape}</div>
+                                    </div>
+                                {/if}
                                 {if $xnode_summary.last_error !== ''}
                                     <div class="datagrid-item">
                                         <div class="datagrid-title">Last Error</div>
