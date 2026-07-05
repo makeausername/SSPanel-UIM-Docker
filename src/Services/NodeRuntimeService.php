@@ -319,6 +319,11 @@ final class NodeRuntimeService
         $runtime->last_seen = $now;
         $runtime->updated_at = $now;
         $runtime->save();
+        $node = (new Node())->where('id', $nodeId)->first();
+        if ($node !== null) {
+            $node->node_heartbeat = $now;
+            $node->save();
+        }
     }
 
     private function assignString(NodeRuntime $runtime, array $payload, string $field, ?int $maxLength = null): void
