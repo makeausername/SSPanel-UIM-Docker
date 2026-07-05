@@ -1,1246 +1,592 @@
-# SSPanel-UIM Docker 一键部署版
+# EzIPLC / SSPanel-UIM-Docker
 
-这是一个基于 SSPanel-UIM 改造的自用 Docker 部署版本。
+这是一个基于 SSPanel-UIM 的 Docker 化面板仓库，面向 EzIPLC 的生产部署和日常运维做了定制。
 
-本版本重点加入：
+本仓库包含 XNode 集成，用于接入 VLESS Reality Vision 节点。当前推荐的 XNode Agent 版本为 `v0.1.5`。
 
-- Docker Compose 一键部署
-- Caddy 自动 HTTPS / Let’s Encrypt 自动续签
-- MariaDB
-- Redis
-- Nginx
-- PHP-FPM
-- Scheduler 定时任务
-- 前台中英文切换
-- 后台保持中文
-- Docker 性能优化配置
-- 交互式安装向导
-- 可自定义 muKey，方便后期节点对接
+XNode 集成支持节点注册、配置同步、用户同步、流量上报、在线上报、心跳、运行状态、自检探针，以及外部大陆探针上报。
 
-> 本仓库为自用版本，不是 SSPanel-UIM 官方仓库。
+本文假设生产路径为 `/opt/SSPanel-UIM-Docker`，域名使用 `panel.example.com`，节点域名使用 `node1.example.com`、`node2.example.com`。实际操作时请替换为自己的域名、节点 ID 和安全密码。不要在文档、截图、工单或聊天记录里暴露真实令牌、私钥、数据库密码、节点 token、探针 token 或 Reality private key。
 
----
+除特别说明外，服务器命令均为 Linux `bash` 命令。本地 Windows 只用于查看仓库状态时，请使用 PowerShell：
 
-## 功能特点
-
-### Docker 一键安装
-
-通过：
-
-```bash
-bash install.sh
-```
-
-即可完成：
-
-```text
-生成 .env
-生成 config/.config.php
-生成 config/appprofile.php
-构建 Docker 镜像
-启动 MariaDB
-启动 Redis
-启动 PHP-FPM app
-启动 Nginx
-启动 Caddy
-启动 Scheduler
-初始化数据库
-创建管理员账号
-```
-
----
-
-### HTTPS 自动证书
-
-本版本使用 Caddy 作为入口网关。
-
-HTTPS 模式下：
-
-```text
-Caddy 自动申请 Let’s Encrypt 证书
-Caddy 自动续签证书
-证书数据持久化保存
-Nginx 只作为内部服务
-app:9000 不对外暴露
-MariaDB / Redis 不对外暴露
-```
-
----
-
-### HTTP / HTTPS 两种模式
-
-安装时可以选择：
-
-```text
-HTTP 测试模式
-HTTPS 正式模式
-```
-
-HTTP 模式：
-
-```text
-只占用 80 端口
-不占用 443 端口
-cookie_secure=false
-baseUrl=http://...
-```
-
-HTTPS 模式：
-
-```text
-占用 80 / 443 端口
-自动申请 SSL
-cookie_secure=true
-baseUrl=https://...
-```
-
----
-
-### 前台中英文切换
-
-前台用户区域支持：
-
-```text
-简体中文
-English
-```
-
-登录页和用户中心均提供语言切换入口。
-
-后台 `/admin` 保持中文。
-
----
-
-## 环境要求
-
-推荐系统：
-
-```text
-Ubuntu 22.04
-Ubuntu 24.04
-Debian 12
-```
-
-推荐配置：
-
-```text
-CPU：2 核以上
-内存：2GB 以上
-硬盘：20GB 以上
-系统：64 位 Linux
-```
-
-正式 HTTPS 部署需要：
-
-```text
-域名已经解析到服务器 IP
-服务器开放 80 端口
-服务器开放 443 端口
-没有其他服务占用 80 / 443
-```
-
-如果使用 Cloudflare，首次签发证书建议：
-
-```text
-DNS only
-不要开启小黄云代理
-证书签发成功后再根据需要调整
-```
-
----
-
-## 一、安装 Docker
-
-如果服务器还没有 Docker，可以先执行：
-
-```bash
-sudo -i
-```
-
-```bash
-apt update
-```
-
-```bash
-apt install -y ca-certificates curl gnupg git lsb-release ufw
-```
-
-卸载可能冲突的旧包：
-
-```bash
-for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
-  apt remove -y "$pkg" 2>/dev/null || true
-done
-```
-
-添加 Docker 官方源：
-
-```bash
-install -m 0755 -d /etc/apt/keyrings
-```
-
-```bash
-curl -fsSL "https://download.docker.com/linux/$(. /etc/os-release && echo "$ID")/gpg" -o /etc/apt/keyrings/docker.asc
-```
-
-```bash
-chmod a+r /etc/apt/keyrings/docker.asc
-```
-
-```bash
-cat > /etc/apt/sources.list.d/docker.sources <<EOF
-Types: deb
-URIs: https://download.docker.com/linux/$(. /etc/os-release && echo "$ID")
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-Components: stable
-Architectures: $(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-```
-
-```bash
-apt update
-```
-
-安装 Docker：
-
-```bash
-apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-```
-
-启动 Docker：
-
-```bash
-systemctl enable --now docker
-```
-
-检查 Docker：
-
-```bash
-docker version
-```
-
-```bash
-docker compose version
-```
-
-```bash
-docker run --rm hello-world
-```
-
----
-
-## 二、开放防火墙端口
-
-如果使用 UFW：
-
-```bash
-ufw allow 22/tcp
-```
-
-```bash
-ufw allow 80/tcp
-```
-
-```bash
-ufw allow 443/tcp
-```
-
-```bash
-ufw --force enable
-```
-
-```bash
-ufw status
-```
-
-同时还需要在服务器厂商后台安全组开放：
-
-```text
-22
-80
-443
-```
-
----
-
-## 三、克隆仓库
-
-如果仓库是私有仓库，克隆时需要 GitHub 认证。
-
-HTTPS 克隆：
-
-```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_PRIVATE_REPO.git
-```
-
-进入目录：
-
-```bash
-cd YOUR_PRIVATE_REPO
-```
-
-如果使用 SSH：
-
-```bash
-git clone git@github.com:YOUR_USERNAME/YOUR_PRIVATE_REPO.git
-```
-
-进入目录：
-
-```bash
-cd YOUR_PRIVATE_REPO
-```
-
-查看当前分支：
-
-```bash
+```powershell
 git status --short --branch
 ```
 
----
+## 1. 当前状态
 
-## 四、运行安装向导
+面板侧 XNode 集成已经合并到默认分支 `master`。当前生产推荐的节点端版本是 `xnode-agent v0.1.5 stable`。
 
-执行：
+在完成真实节点测试、大陆探针测试、前台节点状态验证、订阅输出验证之后，本项目适合小规模生产使用。
 
-```bash
-chmod +x install.sh
-```
+后续变更建议以问题修复、文档完善、兼容性调整和小型 UI 改进为主，避免在生产分支上直接做大范围重构。
 
-```bash
-bash install.sh
-```
-
-安装向导会依次询问：
+## 2. 架构说明
 
 ```text
-部署模式
-域名
-站点名称
-HTTP / HTTPS 配置
-数据库名
-数据库用户
-数据库密码
-数据库 root 密码
-Redis 密码
-管理员邮箱
-管理员密码
-muKey
-时区
+User browser
+  -> SSPanel / user pages
+  -> V2Ray subscription
+
+Admin
+  -> node edit page
+  -> XNode one-click install command
+
+xnode-agent
+  -> /node/api/v1/enroll
+  -> /node/api/v1/config
+  -> /node/api/v1/users
+  -> /node/api/v1/traffic
+  -> /node/api/v1/online
+  -> /node/api/v1/runtime
+  -> /node/api/v1/heartbeat
+  -> /node/api/v1/probe
+
+xnode-probe
+  -> /probe/api/v1/report
 ```
 
-推荐正式环境选择：
+令牌说明：
 
-```text
-HTTPS 正式模式
-```
+- `xne_` enroll token：一次性节点注册令牌，只用于节点首次注册。
+- `xn_` node token：节点注册成功后保存在节点侧，供 `xnode-agent` 调用面板 API。
+- `xnp_` probe token：外部探针令牌，供 `xnode-probe` 上报大陆探测结果。
+- 这些 token 在数据库中只保存哈希值，不保存明文。
+- 不要在截图、日志、README、Issue、PR 或聊天工具里暴露任何 token 明文。
 
-HTTPS 模式下请确保：
+## 3. 生产环境要求
 
-```text
-域名 A 记录已经指向服务器 IP
-80 端口开放
-443 端口开放
-没有其他服务占用 80 / 443
-```
+推荐使用 Ubuntu 服务器。生产环境至少需要：
 
----
+- Docker 和 Docker Compose。
+- 域名已经解析到面板服务器。
+- 如启用 HTTPS，反向代理和证书由本项目栈处理。
+- MySQL/MariaDB 和 Redis 容器正常运行。
+- 服务器可以访问 GitHub。
+- 节点服务器可以访问 GitHub release assets，用于安装 `xnode-agent`。
 
-## 五、安装完成后检查
-
-查看容器状态：
+部署前检查：
 
 ```bash
-docker compose ps
+uname -a
+docker --version
+docker compose version
+git --version
+curl -I https://github.com
 ```
 
-理想状态：
+## 4. 首次部署
 
-```text
-app        Up
-nginx      Up
-caddy      Up
-mariadb    Up healthy
-redis      Up healthy
-scheduler  Up
-```
-
-检查 Compose 配置：
+新服务器首次部署可以使用通用路径 `/opt/SSPanel-UIM-Docker`：
 
 ```bash
-docker compose config
+cd /opt
+git clone https://github.com/makeausername/SSPanel-UIM-Docker.git
+cd /opt/SSPanel-UIM-Docker
+git checkout master
 ```
 
-检查 Nginx 配置：
+如果服务器已经部署过，不要重新 clone。已有部署应在原目录中拉取更新并重建服务：
 
 ```bash
-docker compose exec nginx nginx -t
-```
-
-检查 PHP-FPM 配置：
-
-```bash
-docker compose exec app php-fpm -t
-```
-
----
-
-## 六、访问网站
-
-浏览器打开：
-
-```text
-https://你的域名
-```
-
-常用入口：
-
-```text
-https://你的域名/auth/login
-https://你的域名/user
-https://你的域名/admin
-```
-
----
-
-## 七、测试 HTTPS 登录
-
-把邮箱替换成你的管理员邮箱：
-
-```bash
-read -rsp "Admin password: " ADMIN_PASS; echo
-```
-
-```bash
-curl -sS -i \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -H 'X-Requested-With: XMLHttpRequest' \
-  --data-urlencode 'email=你的管理员邮箱' \
-  --data-urlencode "password=${ADMIN_PASS}" \
-  --data-urlencode 'remember_me=true' \
-  https://你的域名/auth/login
-```
-
-```bash
-unset ADMIN_PASS
-```
-
-成功时应看到：
-
-```text
-hx-redirect: /user
-```
-
-HTTPS 模式下 Cookie 应包含：
-
-```text
-secure; HttpOnly
-```
-
----
-
-## 八、常用命令
-
-进入项目目录：
-
-```bash
-cd ~/YOUR_PRIVATE_REPO
-```
-
-查看容器状态：
-
-```bash
-docker compose ps
-```
-
-查看所有容器，包括已停止：
-
-```bash
-docker compose ps -a
-```
-
-查看 app 日志：
-
-```bash
-docker compose logs -f app
-```
-
-查看 nginx 日志：
-
-```bash
-docker compose logs -f nginx
-```
-
-查看 caddy 日志：
-
-```bash
-docker compose logs -f caddy
-```
-
-查看 scheduler 日志：
-
-```bash
-docker compose logs -f scheduler
-```
-
-查看 MariaDB 日志：
-
-```bash
-docker compose logs -f mariadb
-```
-
-查看 Redis 日志：
-
-```bash
-docker compose logs -f redis
-```
-
-查看最近 100 行 app 日志：
-
-```bash
-docker compose logs --tail=100 app
-```
-
-查看最近 100 行 nginx 日志：
-
-```bash
-docker compose logs --tail=100 nginx
-```
-
-查看最近 100 行 caddy 日志：
-
-```bash
-docker compose logs --tail=100 caddy
-```
-
-重启全部服务：
-
-```bash
-docker compose restart
-```
-
-重启 app：
-
-```bash
-docker compose restart app
-```
-
-重启 nginx：
-
-```bash
-docker compose restart nginx
-```
-
-重启 caddy：
-
-```bash
-docker compose restart caddy
-```
-
-重启 scheduler：
-
-```bash
-docker compose restart scheduler
-```
-
-停止服务：
-
-```bash
-docker compose down
-```
-
-启动服务：
-
-```bash
-docker compose up -d
-```
-
-重新构建并启动：
-
-```bash
-docker compose up -d --build
-```
-
-强制重新构建 app 镜像：
-
-```bash
-docker compose build --no-cache app
-```
-
-```bash
-docker compose up -d
-```
-
-查看实时资源占用：
-
-```bash
-docker stats
-```
-
----
-
-## 九、更新代码
-
-拉取最新代码：
-
-```bash
+cd /opt/SSPanel-UIM-Docker
 git pull
-```
-
-如果只改了文档或安装脚本，通常不需要重启容器。
-
-如果改了 Docker / PHP / Nginx / Caddy 配置，建议：
-
-```bash
-docker compose config
-```
-
-```bash
-docker compose down
-```
-
-```bash
 docker compose up -d --build
-```
-
-```bash
 docker compose ps
 ```
 
----
-
-## 十、修改配置后如何生效
-
-### 修改 .env
-
-如果修改了：
-
-```text
-.env
-```
-
-建议执行：
+首次生产启动：
 
 ```bash
-docker compose config
+cd /opt/SSPanel-UIM-Docker
+
+docker compose up -d --build
+docker compose ps
 ```
+
+## 5. 环境配置
+
+不要提交 `.env`、`config/.config.php` 或任何包含密钥的配置文件。
+
+生产配置应至少确认：
+
+- 面板域名和 `baseUrl` 正确。
+- 数据库密码、Redis 密码足够强。
+- 支付配置、Telegram 配置等私密信息只保存在服务器。
+- 使用项目现有配置模式，不在 README 或脚本中写死真实密钥。
+
+查看容器状态和最近日志：
 
 ```bash
-docker compose down
+cd /opt/SSPanel-UIM-Docker
+docker compose ps
+docker compose logs --since=10m app nginx caddy 2>/dev/null || true
 ```
+
+## 6. 数据库迁移
+
+拉取新 `master` 代码后，执行迁移：
 
 ```bash
-docker compose up -d
+cd /opt/SSPanel-UIM-Docker
+docker compose exec -T app php xcat Migration latest
 ```
 
-### 修改 config/.config.php
+该命令会创建或更新 XNode 相关表：
 
-如果修改了：
+- `node_tokens`
+- `node_runtimes`
+- `node_report_receipts`
+- `node_probe_results`
+- `node_probe_states`
+- `node_profiles`
 
-```text
-config/.config.php
-```
+重大生产更新前请先备份数据库。迁移失败时不要继续升级节点，先查看 `app` 日志和数据库日志。
 
-建议执行：
+## 7. 创建管理员账号
+
+本项目使用 `xcat` 工具创建管理员账号。交互式创建：
 
 ```bash
-docker compose restart app scheduler nginx
+cd /opt/SSPanel-UIM-Docker
+docker compose exec -it app php xcat Tool createAdmin
 ```
 
-### 修改 config/appprofile.php
-
-如果修改了：
-
-```text
-config/appprofile.php
-```
-
-建议执行：
+当前版本支持邮箱和密码参数时，也可以使用非交互方式：
 
 ```bash
-docker compose restart app scheduler nginx
+cd /opt/SSPanel-UIM-Docker
+docker compose exec -T app php xcat Tool createAdmin admin@example.com "CHANGE_ME_STRONG_PASSWORD"
 ```
 
-### 修改 Caddyfile
+如果你的当前版本不支持非交互参数，请使用交互式命令。
 
-如果修改了：
+## 8. 创建和配置节点
+
+登录后台后进入节点管理页面创建节点：
 
 ```text
-docker/caddy/Caddyfile
+https://panel.example.com/admin/node
 ```
 
-建议执行：
+编辑节点示例：
+
+```text
+https://panel.example.com/admin/node/1/edit
+```
+
+节点配置建议：
+
+- 节点类型选择 XNode / VLESS Reality Vision 对应的类型。
+- `server` 填节点域名，例如 `node1.example.com`。
+- 节点等级、用户组、倍率按业务需要设置。
+- 节点应启用并展示给符合条件的用户。
+- 节点域名应解析到节点服务器，不是面板服务器。
+
+## 9. 生成 XNode 节点安装命令
+
+推荐方式是在后台节点编辑页生成命令：
+
+1. 打开后台节点编辑页。
+2. 找到 XNode 安装命令按钮或区域。
+3. 生成一次性安装命令。
+4. 只在对应节点服务器上执行该命令。
+
+生成的命令会包含：
+
+- 面板 URL。
+- 节点 ID。
+- 节点域名。
+- 一次性 enroll token，格式为 `xne_...`。
+- Agent 版本 `v0.1.5`。
+
+也可以在面板服务器用 CLI 生成 enroll token：
 
 ```bash
-docker compose restart caddy
+cd /opt/SSPanel-UIM-Docker
+
+docker compose exec -T app php xcat Tool generateXNodeEnrollToken 1 600
 ```
 
-### 修改 Nginx 配置
+注意事项：
 
-如果修改了：
+- token 明文只显示一次。
+- 不要截图或转发 token。
+- token 应在 TTL 内使用。
+- 节点注册成功后，enroll token 会被标记为已使用。
 
-```text
-docker/nginx/default.conf
-```
+## 10. 安装 xnode-agent 节点
 
-先检查：
+以下命令在节点服务器执行，不是在面板服务器执行。请替换面板 URL、节点 ID、节点域名和 enroll token。
+
+通用安装命令：
 
 ```bash
-docker compose exec nginx nginx -t
+curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scripts/install.sh | bash -s -- \
+  --panel-url "https://panel.example.com" \
+  --node-id "1" \
+  --node-domain "node1.example.com" \
+  --enroll-token "xne_xxx" \
+  --version "v0.1.5"
 ```
 
-再重启：
+低资源节点推荐命令：
 
 ```bash
-docker compose restart nginx
+curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scripts/install.sh | bash -s -- \
+  --panel-url "https://panel.example.com" \
+  --node-id "1" \
+  --node-domain "node1.example.com" \
+  --enroll-token "xne_xxx" \
+  --version "v0.1.5" \
+  --online-interval-sec 120 \
+  --access-log-tail-bytes 1048576 \
+  --access-log-max-lines 5000 \
+  --probe-interval-sec 300
 ```
 
-### 修改 PHP 配置
+安装完成后，节点侧应保存 `xn_` node token，并由 `xnode-agent` 自动使用。不要手工把 `xn_` token 写入面板或公开日志。
 
-如果修改了：
+## 11. 验证节点状态
 
-```text
-docker/php/php.ini
-docker/php/opcache.ini
-docker/php/www.conf
-Dockerfile
-```
-
-建议重新构建：
+在节点服务器执行：
 
 ```bash
-docker compose build --no-cache app
+systemctl status xnode-agent --no-pager
+systemctl status xnode-xray --no-pager
+/usr/local/bin/xnode --version
+/usr/local/bin/xnode --check
+/usr/local/bin/xnode --metrics
+journalctl -u xnode-agent.service -n 100 --no-pager -o cat
 ```
+
+在面板服务器检查数据库状态：
 
 ```bash
-docker compose up -d
+cd /opt/SSPanel-UIM-Docker
+
+docker compose exec -T app php -r '
+require_once "vendor/autoload.php";
+require_once "config/.config.php";
+require_once "config/appprofile.php";
+require_once "app/predefine.php";
+
+App\Services\Boot::setTime();
+App\Services\Boot::bootDb();
+
+echo json_encode([
+    "nodes" => App\Services\DB::select("
+        SELECT id, name, server, node_heartbeat, FROM_UNIXTIME(node_heartbeat) AS heartbeat_time, type
+        FROM node
+        WHERE id IN (1,2)
+        ORDER BY id
+    "),
+    "runtime" => App\Services\DB::select("
+        SELECT node_id, agent_version, core_version, state, last_error, last_seen, FROM_UNIXTIME(last_seen) AS last_seen_time
+        FROM node_runtimes
+        WHERE node_id IN (1,2)
+        ORDER BY node_id
+    "),
+    "receipts" => App\Services\DB::select("
+        SELECT node_id, report_type, period_start, period_end, created_at
+        FROM node_report_receipts
+        WHERE node_id IN (1,2)
+        ORDER BY id DESC
+        LIMIT 30
+    ")
+], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . PHP_EOL;
+'
 ```
 
-### 修改 MariaDB 配置
+预期结果：
 
-如果修改了：
+- `node.node_heartbeat` 是近期时间。
+- `node_runtimes.last_seen` 是近期时间。
+- `node_report_receipts` 有 `heartbeat`、`online`、`traffic` 等记录。
+- 当前台节点心跳在 600 秒内时，前台节点状态应为绿色。
+
+## 12. 订阅验证
+
+用户订阅在节点运行状态包含 `public_key` 和 `short_ids` 后，应输出 VLESS Reality 链接。
+
+用户侧需要满足：
+
+- 用户有有效 UUID。
+- 用户未被封禁。
+- 用户等级满足节点等级要求。
+- 用户组匹配节点组。
+
+订阅 URL 格式：
 
 ```text
-docker/mariadb/99-sspanel.cnf
+https://panel.example.com/sub/<token>/v2ray
 ```
 
-执行：
+浏览器不能把节点域名当成普通网站直接打开。VLESS Reality 节点不是普通 HTTP 网站端点，客户端应使用 VLESS Reality 配置连接。
+
+## 13. 外部大陆探针 xnode-probe
+
+`xnode-probe` 建议运行在单独的大陆 VPS。它使用 `xnp_` probe token 上报到面板：
+
+```text
+/probe/api/v1/report
+```
+
+外部探针不使用 `xne_` enroll token，也不使用 `xn_` node token。
+
+在面板服务器生成 probe token：
 
 ```bash
-docker compose restart mariadb
+cd /opt/SSPanel-UIM-Docker
+docker compose exec -T app php xcat Tool generateXNodeProbeToken
 ```
 
-### 修改 Redis 配置
-
-如果修改了：
-
-```text
-docker/redis/redis.conf
-```
-
-执行：
+在探针 VPS 安装：
 
 ```bash
-docker compose restart redis
+curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scripts/install-probe.sh | bash -s -- \
+  --panel-url "https://panel.example.com" \
+  --probe-token "xnp_xxx" \
+  --probe-region "cn" \
+  --probe-provider "aliyun" \
+  --probe-location "cn-mainland-1" \
+  --target "1:node1.example.com:443" \
+  --target "2:node2.example.com:443" \
+  --interval-sec 300 \
+  --version "v0.1.5"
 ```
 
----
-
-## 十一、备份
-
-安装完成后，建议立刻备份：
-
-```text
-.env
-config/.config.php
-config/appprofile.php
-数据库
-```
-
-创建备份目录：
+一次性验证：
 
 ```bash
-mkdir -p ~/sspanel-backup
+xnode-probe --once \
+  --panel-url "https://panel.example.com" \
+  --probe-token "xnp_xxx" \
+  --probe-region "cn" \
+  --probe-provider "aliyun" \
+  --probe-location "cn-mainland-1" \
+  --target "1:node1.example.com:443" \
+  --target "2:node2.example.com:443" \
+  --json
 ```
 
-备份配置文件：
+## 14. 探针 DB 验证
+
+在面板服务器执行：
 
 ```bash
-cp .env ~/sspanel-backup/.env.backup
+cd /opt/SSPanel-UIM-Docker
+
+docker compose exec -T app php -r '
+require_once "vendor/autoload.php";
+require_once "config/.config.php";
+require_once "config/appprofile.php";
+require_once "app/predefine.php";
+
+App\Services\Boot::setTime();
+App\Services\Boot::bootDb();
+
+echo json_encode([
+    "probe_states" => App\Services\DB::select("
+        SELECT node_id, status, previous_status, probe_region, probe_provider, probe_location, probe_type, target_host, target_port, latency_ms, error, last_checked_at, last_changed_at
+        FROM node_probe_states
+        WHERE node_id IN (1,2)
+        ORDER BY node_id
+    "),
+    "recent_probe_results" => App\Services\DB::select("
+        SELECT node_id, probe_region, probe_provider, probe_location, probe_type, target_host, target_port, status, latency_ms, error, checked_at, created_at
+        FROM node_probe_results
+        WHERE node_id IN (1,2)
+        ORDER BY id DESC
+        LIMIT 20
+    ")
+], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . PHP_EOL;
+'
 ```
+
+预期结果：
+
+- `node_probe_results` 有近期记录。
+- `node_probe_states` 被更新。
+- `status = ok` 表示探针侧可达。
+- `suspected_blocked` 表示大陆探针怀疑该节点被阻断，不一定代表 `xnode-agent` 已停止。
+
+## 15. 常用运维命令
+
+面板服务器：
 
 ```bash
-cp config/.config.php ~/sspanel-backup/.config.php.backup
+cd /opt/SSPanel-UIM-Docker
+docker compose ps
+docker compose logs -f app
+docker compose logs -f nginx
+docker compose logs --since=10m app nginx caddy 2>/dev/null | grep -Ei "502|bad gateway|connect\(\) failed|connection refused|error|exception|fatal|panic|SQLSTATE|undefined" || true
 ```
+
+节点服务器：
 
 ```bash
-cp config/appprofile.php ~/sspanel-backup/appprofile.php.backup
+systemctl status xnode-agent --no-pager
+systemctl status xnode-xray --no-pager
+journalctl -u xnode-agent.service -f -o cat
+/usr/local/bin/xnode --metrics
+/usr/local/bin/xnode --probe-once
 ```
 
-备份数据库：
+探针 VPS：
 
 ```bash
-docker compose exec -T mariadb sh -lc 'mariadb-dump -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE"' > ~/sspanel-backup/sspanel.sql
+systemctl status xnode-probe.timer --no-pager
+systemctl status xnode-probe.service --no-pager
+journalctl -u xnode-probe.service -n 100 --no-pager -o cat
 ```
 
-查看备份：
+## 16. 升级流程
+
+面板升级：
 
 ```bash
-ls -lh ~/sspanel-backup
+cd /opt/SSPanel-UIM-Docker
+
+git fetch origin master
+git checkout -B master origin/master
+git log --oneline -1
+
+docker compose up -d --build app scheduler
+docker compose restart nginx caddy
+docker compose exec -T app php xcat Migration latest
+docker compose ps
 ```
 
----
+节点升级：
 
-## 十二、恢复数据库
-
-先确认备份文件存在：
+使用后台节点编辑页生成的新安装命令，或手工运行 `install.sh` 并指定版本：
 
 ```bash
-ls -lh ~/sspanel-backup/sspanel.sql
+curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scripts/install.sh | bash -s -- \
+  --panel-url "https://panel.example.com" \
+  --node-id "1" \
+  --node-domain "node1.example.com" \
+  --enroll-token "xne_xxx" \
+  --version "v0.1.5"
 ```
 
-恢复数据库：
+升级后重新执行节点状态和订阅验证。
+
+## 17. 回滚流程
+
+重大升级前先备份数据库。代码可以回滚到旧 commit，但数据库迁移不应随意回滚，除非你有明确备份和恢复计划。
+
+安全示例：
 
 ```bash
-docker compose exec -T mariadb sh -lc 'mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE"' < ~/sspanel-backup/sspanel.sql
+cd /opt/SSPanel-UIM-Docker
+git log --oneline -10
+git checkout -B rollback <COMMIT_SHA>
+docker compose up -d --build app scheduler
+docker compose restart nginx caddy
 ```
 
-恢复后重启服务：
-
-```bash
-docker compose restart app scheduler
-```
-
----
-
-## 十三、重要文件说明
-
-```text
-.env
-```
-
-Docker 环境变量文件，包含数据库密码、Redis 配置、Caddy 配置等。
-
-```text
-config/.config.php
-```
-
-SSPanel 核心配置文件，包含 baseUrl、muKey、数据库配置等。
-
-```text
-config/appprofile.php
-```
-
-应用配置文件。
-
-```text
-docker-compose.yml
-```
-
-Docker Compose 主配置。
-
-```text
-docker-compose.override.yml
-```
-
-HTTPS 模式下由安装脚本生成，用于绑定 443 端口。该文件默认被 Git 忽略。
-
-```text
-docker/caddy/Caddyfile
-```
-
-Caddy HTTPS 反向代理配置。
-
-```text
-docker/nginx/default.conf
-```
-
-Nginx 内部 Web 配置。
-
-```text
-docker/php/php.ini
-```
-
-PHP 基础配置。
-
-```text
-docker/php/opcache.ini
-```
-
-OPcache 配置。
-
-```text
-docker/php/www.conf
-```
-
-PHP-FPM 进程池配置。
-
-```text
-docker/mariadb/99-sspanel.cnf
-```
-
-MariaDB 性能配置。
-
-```text
-docker/redis/redis.conf
-```
-
-Redis 持久化与性能配置。
-
----
-
-## 十四、muKey 注意事项
-
-`muKey` 用于后期节点通信。
-
-安装时可以：
-
-```text
-手动输入 muKey
-留空自动生成
-```
+节点端如需回滚，可以重新安装上一个确认可用的 xnode-agent release 版本。
 
 注意：
 
-```text
-muKey 必须妥善保存
-muKey 位于 config/.config.php
-节点接入后不要随便修改 muKey
-如果修改 muKey，所有节点侧配置也必须同步修改
-```
+- 不要在没有备份的情况下回滚数据库。
+- 严重数据库问题优先恢复备份。
+- 回滚后重新验证管理员登录、订阅输出、节点心跳、探针上报。
 
----
+## 18. 备份建议
 
-## 十五、HTTPS 注意事项
+建议定期备份：
 
-HTTPS 模式需要：
+- 数据库 dump。
+- `.env`。
+- `config/.config.php`。
+- `config/appprofile.php`。
+- 用户上传资源和业务需要保留的本地文件。
 
-```text
-域名解析正确
-80 端口开放
-443 端口开放
-Caddy 正常运行
-没有其他服务占用 80 / 443
-```
+密钥配置应私密备份，不要提交到 Git。
 
-查看 Caddy 日志：
+示例：
 
 ```bash
-docker compose logs -f caddy
+cd /opt/SSPanel-UIM-Docker
+mkdir -p /opt/backups/sspanel
+
+docker compose exec -T mariadb sh -lc 'mariadb-dump -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE"' > /opt/backups/sspanel/sspanel-$(date +%F-%H%M%S).sql
 ```
 
-测试 HTTPS：
+如果你的实际服务名、数据库名、用户名或密码变量不同，请按当前部署调整。部分 MySQL 镜像可能使用 `mysqldump` 而不是 `mariadb-dump`。
+
+## 19. 常见问题
+
+### 节点前台显示黄色，但节点实际可用
+
+检查 `node.node_heartbeat` 是否近期更新。前台状态依赖心跳时间，首次注册或刚重启后可能需要等待下一次心跳。
+
+### `node_report_receipts` 没有 traffic
+
+检查是否有真实用户流量，查看 `xnode-agent` 日志，确认节点侧保存的是有效 `xn_` node token。
+
+### 订阅没有 VLESS 链接
+
+检查 `node_runtimes.public_key` 和 `node_runtimes.short_ids_json` 是否存在且格式正确；同时检查用户 UUID、用户等级、用户组和节点启用状态。
+
+### `xnode-probe` 返回 HTTP 401
+
+检查是否使用 `xnp_` probe token。数据库中对应 token 应为 `token_type = probe`、`node_id = 0`，且未过期、未撤销。
+
+### `xnode-probe` 返回 HTTP 500
+
+查看面板日志，重点搜索 `ProbeApiV1Controller`、`NodeProbeService`、`SQLSTATE`：
 
 ```bash
-curl -I https://你的域名
+cd /opt/SSPanel-UIM-Docker
+docker compose logs --since=10m app | grep -Ei "ProbeApiV1Controller|NodeProbeService|SQLSTATE|exception|fatal|error" || true
 ```
 
-正常应看到：
+### 浏览器无法打开节点域名
 
-```text
-HTTP/2 200
-via: 1.1 Caddy
-```
+VLESS Reality 节点不是普通网站端点，浏览器不能直接访问节点域名来判断节点是否可用。请使用客户端订阅或节点探针验证。
 
----
+### 面板 502
 
-## 十六、不要执行的危险命令
-
-不要随便执行：
+先查看容器状态和入口日志：
 
 ```bash
-docker compose down -v
-```
-
-这个命令会删除 Docker volume，可能导致：
-
-```text
-数据库丢失
-Redis 数据丢失
-Caddy 证书数据丢失
-需要重新初始化
-```
-
-正常停止服务只需要：
-
-```bash
-docker compose down
-```
-
----
-
-## 十七、常见问题
-
-### 1. HTTPS 证书申请失败
-
-检查 DNS：
-
-```bash
-ping 你的域名
-```
-
-检查 80 / 443：
-
-```bash
-ss -lntp
-```
-
-查看 Caddy 日志：
-
-```bash
-docker compose logs -f caddy
-```
-
-确认：
-
-```text
-域名解析到当前服务器
-80 端口开放
-443 端口开放
-Cloudflare 暂时使用 DNS only
-没有其他服务占用端口
-```
-
----
-
-### 2. 登录后没有反应
-
-查看 app 日志：
-
-```bash
-docker compose logs --tail=100 app
-```
-
-查看 nginx 日志：
-
-```bash
-docker compose logs --tail=100 nginx
-```
-
-测试登录接口：
-
-```bash
-read -rsp "Admin password: " ADMIN_PASS; echo
-```
-
-```bash
-curl -sS -i \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -H 'X-Requested-With: XMLHttpRequest' \
-  --data-urlencode 'email=你的管理员邮箱' \
-  --data-urlencode "password=${ADMIN_PASS}" \
-  --data-urlencode 'remember_me=true' \
-  https://你的域名/auth/login
-```
-
-```bash
-unset ADMIN_PASS
-```
-
-成功应看到：
-
-```text
-hx-redirect: /user
-```
-
----
-
-### 3. 数据库连接失败
-
-查看 MariaDB 状态：
-
-```bash
+cd /opt/SSPanel-UIM-Docker
 docker compose ps
+docker compose logs --since=10m app nginx caddy 2>/dev/null || true
 ```
 
-查看 MariaDB 日志：
+重点检查 `app` 是否启动、`nginx` 是否能连接 `app:9000`、`caddy` 是否正确转发。
 
-```bash
-docker compose logs --tail=100 mariadb
-```
+## 20. 安全注意事项
 
-测试数据库表：
+- 不要在截图、聊天记录或工单中贴出 token。
+- 不要提交 `.env`、带真实密钥的 `config/.config.php`、node token、probe token、Reality private key 或 `xray.json`。
+- `xne_` 一次性 enroll token 应短期有效，用完即失效。
+- `xnp_` probe token 泄露后应立即轮换。
+- 不要在没有强密码、MFA 或访问策略的情况下暴露后台管理入口。
+- 备份应加密或保存在私密位置。
+- 节点服务器和探针 VPS 应只保存自己需要的最小凭据。
 
-```bash
-docker compose exec -T mariadb sh -lc 'mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e "SHOW TABLES;"'
-```
+## 21. 生产验收清单
 
----
+上线前逐项确认：
 
-### 4. Scheduler 报错
-
-查看 Scheduler 日志：
-
-```bash
-docker compose logs --tail=100 scheduler
-```
-
-手动执行 Cron：
-
-```bash
-docker compose exec scheduler php xcat Cron
-```
-
----
-
-### 5. 修改代码后页面没有变化
-
-本版本启用了 OPcache 生产优化：
-
-```text
-opcache.validate_timestamps=0
-```
-
-修改代码后建议重建并重启：
-
-```bash
-docker compose build --no-cache app
-```
-
-```bash
-docker compose up -d
-```
-
----
-
-## 十八、性能优化说明
-
-本版本已包含 Docker 性能优化：
-
-```text
-PHP-FPM 进程池配置
-PHP 运行参数
-OPcache
-MariaDB 参数
-Redis RDB / AOF 持久化
-Docker nofile ulimits
-```
-
-查看资源占用：
-
-```bash
-docker stats
-```
-
-查看 PHP-FPM 配置是否正常：
-
-```bash
-docker compose exec app php-fpm -t
-```
-
-如果服务器内存较小，可以适当降低：
-
-```text
-PHP_FPM_MAX_CHILDREN
-PHP_FPM_START_SERVERS
-PHP_FPM_MIN_SPARE_SERVERS
-PHP_FPM_MAX_SPARE_SERVERS
-```
-
-这些参数通常在 `.env` 中配置。
-
----
-
-## 十九、私有仓库认证说明
-
-如果本仓库是 GitHub Private 仓库，clone 时需要认证。
-
-HTTPS clone 时：
-
-```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_PRIVATE_REPO.git
-```
-
-如果提示：
-
-```text
-Username:
-Password:
-```
-
-请填写：
-
-```text
-Username：你的 GitHub 用户名
-Password：GitHub Personal Access Token，不是 GitHub 登录密码
-```
-
-也可以使用 SSH：
-
-```bash
-git clone git@github.com:YOUR_USERNAME/YOUR_PRIVATE_REPO.git
-```
-
----
-
-## 二十、升级建议
-
-升级前先备份：
-
-```bash
-mkdir -p ~/sspanel-backup-before-update
-```
-
-```bash
-cp .env ~/sspanel-backup-before-update/.env.backup
-```
-
-```bash
-cp config/.config.php ~/sspanel-backup-before-update/.config.php.backup
-```
-
-```bash
-cp config/appprofile.php ~/sspanel-backup-before-update/appprofile.php.backup
-```
-
-拉取代码：
-
-```bash
-git pull
-```
-
-检查 Compose：
-
-```bash
-docker compose config
-```
-
-重建并启动：
-
-```bash
-docker compose down
-```
-
-```bash
-docker compose up -d --build
-```
-
-检查状态：
-
-```bash
-docker compose ps
-```
-
----
-
-## 二十一、免责声明
-
-本项目仅供自用部署、学习和测试。
-
-请自行确保：
-
-```text
-服务器安全
-数据备份
-域名配置
-合规使用
-密码安全
-数据库安全
-```
-
-不要在生产环境中使用弱密码。
-
-不要公开 `.env`、`config/.config.php`、`config/appprofile.php`。
-
-不要公开 muKey。
+- 面板容器健康。
+- `Migration latest` 已完成。
+- 管理员可以登录。
+- 节点编辑页可以生成 `v0.1.5` 安装命令。
+- `xnode-agent` 注册成功。
+- `xnode-xray` 处于 active 状态。
+- `node_runtimes.last_seen` 持续更新。
+- `node.node_heartbeat` 持续更新。
+- 前台节点状态为绿色。
+- `/sub/<token>/v2ray` 输出 VLESS Reality 链接。
+- `xnode-probe` 上报被面板接受。
+- `node_probe_results` 和 `node_probe_states` 持续更新。
+- 没有持续的 `500`、`502`、`SQLSTATE` 错误。
+- 所有 token、私钥和配置密钥没有泄露。
