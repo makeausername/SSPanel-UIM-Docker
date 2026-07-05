@@ -173,6 +173,11 @@ final class NodeProbeService
         return in_array($region, ['node-self', 'self', 'local', 'agent-self'], true);
     }
 
+    public static function isAllowedStatus(string $status): bool
+    {
+        return in_array(trim($status), self::ALLOWED_STATUSES, true);
+    }
+
     public static function summarizeNode(int $nodeId): array
     {
         if ($nodeId <= 0) {
@@ -268,7 +273,7 @@ final class NodeProbeService
     {
         $status = trim($status);
 
-        if (! in_array($status, self::ALLOWED_STATUSES, true)) {
+        if (! self::isAllowedStatus($status)) {
             return self::STATUS_ERROR;
         }
 
