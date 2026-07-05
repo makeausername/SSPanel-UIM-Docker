@@ -146,6 +146,57 @@
                         </div>
                     </div>
                 </div>
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">XNode 节点状态</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead>
+                                <tr>
+                                    <th>Node ID</th>
+                                    <th>Server</th>
+                                    <th>State</th>
+                                    <th>Last Seen</th>
+                                    <th>Last Error</th>
+                                    <th>Agent</th>
+                                    <th>Core</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {foreach $xnode_runtimes as $runtime}
+                                    <tr>
+                                        <td>#{$runtime->node_id}</td>
+                                        <td class="text-break">
+                                            {if $runtime->server}{$runtime->server|escape}{else}-{/if}
+                                        </td>
+                                        <td>
+                                            {if $runtime->state}{$runtime->state|escape}{else}-{/if}
+                                        </td>
+                                        <td>
+                                            {if $runtime->last_seen_formatted}{$runtime->last_seen_formatted|escape}{else}-{/if}
+                                        </td>
+                                        <td class="text-break">
+                                            {if $runtime->last_error}{$runtime->last_error|escape}{else}-{/if}
+                                        </td>
+                                        <td>
+                                            {if $runtime->agent_version}{$runtime->agent_version|escape}{else}-{/if}
+                                        </td>
+                                        <td>
+                                            {if $runtime->core_version}{$runtime->core_version|escape}{else}-{/if}
+                                        </td>
+                                    </tr>
+                                {foreachelse}
+                                    <tr>
+                                        <td colspan="7" class="text-secondary">暂无 XNode runtime 数据</td>
+                                    </tr>
+                                {/foreach}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

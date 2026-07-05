@@ -80,13 +80,14 @@ final class Node extends Model
      */
     public function sort(): string
     {
-        return match ($this->sort) {
+        return match ((int) $this->sort) {
             0 => 'Shadowsocks',
             1 => 'Shadowsocks2022',
             2 => 'TUIC',
             3 => 'WireGuard',
             11 => 'Vmess',
             14 => 'Trojan',
+            15 => 'XNode / VLESS Reality Vision',
             default => '未知',
         };
     }

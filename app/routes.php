@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Middleware\Admin;
 use App\Middleware\Guest;
+use App\Middleware\NodeApiToken;
 use App\Middleware\NodeToken;
+use App\Middleware\ProbeApiToken;
 use App\Middleware\User;
 use Slim\Routing\RouteCollectorProxy;
 
@@ -155,6 +157,10 @@ return static function (Slim\App $app): void {
         $group->post(
             '/node/{id:[0-9]+}/reset_bandwidth',
             App\Controllers\Admin\NodeController::class . ':resetBandwidth'
+        );
+        $group->post(
+            '/node/{id:[0-9]+}/xnode_install_command',
+            App\Controllers\Admin\NodeController::class . ':generateXNodeInstallCommand'
         );
         $group->post('/node/{id:[0-9]+}/copy', App\Controllers\Admin\NodeController::class . ':copy');
         $group->put('/node/{id:[0-9]+}', App\Controllers\Admin\NodeController::class . ':update');
@@ -343,14 +349,24 @@ return static function (Slim\App $app): void {
     //    $group->post('/{action}', App\Controllers\Api\UserApiV1Controller::class . ':actionHandler');
     //})->add(new UserApi());
 
-    // WebAPI V2(Aka Node API V1)
-    //$app->group('/node/api/v1', function (RouteCollectorProxy $group): void {
-    //    $group->put('/heartbeat', App\Controllers\Api\NodeApiV1Controller::class . ':getHeartbeat');
-    //    $group->get('/info', App\Controllers\Api\NodeApiV1Controller::class . ':getInfo');
-    //    $group->get('/user', App\Controllers\Api\NodeApiV1Controller::class . ':getUser');
-    //    $group->get('/detect_rule', App\Controllers\Api\NodeApiV1Controller::class . ':getDetectRule');
-    //    $group->post('/user/traffic', App\Controllers\Api\NodeApiV1Controller::class . ':addUserTraffic');
-    //    $group->post('/user/online_ip', App\Controllers\Api\NodeApiV1Controller::class . ':addUserOnlineIp');
-    //    $group->post('/user/detect_log', App\Controllers\Api\NodeApiV1Controller::class . ':addUserDetectLog');
-    //})->add(new NodeApi());
+    // XNode Node API V1
+    $app->group('/node/api/v1', static function (RouteCollectorProxy $group): void {
+        $nodeApiToken = new NodeApiToken();
+
+        $group->post('/enroll', App\Controllers\Api\NodeApiV1Controller::class . ':enroll');
+        $group->get('/config', App\Controllers\Api\NodeApiV1Controller::class . ':config')->add($nodeApiToken);
+        $group->get('/users', App\Controllers\Api\NodeApiV1Controller::class . ':users')->add($nodeApiToken);
+        $group->get('/detect-rules', App\Controllers\Api\NodeApiV1Controller::class . ':detectRules')->add($nodeApiToken);
+        $group->post('/runtime', App\Controllers\Api\NodeApiV1Controller::class . ':runtime')->add($nodeApiToken);
+        $group->post('/traffic', App\Controllers\Api\NodeApiV1Controller::class . ':traffic')->add($nodeApiToken);
+        $group->post('/online', App\Controllers\Api\NodeApiV1Controller::class . ':online')->add($nodeApiToken);
+        $group->post('/detect-log', App\Controllers\Api\NodeApiV1Controller::class . ':detectLog')->add($nodeApiToken);
+        $group->post('/probe', App\Controllers\Api\NodeApiV1Controller::class . ':probe')->add($nodeApiToken);
+        $group->post('/heartbeat', App\Controllers\Api\NodeApiV1Controller::class . ':heartbeat')->add($nodeApiToken);
+    });
+
+    // XNode external probe API V1
+    $app->group('/probe/api/v1', static function (RouteCollectorProxy $group): void {
+        $group->post('/report', App\Controllers\Api\ProbeApiV1Controller::class . ':report')->add(new ProbeApiToken());
+    });
 };

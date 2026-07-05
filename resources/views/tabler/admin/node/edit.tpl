@@ -71,11 +71,20 @@
                                 <div class="col">
                                     <select id="sort" class="col form-select" value="{$node->sort}">
                                         <option value="14" {if $node->sort === 14}selected{/if}>Trojan</option>
+                                        <option value="15" {if $node->sort === 15}selected{/if}>XNode / VLESS Reality Vision</option>
                                         <option value="11" {if $node->sort === 11}selected{/if}>Vmess</option>
                                         <option value="2" {if $node->sort === 2}selected{/if}>TUIC</option>
                                         <option value="1" {if $node->sort === 1}selected{/if}>Shadowsocks2022</option>
                                         <option value="0" {if $node->sort === 0}selected{/if}>Shadowsocks</option>
                                     </select>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
+                                <div class="col offset-3">
+                                    <button id="apply-xnode-reality-template" class="btn btn-outline-primary btn-sm" type="button">
+                                        <i class="icon ti ti-wand"></i>
+                                        使用 XNode Reality 模板
+                                    </button>
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
@@ -219,6 +228,100 @@
                                     通讯密钥用于 NodeAPI 鉴权，如需更改请点击重置
                                 </label>
                             </div>
+                            {if $node->sort === 15}
+                                <div class="hr-text">
+                                    <span>节点部署</span>
+                                </div>
+                                <div class="form-group mb-3 row">
+                                    <div class="col">
+                                        <div class="btn-list">
+                                            <button id="generate-xnode-install-command" class="btn btn-primary" type="button">
+                                                <i class="icon ti ti-terminal"></i>
+                                                生成 XNode 一键安装命令
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header card-header-light">
+                            <h3 class="card-title">XNode 节点状态</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="datagrid">
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">运行状态</div>
+                                    <div class="datagrid-content">
+                                        <span class="badge {$xnode_summary.status_class|escape}">{$xnode_summary.status_text|escape}</span>
+                                    </div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">最近心跳</div>
+                                    <div class="datagrid-content">{$xnode_summary.last_seen|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">Agent</div>
+                                    <div class="datagrid-content">{$xnode_summary.agent_version|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">Xray</div>
+                                    <div class="datagrid-content">{$xnode_summary.core_version|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">当前在线 IP</div>
+                                    <div class="datagrid-content">{$xnode_summary.online_count|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">节点已用流量</div>
+                                    <div class="datagrid-content">{$xnode_summary.node_bandwidth|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">最近 Traffic 上报</div>
+                                    <div class="datagrid-content">{$xnode_summary.latest_traffic_report|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">最近 Online 上报</div>
+                                    <div class="datagrid-content">{$xnode_summary.latest_online_report|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">可达性</div>
+                                    <div class="datagrid-content">
+                                        <span class="badge {$xnode_probe_summary.badge_class|escape}">{$xnode_probe_summary.label|escape}</span>
+                                    </div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测区域</div>
+                                    <div class="datagrid-content">{$xnode_probe_summary.latest_region|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测类型</div>
+                                    <div class="datagrid-content">{$xnode_probe_summary.latest_probe_type|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">检测时间</div>
+                                    <div class="datagrid-content">{$xnode_probe_summary.latest_checked_at|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">延迟</div>
+                                    <div class="datagrid-content">{$xnode_probe_summary.latest_latency_ms|escape}</div>
+                                </div>
+                                {if $xnode_probe_summary.latest_error !== ''}
+                                    <div class="datagrid-item">
+                                        <div class="datagrid-title">检测错误</div>
+                                        <div class="datagrid-content text-break">{$xnode_probe_summary.latest_error|escape}</div>
+                                    </div>
+                                {/if}
+                                {if $xnode_summary.last_error !== ''}
+                                    <div class="datagrid-item">
+                                        <div class="datagrid-title">Last Error</div>
+                                        <div class="datagrid-content text-break">{$xnode_summary.last_error|escape}</div>
+                                    </div>
+                                {/if}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -227,9 +330,51 @@
     </div>
 </div>
 
+<div class="modal modal-blur fade" id="xnode-install-command-dialog" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">XNode 一键安装命令</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    此一键安装命令 10 分钟内有效，请勿公开分享；请以 root 身份粘贴到目标 Linux 节点服务器执行。
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">有效期</label>
+                    <input id="xnode-token-expires" type="text" class="form-control" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Linux 一键安装命令</label>
+                    <textarea id="xnode-command-text" class="form-control font-monospace" rows="18" readonly></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn me-auto" data-bs-dismiss="modal">关闭</button>
+                <button id="copy-xnode-install-command" class="copy btn btn-primary" type="button" data-clipboard-target="#xnode-command-text">
+                    <i class="icon ti ti-copy"></i>
+                    复制命令
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     let clipboard = new ClipboardJS('.copy');
     clipboard.on('success', function (e) {
+        if (e.trigger && e.trigger.id === 'copy-xnode-install-command') {
+            $('#success-message').text('命令已复制，正在返回节点列表');
+            $('#success-dialog').modal('show');
+            $('#xnode-install-command-dialog').modal('hide');
+            clearXNodeInstallCommand();
+            window.setTimeout(function () {
+                window.location.href = '/admin/node';
+            }, 800);
+            return;
+        }
+
         $('#success-message').text('已复制到剪切板');
         $('#success-dialog').modal('show');
     });
@@ -240,6 +385,38 @@
     };
     const editor = new JSONEditor(container, options);
     editor.set({$node->custom_config})
+
+    const xnodeRealityTemplate = {
+        xnode: {
+            enabled: true,
+            profile: 'vless-reality-vision',
+            port: 443,
+            network: 'raw',
+            security: 'reality',
+            flow: 'xtls-rprx-vision',
+            sni: 'www.cloudflare.com',
+            fingerprint: 'chrome'
+        }
+    };
+
+    function fillIfEmpty(selector, value) {
+        let input = $(selector);
+        if (String(input.val() || '').trim() === '') {
+            input.val(value);
+        }
+    }
+
+    $("#apply-xnode-reality-template").click(function () {
+        $('#sort').val('15');
+        fillIfEmpty('#traffic_rate', '1');
+        fillIfEmpty('#node_class', '0');
+        fillIfEmpty('#node_group', '0');
+        fillIfEmpty('#node_speedlimit', '0');
+        fillIfEmpty('#node_bandwidth_limit', '0');
+        fillIfEmpty('#bandwidthlimit_resetday', '0');
+        $('#is_dynamic_rate').prop('checked', false);
+        editor.set(xnodeRealityTemplate);
+    });
 
     $("#reset-bandwidth").click(function () {
         $.ajax({
@@ -273,6 +450,92 @@
                 }
             }
         })
+    });
+
+    let xnodeTokenExpireTimer = null;
+
+    function clearXNodeInstallCommand() {
+        if (xnodeTokenExpireTimer !== null) {
+            window.clearTimeout(xnodeTokenExpireTimer);
+            xnodeTokenExpireTimer = null;
+        }
+
+        $('#xnode-token-expires').val('');
+        $('#xnode-command-text').val('');
+    }
+
+    function scheduleXNodeTokenClear(expiresIn) {
+        let seconds = Number(expiresIn || 600);
+
+        if (!Number.isFinite(seconds) || seconds <= 0) {
+            seconds = 600;
+        }
+
+        xnodeTokenExpireTimer = window.setTimeout(function () {
+            $('#xnode-token-expires').val('已过期，请重新生成一键安装命令');
+            $('#xnode-command-text').val('');
+            xnodeTokenExpireTimer = null;
+        }, seconds * 1000);
+    }
+
+    $("#generate-xnode-install-command").click(function () {
+        let button = $(this);
+        button.prop('disabled', true);
+        clearXNodeInstallCommand();
+
+        $.ajax({
+            url: '/admin/node/{$node->id}/xnode_install_command',
+            type: 'POST',
+            dataType: "json",
+            success: function (data) {
+                if (data.ret === 1) {
+                    let command = data.install_command || data.command || '';
+
+                    if (String(command).trim() === '') {
+                        $('#fail-message').text('生成 XNode 命令失败：未返回安装命令');
+                        $('#fail-dialog').modal('show');
+                        return;
+                    }
+
+                    let expiresIn = data.expires_in || 600;
+                    let expiresAt = data.expires_at_text || data.expires_at || '-';
+
+                    $('#xnode-token-expires').val('10 分钟内有效，过期时间：' + expiresAt);
+                    $('#xnode-command-text').val(command);
+                    $('#xnode-install-command-dialog').modal('show');
+                    scheduleXNodeTokenClear(expiresIn);
+                } else {
+                    $('#fail-message').text(data.msg);
+                    $('#fail-dialog').modal('show');
+                }
+            },
+            error: function () {
+                $('#fail-message').text('生成 XNode 命令失败');
+                $('#fail-dialog').modal('show');
+            },
+            complete: function () {
+                button.prop('disabled', false);
+            }
+        })
+    });
+
+    let xnodeInstallButton = $("#generate-xnode-install-command");
+    if (xnodeInstallButton.length > 0) {
+        let shouldOpenXNodeInstall = false;
+
+        if (window.URLSearchParams) {
+            shouldOpenXNodeInstall = (new URLSearchParams(window.location.search)).get('open_xnode_install') === '1';
+        } else {
+            shouldOpenXNodeInstall = window.location.search.indexOf('open_xnode_install=1') !== -1;
+        }
+
+        if (shouldOpenXNodeInstall) {
+            xnodeInstallButton.click();
+        }
+    }
+
+    $("#xnode-install-command-dialog").on('hidden.bs.modal', function () {
+        clearXNodeInstallCommand();
     });
 
     $("#save-node").click(function () {
