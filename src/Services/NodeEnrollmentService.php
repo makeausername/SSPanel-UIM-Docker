@@ -126,6 +126,30 @@ final class NodeEnrollmentService
     }
 
     /**
+     * Show the returned token once to the operator, then discard it.
+     */
+    public static function createProbeToken(?int $ttlSeconds = null): string
+    {
+        if ($ttlSeconds !== null && $ttlSeconds <= 0) {
+            throw new InvalidArgumentException('ttl_seconds must be a positive integer.');
+        }
+
+        $service = new self();
+        $now = time();
+        $probeToken = 'xnp_' . bin2hex(random_bytes(32));
+        $tokenRecord = new NodeToken();
+        $tokenRecord->node_id = 0;
+        $tokenRecord->token_hash = $service->hashToken($probeToken);
+        $tokenRecord->token_type = 'probe';
+        $tokenRecord->name = 'xnode-probe';
+        $tokenRecord->expires_at = $ttlSeconds === null ? null : $now + $ttlSeconds;
+        $tokenRecord->created_at = $now;
+        $tokenRecord->save();
+
+        return $probeToken;
+    }
+
+    /**
      * @param mixed $nodeId
      */
     private function parseNodeId($nodeId): int

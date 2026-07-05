@@ -52,6 +52,7 @@ final class Tool extends Command
 │ ├─ setLocale           - 为所有用户设置新的语言
 │ ├─ createAdmin         - 创建管理员帐号
 │ ├─ generateXNodeEnrollToken <node_id> [ttl_seconds] - Generate one-time XNode enroll token
+│ ├─ generateXNodeProbeToken [ttl_seconds] - Generate XNode external probe token
 │ └─ updateGeoIP2        - 更新 GeoIP2 数据库
 
 EOL;
@@ -446,6 +447,68 @@ EOL;
         echo '  -H "Authorization: Bearer <token above>" \\' . PHP_EOL;
         echo '  -H "Content-Type: application/json" \\' . PHP_EOL;
         echo "  -d '" . $payload . "'" . PHP_EOL;
+    }
+
+    public function generateXNodeProbeToken(): void
+    {
+        if (count($this->argv) > 4) {
+            echo 'Usage: php xcat Tool generateXNodeProbeToken [ttl_seconds]' . PHP_EOL;
+            return;
+        }
+
+        $ttlSeconds = null;
+
+        if (isset($this->argv[3])) {
+            $ttlArgument = trim((string) $this->argv[3]);
+
+            if (! ctype_digit($ttlArgument) || (int) $ttlArgument <= 0) {
+                echo 'ttl_seconds must be a positive integer.' . PHP_EOL;
+                return;
+            }
+
+            $ttlSeconds = (int) $ttlArgument;
+        }
+
+        $token = NodeEnrollmentService::createProbeToken($ttlSeconds);
+        $service = new NodeEnrollmentService();
+        $tokenRecord = (new NodeToken())
+            ->where('token_hash', $service->hashToken($token))
+            ->where('token_type', 'probe')
+            ->where('node_id', 0)
+            ->first();
+
+        if ($tokenRecord === null) {
+            echo 'Probe token was created, but the saved token record could not be verified.' . PHP_EOL;
+            return;
+        }
+
+        $panelUrl = $_ENV['baseUrl'] ?? '';
+        $panelUrl = $panelUrl === '' ? 'https://panel.example.com' : trim((string) $panelUrl);
+        $panelUrl = rtrim($panelUrl, '/');
+        $reportUrl = $panelUrl . '/probe/api/v1/report';
+
+        echo 'XNode external probe token created.' . PHP_EOL;
+        echo 'Token type: probe' . PHP_EOL;
+        echo 'Node ID: 0' . PHP_EOL;
+
+        if ($ttlSeconds === null) {
+            echo 'Expires: never' . PHP_EOL;
+        } else {
+            $expiresAt = (int) $tokenRecord->expires_at;
+
+            echo 'Expires in: ' . $ttlSeconds . ' seconds' . PHP_EOL;
+            echo 'Expires at: ' . date('Y-m-d H:i:s T', $expiresAt) . ' (' . $expiresAt . ')' . PHP_EOL;
+        }
+
+        echo 'Token: ' . $token . PHP_EOL;
+        echo 'Store this token only on the probe host.' . PHP_EOL . PHP_EOL;
+        echo 'Example xnode-probe install command:' . PHP_EOL;
+        echo 'xnode-probe install \\' . PHP_EOL;
+        echo '  --report-url ' . $reportUrl . ' \\' . PHP_EOL;
+        echo '  --probe-token <token above> \\' . PHP_EOL;
+        echo '  --probe-region cn \\' . PHP_EOL;
+        echo '  --probe-provider aliyun \\' . PHP_EOL;
+        echo '  --probe-location cn-mainland-1' . PHP_EOL;
     }
 
     public function updateGeoIP2(): void
