@@ -64,10 +64,13 @@ Usage:
   curl -fsSL https://raw.githubusercontent.com/makeausername/SSPanel-UIM-Docker/master/bootstrap.sh | sudo bash
   sudo bash bootstrap.sh
   sudo ./bootstrap.sh
+  sudo bash bootstrap.sh --resume
   sudo bash bootstrap.sh --upgrade
   sudo bash bootstrap.sh --reinstall
 
 Options:
+  --resume     Continue a partial installation that has configuration files but
+               no storage/.install_lock. Credentials and Docker volumes are kept.
   --upgrade    Update an existing installation without changing credentials.
   --reinstall  Enter the guarded reinstall flow. Existing Docker data is never
                deleted automatically.
@@ -77,11 +80,12 @@ EOF
 
 parse_args() {
     if [ "$#" -gt 1 ]; then
-        die "一次只能指定一个操作模式：--upgrade 或 --reinstall。"
+        die "一次只能指定一个操作模式：--resume、--upgrade 或 --reinstall。"
     fi
 
     case "${1:-}" in
         "") MODE="install" ;;
+        --resume) MODE="resume" ;;
         --upgrade) MODE="upgrade" ;;
         --reinstall) MODE="reinstall" ;;
         -h|--help)
@@ -437,8 +441,22 @@ has_existing_installation() {
 
 guard_default_install() {
     if has_existing_installation; then
+        if [ -f "${INSTALL_DIR}/.env" ] \
+            && [ -f "${INSTALL_DIR}/config/.config.php" ] \
+            && [ ! -e "${INSTALL_DIR}/storage/.install_lock" ]; then
+            die "检测到未完成的安装。请保留现有配置和 Docker volume，并使用 bootstrap.sh --resume。"
+        fi
         die "检测到已有安装，为避免数据库凭据失配，本次安装已安全终止。请使用 bootstrap.sh --upgrade。"
     fi
+}
+
+guard_resume_installation() {
+    [ -d "$INSTALL_DIR" ] || die "未找到 ${INSTALL_DIR}，不能执行恢复。首次安装请不要传 --resume。"
+    verify_repository_origin
+    [ -f "${INSTALL_DIR}/.env" ] || die "--resume 仅适用于已存在 .env 的部分安装。"
+    [ -f "${INSTALL_DIR}/config/.config.php" ] || die "--resume 仅适用于已存在 config/.config.php 的部分安装。"
+    [ ! -e "${INSTALL_DIR}/storage/.install_lock" ] \
+        || die "检测到 storage/.install_lock；该安装已经完成，请使用 --upgrade。"
 }
 
 confirm_reinstall() {
@@ -480,6 +498,15 @@ run_upgrade() {
     success "升级完成。所有配置文件和 Docker volume 均已保留。"
 }
 
+run_resume() {
+    guard_resume_installation
+    update_repository
+    cd "$INSTALL_DIR"
+    [ -f install.sh ] || die "仓库中缺少 install.sh。"
+    unset GITHUB_TOKEN GIT_ASKPASS GIT_TERMINAL_PROMPT || true
+    SSPANEL_INSTALL_MODE=resume exec bash ./install.sh
+}
+
 run_install() {
     if [ -e "$INSTALL_DIR" ]; then
         verify_repository_origin
@@ -519,6 +546,7 @@ main() {
     step 3 "准备面板仓库"
     case "$MODE" in
         install) run_install ;;
+        resume) run_resume ;;
         upgrade) run_upgrade ;;
         reinstall) run_reinstall ;;
     esac

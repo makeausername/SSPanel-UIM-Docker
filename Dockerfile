@@ -70,6 +70,9 @@ RUN set -eux; \
     php -r '$required = ["bcmath","curl","fileinfo","gmp","json","mbstring","mysqli","openssl","pdo","pdo_mysql","posix","redis","sodium","xml","yaml","zip"]; foreach ($required as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Missing required PHP extension: {$extension}\n"); exit(1); } } if (!extension_loaded("Zend OPcache") && !extension_loaded("opcache")) { fwrite(STDERR, "Missing required PHP extension: opcache\n"); exit(1); }'; \
     composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist; \
     sed -i 's/\r$//' docker/entrypoint.sh docker/cron/scheduler; \
+    bash -n docker/entrypoint.sh; \
+    bash -n docker/cron/scheduler; \
+    test -r docker/cron/scheduler; \
     mkdir -p \
         storage/framework \
         storage/framework/smarty/cache \

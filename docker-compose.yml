@@ -137,7 +137,9 @@ services:
       nofile:
         soft: 65535
         hard: 65535
-    command: ["/var/www/html/docker/cron/scheduler"]
+    command:
+      - bash
+      - /var/www/html/docker/cron/scheduler
     environment:
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
       APP_NAME: ${APP_NAME:-SSPanel-UIM}

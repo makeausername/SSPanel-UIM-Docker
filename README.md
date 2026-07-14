@@ -132,13 +132,24 @@ Token 必须使用 Fine-grained Personal Access Token，并且：
 
 HTTPS、80/443 端口和 `Asia/Shanghai` 时区使用固定生产默认值。数据库名、数据库用户、数据库密码、数据库 root 密码、Redis 密码、App Key 和 muKey 均由 OpenSSL 自动生成。
 
-成功后终端只显示一次完整凭据，并同时保存到：
+安全凭据写入 `.env` 和 `config/.config.php` 后，安装器会立即在 `/root` 创建权限为 `0600` 的恢复凭据文件。安装成功后，它会更新为正式凭据文件：
 
 ```text
 /root/eziplc-panel-credentials-YYYYMMDD-HHMMSS.txt
 ```
 
-该文件权限为 `0600`，包含站点 URL、管理员凭据、数据库凭据、Redis 密码、App Key、muKey、常用命令和备份提示。不要把该文件发送到聊天、工单或公开仓库。
+正式文件包含站点 URL、管理员凭据、数据库凭据、Redis 密码、App Key、muKey、常用命令和备份提示。安装失败时，恢复文件会保留并在错误信息中显示路径。`GITHUB_TOKEN` 不会写入任何凭据文件，管理员密码也不会写入 `.env`。不要把凭据文件发送到聊天、工单或公开仓库。
+
+### 恢复未完成的安装
+
+当 `.env` 和 `config/.config.php` 已存在、但 `storage/.install_lock` 尚未生成时，可以安全续装：
+
+```bash
+cd /opt/SSPanel-UIM-Docker
+sudo bash bootstrap.sh --resume
+```
+
+恢复模式保留现有数据库、Redis、App Key、muKey 和所有 Docker volume；它不会再次执行 `Migration new`，只会重建服务、执行 `Migration latest`、跳过已经存在的管理员，然后验证容器与 HTTPS。验证成功后才写入安装锁。
 
 ### 升级现有安装
 
@@ -165,7 +176,7 @@ docker compose logs -f caddy
 docker compose logs --tail=200 mariadb
 ```
 
-备份至少应包含 `.env`、`config/.config.php`、`config/appprofile.php`、数据库导出文件，以及确有需要的 Docker volume。安装失败时脚本会显示失败阶段、`docker compose ps` 和对应日志命令，但不会自动删除数据卷。HTTPS 失败时检查 DNS、80/443、防火墙、端口占用和 Cloudflare 代理状态。
+备份至少应包含 `.env`、`config/.config.php`、`config/appprofile.php`、数据库导出文件，以及确有需要的 Docker volume。安装失败时脚本会显示失败阶段、恢复凭据路径、`docker compose ps` 和对应日志命令，但不会自动删除数据卷。HTTPS 失败时检查 DNS、80/443、防火墙、端口占用和 Cloudflare 代理状态。
 
 ## 4. 手动部署
 

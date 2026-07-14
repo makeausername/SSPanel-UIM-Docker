@@ -37,6 +37,8 @@ REDIS_PASSWORD=""
 APP_KEY=""
 MU_KEY=""
 CREDENTIALS_FILE=""
+RECOVERY_CREDENTIALS_FILE=""
+ADMIN_PASSWORD_RECOVERABLE="false"
 
 CURRENT_STAGE="启动安装程序"
 INSTALL_SUCCEEDED="false"
@@ -155,6 +157,11 @@ failure_report() {
         docker compose ps >&2 2>/dev/null || true
     fi
 
+    if [ -n "$RECOVERY_CREDENTIALS_FILE" ] && [ -f "$RECOVERY_CREDENTIALS_FILE" ]; then
+        printf '\n恢复凭据已保留：%s\n' "$RECOVERY_CREDENTIALS_FILE" >&2
+        printf '修复问题后可运行：sudo bash bootstrap.sh --resume\n' >&2
+    fi
+
     cat >&2 <<'EOF'
 
 建议的排查命令：
@@ -247,6 +254,9 @@ guard_existing_installation() {
     case "$INSTALL_MODE" in
         install)
             if has_installation_files || compose_has_containers || has_mariadb_volume; then
+                if [ -f "$ENV_FILE" ] && [ -f "$APP_CONFIG_FILE" ] && [ ! -e "$INSTALL_LOCK" ]; then
+                    die "检测到未完成的安装。请保留现有配置和 Docker volume，并使用 bootstrap.sh --resume。"
+                fi
                 die "检测到已有安装，为避免数据库凭据失配，本次安装已安全终止。请使用 bootstrap.sh --upgrade。"
             fi
             ;;
@@ -256,6 +266,11 @@ guard_existing_installation() {
             if compose_has_containers || has_mariadb_volume; then
                 die "检测到现有容器或 MariaDB volume。脚本不会自动删除生产数据，请先备份并手工处理。"
             fi
+            ;;
+        resume)
+            [ -f "$ENV_FILE" ] || die "恢复模式要求现有 .env。"
+            [ -f "$APP_CONFIG_FILE" ] || die "恢复模式要求现有 config/.config.php。"
+            [ ! -e "$INSTALL_LOCK" ] || die "检测到 storage/.install_lock；已完成的安装不能使用 --resume。"
             ;;
         *) die "不支持的安装模式：${INSTALL_MODE}" ;;
     esac
@@ -350,6 +365,7 @@ prompt_admin_password() {
             continue
         fi
         ADMIN_PASSWORD="$first"
+        ADMIN_PASSWORD_RECOVERABLE="true"
         return 0
     done
 }
@@ -450,6 +466,89 @@ atomic_write() {
     cat > "$temp_file"
     chmod "$mode" "$temp_file"
     mv -f -- "$temp_file" "$target"
+}
+
+read_env_value() {
+    local key="$1"
+    local value
+
+    value="$(sed -n "s/^${key}=//p" "$ENV_FILE" | tail -n 1)"
+    [ -n "$value" ] || die "现有 .env 缺少 ${key}。"
+    case "$value" in
+        \'*\') value="${value#\'}"; value="${value%\'}" ;;
+        \"*\") value="${value#\"}"; value="${value%\"}" ;;
+    esac
+    value="${value//\\\'/\'}"
+    value="${value//\\\\/\\}"
+    printf '%s' "$value"
+}
+
+read_php_hex_value() {
+    local key="$1"
+    local value
+
+    value="$(sed -n "s/^[[:space:]]*\\\$_ENV\['${key}'\][[:space:]]*=[[:space:]]*'\([0-9a-f]*\)'.*/\1/p" "$APP_CONFIG_FILE" | tail -n 1)"
+    [ -n "$value" ] || die "现有 config/.config.php 缺少可恢复的 ${key}。"
+    printf '%s' "$value"
+}
+
+credential_field() {
+    local label="$1"
+    local source_file="$2"
+
+    sed -n "s/^${label}: //p" "$source_file" | head -n 1
+}
+
+find_recovery_credentials_file() {
+    local candidate
+    local matched=""
+
+    for candidate in /root/eziplc-panel-recovery-*.txt; do
+        [ -f "$candidate" ] || continue
+        if grep -Fqx "安装目录: ${INSTALL_DIR}" "$candidate"; then
+            matched="$candidate"
+        fi
+    done
+    printf '%s' "$matched"
+}
+
+load_existing_credentials() {
+    local recoverable
+
+    APP_DOMAIN="$(read_env_value APP_DOMAIN)"
+    APP_NAME="$(read_env_value APP_NAME)"
+    HTTPS_ENABLED="$(read_env_value HTTPS_ENABLED)"
+    HTTP_PORT="$(read_env_value HTTP_PORT)"
+    HTTPS_PORT="$(read_env_value HTTPS_PORT)"
+    CADDY_SITE_ADDRESS="$(read_env_value CADDY_SITE_ADDRESS)"
+    DB_DATABASE="$(read_env_value DB_DATABASE)"
+    DB_USERNAME="$(read_env_value DB_USERNAME)"
+    DB_PASSWORD="$(read_env_value DB_PASSWORD)"
+    DB_ROOT_PASSWORD="$(read_env_value DB_ROOT_PASSWORD)"
+    REDIS_PASSWORD="$(read_env_value REDIS_PASSWORD)"
+    TZ="$(read_env_value TZ)"
+    APP_KEY="$(read_php_hex_value key)"
+    MU_KEY="$(read_php_hex_value muKey)"
+    BASE_URL="https://${APP_DOMAIN}"
+
+    valid_domain "$APP_DOMAIN" || die "现有 .env 中的 APP_DOMAIN 无效。"
+    validate_hex_value "数据库密码" "$DB_PASSWORD" 48
+    validate_hex_value "数据库 root 密码" "$DB_ROOT_PASSWORD" 48
+    validate_hex_value "Redis 密码" "$REDIS_PASSWORD" 48
+    validate_hex_value "App Key" "$APP_KEY" 64
+    validate_hex_value "muKey" "$MU_KEY" 64
+
+    RECOVERY_CREDENTIALS_FILE="$(find_recovery_credentials_file)"
+    if [ -n "$RECOVERY_CREDENTIALS_FILE" ]; then
+        recoverable="$(credential_field "管理员密码可恢复" "$RECOVERY_CREDENTIALS_FILE")"
+        ADMIN_EMAIL="$(credential_field "管理员账号" "$RECOVERY_CREDENTIALS_FILE")"
+        if [ "$recoverable" = "yes" ]; then
+            ADMIN_PASSWORD="$(credential_field "管理员密码" "$RECOVERY_CREDENTIALS_FILE")"
+            ADMIN_PASSWORD_RECOVERABLE="true"
+        fi
+    fi
+
+    success "已读取现有配置；数据库、Redis、App Key 和 muKey 均保持不变。"
 }
 
 write_env_file() {
@@ -649,18 +748,107 @@ create_admin() {
     success "管理员账号已创建。"
 }
 
+ensure_admin_for_resume() {
+    local admin_count
+    local existing_admin_email
+
+    admin_count="$(run_mariadb_root_sql "SELECT COUNT(*) FROM \`user\` WHERE is_admin = 1;" | tr -d '[:space:]')" \
+        || die "无法检查现有管理员账号。"
+    [[ "$admin_count" =~ ^[0-9]+$ ]] || die "管理员数量检查返回意外结果：${admin_count:-empty}。"
+
+    if [ "$admin_count" -gt 0 ]; then
+        existing_admin_email="$(run_mariadb_root_sql "SELECT email FROM \`user\` WHERE is_admin = 1 ORDER BY id LIMIT 1;" | sed -n '1p')" \
+            || die "无法读取现有管理员账号。"
+        valid_email "$ADMIN_EMAIL" || ADMIN_EMAIL="$existing_admin_email"
+        success "检测到现有管理员账号，跳过重复创建。"
+        write_recovery_credentials_file
+        return 0
+    fi
+
+    if ! valid_email "$ADMIN_EMAIL" \
+        || [ "$ADMIN_PASSWORD_RECOVERABLE" != "true" ] \
+        || [ "${#ADMIN_PASSWORD}" -lt 12 ]; then
+        warn "未找到现有管理员和可恢复的管理员凭据，请创建管理员。"
+        prompt_admin_email
+        prompt_admin_password
+        write_recovery_credentials_file
+    fi
+    create_admin
+}
+
 verify_containers() {
+    local timeout_seconds=60
+    local started_at
     local service
     local container_id
     local status
+    local health
+    local effective_status
+    local exit_code
+    local all_ready
+    local pending_service
+    local pending_status
+    local pending_exit_code
 
-    for service in mariadb redis app nginx caddy scheduler; do
-        container_id="$(docker compose ps -q "$service" | sed -n '1p')"
-        [ -n "$container_id" ] || die "未找到 ${service} 容器。"
-        status="$(docker inspect --format '{{.State.Status}}' "$container_id" 2>/dev/null || true)"
-        [ "$status" = "running" ] || die "${service} 容器状态为 ${status:-unknown}。"
+    started_at="$(date +%s)"
+    while true; do
+        all_ready="true"
+        pending_service=""
+        pending_status=""
+        pending_exit_code=""
+
+        for service in mariadb redis app nginx caddy scheduler; do
+            status=""
+            health=""
+            effective_status="unknown"
+            exit_code="unknown"
+            container_id="$(docker compose ps -aq "$service" | sed -n '1p')"
+            if [ -z "$container_id" ]; then
+                all_ready="false"
+                effective_status="not-found"
+                exit_code="unknown"
+            else
+                status="$(docker inspect --format '{{.State.Status}}' "$container_id" 2>/dev/null || true)"
+                health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id" 2>/dev/null || true)"
+                exit_code="$(docker inspect --format '{{.State.ExitCode}}' "$container_id" 2>/dev/null || true)"
+                effective_status="${health:-${status:-unknown}}"
+
+                case "$effective_status" in
+                    running|healthy) continue ;;
+                esac
+                all_ready="false"
+            fi
+
+            pending_service="$service"
+            pending_status="$effective_status"
+            pending_exit_code="$exit_code"
+
+            case "${status:-$effective_status}" in
+                restarting|exited|dead)
+                    docker compose ps >&2 || true
+                    docker compose logs --tail=100 "$service" >&2 || true
+                    die "${service} 容器状态为 ${status:-$effective_status}，ExitCode=${exit_code:-unknown}。"
+                    ;;
+            esac
+            if [ "$effective_status" = "unhealthy" ]; then
+                docker compose ps >&2 || true
+                docker compose logs --tail=100 "$service" >&2 || true
+                die "${service} 容器状态为 unhealthy，ExitCode=${exit_code:-unknown}。"
+            fi
+        done
+
+        if [ "$all_ready" = "true" ]; then
+            success "全部 Docker 服务均处于 running 或 healthy 状态。"
+            return 0
+        fi
+
+        if [ $(( "$(date +%s)" - started_at )) -ge "$timeout_seconds" ]; then
+            docker compose ps >&2 || true
+            docker compose logs --tail=100 "$pending_service" >&2 || true
+            die "等待 ${pending_service} 容器就绪超过 ${timeout_seconds} 秒，状态为 ${pending_status:-unknown}，ExitCode=${pending_exit_code:-unknown}。"
+        fi
+        sleep 3
     done
-    success "全部 Docker 服务均处于运行状态。"
 }
 
 verify_https() {
@@ -685,22 +873,34 @@ verify_https() {
     done
 }
 
-write_credentials_file() {
+write_credentials_document() {
+    local target="$1"
+    local status_label="$2"
     local created_at
-    local timestamp
+    local admin_email_display
+    local admin_password_display
+    local recoverable_label
 
     created_at="$(date '+%Y-%m-%d %H:%M:%S %Z')"
-    timestamp="$(date '+%Y%m%d-%H%M%S')"
-    CREDENTIALS_FILE="/root/eziplc-panel-credentials-${timestamp}.txt"
+    admin_email_display="${ADMIN_EMAIL:-恢复完成后从数据库确认}"
+    if [ "$ADMIN_PASSWORD_RECOVERABLE" = "true" ]; then
+        admin_password_display="$ADMIN_PASSWORD"
+        recoverable_label="yes"
+    else
+        admin_password_display="未保存在现有配置中；请继续使用原管理员密码"
+        recoverable_label="no"
+    fi
 
-    atomic_write "$CREDENTIALS_FILE" 0600 <<EOF
+    atomic_write "$target" 0600 <<EOF
 EzIPLC / SSPanel-UIM-Docker 安装凭据
+状态: ${status_label}
 创建时间: ${created_at}
 站点 URL: ${BASE_URL}
 安装目录: ${INSTALL_DIR}
 
-管理员账号: ${ADMIN_EMAIL}
-管理员密码: ${ADMIN_PASSWORD}
+管理员账号: ${admin_email_display}
+管理员密码可恢复: ${recoverable_label}
+管理员密码: ${admin_password_display}
 
 数据库主机: mariadb
 数据库端口: 3306
@@ -729,7 +929,41 @@ muKey: ${MU_KEY}
   永远不要随意执行 docker compose down -v。
 EOF
 
-    [ "$(stat -c '%a' "$CREDENTIALS_FILE")" = "600" ] || die "凭据文件权限不是 0600。"
+    [ "$(stat -c '%a' "$target")" = "600" ] || die "凭据文件权限不是 0600：${target}"
+}
+
+write_recovery_credentials_file() {
+    local timestamp
+
+    if [ -z "$RECOVERY_CREDENTIALS_FILE" ]; then
+        timestamp="$(date '+%Y%m%d-%H%M%S')"
+        RECOVERY_CREDENTIALS_FILE="/root/eziplc-panel-recovery-${timestamp}.txt"
+    fi
+    write_credentials_document "$RECOVERY_CREDENTIALS_FILE" "安装未完成（恢复凭据）"
+    success "恢复凭据已安全写入 ${RECOVERY_CREDENTIALS_FILE}（权限 0600）。"
+}
+
+finalize_credentials_file() {
+    local timestamp
+
+    [ -n "$RECOVERY_CREDENTIALS_FILE" ] || die "恢复凭据文件尚未创建。"
+    case "$RECOVERY_CREDENTIALS_FILE" in
+        /root/eziplc-panel-recovery-*.txt)
+            CREDENTIALS_FILE="${RECOVERY_CREDENTIALS_FILE/eziplc-panel-recovery-/eziplc-panel-credentials-}"
+            ;;
+        *)
+            timestamp="$(date '+%Y%m%d-%H%M%S')"
+            CREDENTIALS_FILE="/root/eziplc-panel-credentials-${timestamp}.txt"
+            ;;
+    esac
+
+    write_credentials_document "$CREDENTIALS_FILE" "安装成功（正式凭据）"
+}
+
+remove_recovery_credentials_file() {
+    [ -n "$RECOVERY_CREDENTIALS_FILE" ] || return 0
+    rm -f -- "$RECOVERY_CREDENTIALS_FILE"
+    RECOVERY_CREDENTIALS_FILE=""
 }
 
 write_install_lock() {
@@ -748,7 +982,11 @@ print_credentials_summary() {
     printf '│ 站点地址: %s\n' "$BASE_URL"
     printf '│ 安装目录: %s\n' "$INSTALL_DIR"
     printf '│ 管理员账号: %s\n' "$ADMIN_EMAIL"
-    printf '│ 管理员密码: %s\n' "$ADMIN_PASSWORD"
+    if [ "$ADMIN_PASSWORD_RECOVERABLE" = "true" ]; then
+        printf '│ 管理员密码: %s\n' "$ADMIN_PASSWORD"
+    else
+        printf '│ 管理员密码: 未保存在现有配置中，请继续使用原密码\n'
+    fi
     printf '│ 数据库主机: mariadb\n'
     printf '│ 数据库端口: 3306\n'
     printf '│ 数据库名称: %s\n' "$DB_DATABASE"
@@ -771,10 +1009,59 @@ print_credentials_summary() {
     warn "不要将凭据文件发送到聊天、工单或公开仓库。"
 }
 
+resume_installation() {
+    show_step 1 "检查部分安装状态"
+    require_root
+    require_runtime
+    acquire_install_lock
+    guard_existing_installation
+    success "确认存在 .env 和 config/.config.php，且尚未写入安装锁。"
+
+    show_step 2 "读取现有配置和恢复凭据"
+    load_existing_credentials
+    [ -f "$APP_PROFILE_FILE" ] || write_appprofile_file
+    [ -f "$COMPOSE_OVERRIDE_FILE" ] || write_compose_override
+    write_recovery_credentials_file
+    validate_compose_config
+
+    show_step 3 "重建 Docker 镜像"
+    build_images
+    success "Docker 镜像重建完成，未重新生成任何凭据。"
+
+    show_step 4 "启动现有服务"
+    docker_compose_up mariadb redis
+    wait_for_health mariadb 240
+    wait_for_health redis 120
+    docker_compose_up app nginx caddy scheduler
+    ensure_app_autoload
+
+    show_step 5 "更新数据库结构"
+    run_init_command Migration latest
+
+    show_step 6 "确认管理员账号"
+    ensure_admin_for_resume
+
+    show_step 7 "验证 Docker 服务"
+    verify_containers
+
+    show_step 8 "验证 HTTPS 并完成恢复"
+    verify_https || die "HTTPS 验证失败，恢复安装不会被标记为成功。"
+    finalize_credentials_file
+    write_install_lock
+    remove_recovery_credentials_file
+    INSTALL_SUCCEEDED="true"
+    print_credentials_summary
+}
+
 main() {
     cd "$SCRIPT_DIR"
     unset GITHUB_TOKEN GIT_ASKPASS GIT_TERMINAL_PROMPT || true
     banner
+
+    if [ "$INSTALL_MODE" = "resume" ]; then
+        resume_installation
+        return 0
+    fi
 
     show_step 1 "检查服务器环境"
     require_root
@@ -798,6 +1085,7 @@ main() {
     write_config_file
     write_appprofile_file
     write_compose_override
+    write_recovery_credentials_file
     validate_compose_config
 
     show_step 5 "构建 Docker 镜像"
@@ -821,8 +1109,9 @@ main() {
     show_step 8 "验证站点"
     verify_containers
     verify_https || die "HTTPS 验证失败，安装不会被标记为成功。"
-    write_credentials_file
+    finalize_credentials_file
     write_install_lock
+    remove_recovery_credentials_file
     INSTALL_SUCCEEDED="true"
     print_credentials_summary
 }

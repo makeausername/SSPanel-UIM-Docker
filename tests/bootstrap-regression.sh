@@ -22,6 +22,53 @@ assert_help_output() {
         printf 'ERROR: %s did not print bootstrap help.\n%s\n' "$label" "$output" >&2
         return 1
     fi
+    if [[ "$output" != *"--resume"* ]]; then
+        printf 'ERROR: %s did not document --resume.\n%s\n' "$label" "$output" >&2
+        return 1
+    fi
+}
+
+assert_file_contains() {
+    local file="$1"
+    local expected="$2"
+
+    grep -Fq -- "$expected" "$file" || {
+        printf 'ERROR: %s does not contain required text: %s\n' "$file" "$expected" >&2
+        return 1
+    }
+}
+
+function_body() {
+    local function_name="$1"
+    local file="$2"
+
+    sed -n "/^${function_name}() {$/,/^}$/p" "$file"
+}
+
+assert_function_contains() {
+    local function_name="$1"
+    local file="$2"
+    local expected="$3"
+    local body
+
+    body="$(function_body "$function_name" "$file")"
+    [[ "$body" == *"$expected"* ]] || {
+        printf 'ERROR: %s in %s does not contain required text: %s\n' "$function_name" "$file" "$expected" >&2
+        return 1
+    }
+}
+
+assert_function_excludes() {
+    local function_name="$1"
+    local file="$2"
+    local forbidden="$3"
+    local body
+
+    body="$(function_body "$function_name" "$file")"
+    [[ "$body" != *"$forbidden"* ]] || {
+        printf 'ERROR: %s in %s contains forbidden text: %s\n' "$function_name" "$file" "$forbidden" >&2
+        return 1
+    }
 }
 
 test_reader() {
@@ -92,5 +139,22 @@ test_caller
 test_other_return_targets
 assert_read_tty_shape install.sh
 assert_read_tty_shape bootstrap.sh
+assert_file_contains docker-compose.yml '      - bash'
+assert_file_contains docker-compose.yml '      - /var/www/html/docker/cron/scheduler'
+assert_file_contains Dockerfile 'bash -n docker/entrypoint.sh; \'
+assert_file_contains Dockerfile 'bash -n docker/cron/scheduler; \'
+assert_file_contains Dockerfile 'test -r docker/cron/scheduler; \'
+assert_function_contains verify_containers install.sh 'local timeout_seconds=60'
+assert_function_contains verify_containers install.sh 'sleep 3'
+assert_function_contains verify_containers install.sh 'docker compose logs --tail=100 "$service"'
+assert_function_contains verify_containers install.sh 'ExitCode=${exit_code:-unknown}'
+assert_function_contains resume_installation install.sh 'run_init_command Migration latest'
+assert_function_excludes resume_installation install.sh 'Migration new'
+assert_function_contains resume_installation install.sh 'ensure_admin_for_resume'
+assert_function_contains resume_installation install.sh 'verify_https'
+assert_function_contains resume_installation install.sh 'write_install_lock'
+assert_function_excludes resume_installation install.sh 'down -v'
+assert_function_excludes write_env_file install.sh 'ADMIN_PASSWORD'
+assert_function_excludes write_credentials_document install.sh 'GITHUB_TOKEN'
 
 printf 'installer regression tests passed.\n'
