@@ -204,6 +204,7 @@ require_command() {
 
 require_runtime() {
     require_command docker
+    require_command git
     require_command openssl
     require_command curl
     docker compose version >/dev/null 2>&1 || die "需要 Docker Compose v2 插件，请使用 'docker compose'。"
@@ -211,6 +212,72 @@ require_runtime() {
     [ -f "$APP_CONFIG_EXAMPLE" ] || die "缺少模板：${APP_CONFIG_EXAMPLE}"
     [ -f "$APP_PROFILE_EXAMPLE" ] || die "缺少模板：${APP_PROFILE_EXAMPLE}"
     [ -f docker-compose.yml ] || die "缺少 docker-compose.yml。"
+}
+
+normalize_repository_permissions() {
+    local record
+    local mode
+    local path
+    local parent
+
+    [ -d "${INSTALL_DIR}/.git" ] \
+        || die "无法规范化权限：${INSTALL_DIR} 不是 Git 仓库。"
+
+    chmod 0755 "$INSTALL_DIR"
+
+    while IFS= read -r -d '' record; do
+        mode="${record%% *}"
+        path="${record#*$'\t'}"
+
+        [ "$path" != "$record" ] \
+            || die "无法解析 Git 文件记录。"
+
+        parent="$(dirname -- "$path")"
+        while [ "$parent" != "." ] && [ "$parent" != "/" ]; do
+            if [ -d "${INSTALL_DIR}/${parent}" ]; then
+                chmod 0755 "${INSTALL_DIR}/${parent}"
+            fi
+            parent="$(dirname -- "$parent")"
+        done
+
+        # Never follow or change tracked symbolic links.
+        if [ -L "${INSTALL_DIR}/${path}" ]; then
+            continue
+        fi
+
+        [ -f "${INSTALL_DIR}/${path}" ] || continue
+
+        case "$path" in
+            bootstrap.sh|install.sh|docker/entrypoint.sh|docker/cron/scheduler)
+                chmod 0755 "${INSTALL_DIR}/${path}"
+                ;;
+            *)
+                case "$mode" in
+                    100755)
+                        chmod 0755 "${INSTALL_DIR}/${path}"
+                        ;;
+                    *)
+                        chmod 0644 "${INSTALL_DIR}/${path}"
+                        ;;
+                esac
+                ;;
+        esac
+    done < <(git -C "$INSTALL_DIR" ls-files -s -z)
+
+    success "Git 跟踪文件权限已规范化。"
+}
+
+verify_repository_permissions() {
+    test -r docker/entrypoint.sh \
+        || die "docker/entrypoint.sh 对当前用户不可读，拒绝继续构建。"
+    test -r docker/cron/scheduler \
+        || die "docker/cron/scheduler 对当前用户不可读，拒绝继续构建。"
+    test -x docker/entrypoint.sh \
+        || die "docker/entrypoint.sh 不可执行，拒绝继续构建。"
+    test -x docker/cron/scheduler \
+        || die "docker/cron/scheduler 不可执行，拒绝继续构建。"
+    test -x public \
+        || die "public 目录不可进入，nginx 无法读取静态资源，拒绝继续构建。"
 }
 
 acquire_install_lock() {
@@ -653,6 +720,8 @@ stash_for_build() {
 }
 
 build_images() {
+    normalize_repository_permissions
+    verify_repository_permissions
     stash_for_build "$ENV_FILE"
     stash_for_build "$APP_CONFIG_FILE"
     stash_for_build "$APP_PROFILE_FILE"

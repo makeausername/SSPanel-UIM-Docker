@@ -65,6 +65,22 @@ RUN set -eux; \
 COPY . /var/www/html
 
 RUN set -eux; \
+    find /var/www/html -xdev -type d -exec chmod 0755 {} +; \
+    find /var/www/html -xdev -type f -exec chmod 0644 {} +; \
+    chmod 0755 \
+        /var/www/html/docker/entrypoint.sh \
+        /var/www/html/docker/cron/scheduler; \
+    bash -n /var/www/html/docker/entrypoint.sh; \
+    bash -n /var/www/html/docker/cron/scheduler; \
+    gosu www-data test -r /var/www/html/docker/cron/scheduler; \
+    gosu www-data bash -n /var/www/html/docker/cron/scheduler; \
+    gosu www-data test -x /var/www/html/public; \
+    gosu www-data test -r /var/www/html/public/index.php; \
+    gosu www-data test -r /var/www/html/src/Utils/Tools.php; \
+    gosu www-data test ! -w /var/www/html/src/Utils/Tools.php; \
+    test "$(stat -c '%U:%G' /var/www/html/src/Utils/Tools.php)" = root:root
+
+RUN set -eux; \
     php -v; \
     php -m | sort; \
     php -r '$required = ["bcmath","curl","fileinfo","gmp","json","mbstring","mysqli","openssl","pdo","pdo_mysql","posix","redis","sodium","xml","yaml","zip"]; foreach ($required as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Missing required PHP extension: {$extension}\n"); exit(1); } } if (!extension_loaded("Zend OPcache") && !extension_loaded("opcache")) { fwrite(STDERR, "Missing required PHP extension: opcache\n"); exit(1); }'; \
@@ -85,16 +101,13 @@ RUN set -eux; \
         storage/framework/smarty/cache \
         storage/framework/smarty/compile \
         storage/framework/twig/cache \
-        public/clients \
-        config; \
+        public/clients; \
     chmod -R ug+rwX \
         storage/framework \
         storage/framework/smarty/cache \
         storage/framework/smarty/compile \
         storage/framework/twig/cache \
-        public/clients \
-        config; \
-    chmod +x docker/entrypoint.sh docker/cron/scheduler
+        public/clients
 
 ENTRYPOINT ["docker/entrypoint.sh"]
 CMD ["php-fpm"]

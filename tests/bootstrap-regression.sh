@@ -71,6 +71,111 @@ assert_function_excludes() {
     }
 }
 
+assert_mode() {
+    local expected="$1"
+    local path="$2"
+    local actual
+
+    actual="$(stat -c '%a' "$path")"
+    [ "$actual" = "$expected" ] || {
+        printf 'ERROR: expected mode %s for %s, got %s.\n' "$expected" "$path" "$actual" >&2
+        return 1
+    }
+}
+
+assert_git_mode() {
+    local expected="$1"
+    local path="$2"
+    local actual
+
+    actual="$(git ls-files -s -- "$path" | sed -n 's/^\([^ ]*\).*/\1/p')"
+    [ "$actual" = "$expected" ] || {
+        printf 'ERROR: expected Git mode %s for %s, got %s.\n' "$expected" "$path" "$actual" >&2
+        return 1
+    }
+}
+
+create_strict_clone() {
+    local target="$1"
+    local scheduler_mode
+    local public_mode
+    local public_file_mode
+
+    (
+        umask 077
+        git clone --quiet --no-local "$ROOT_DIR" "$target"
+        printf 'secret\n' > "${target}/.env"
+        printf '<?php // secret\n' > "${target}/config/.config.php"
+        printf 'recovery secret\n' > "${target}/eziplc-panel-recovery-test.txt"
+    )
+
+    scheduler_mode="$(stat -c '%a' "${target}/docker/cron/scheduler")"
+    public_mode="$(stat -c '%a' "${target}/public")"
+    public_file_mode="$(stat -c '%a' "${target}/public/index.php")"
+    if { [ "$scheduler_mode" != "600" ] && [ "$scheduler_mode" != "700" ]; } \
+        || [ "$public_mode" != "700" ] \
+        || [ "$public_file_mode" != "600" ]; then
+        STRICT_UMASK_SUPPORTED="false"
+        printf 'SKIP: filesystem does not expose strict umask clone modes (scheduler=%s, public=%s, public/index.php=%s).\n' \
+            "$scheduler_mode" "$public_mode" "$public_file_mode" >&2
+        return 0
+    fi
+
+    assert_mode 600 "${target}/.env"
+    assert_mode 600 "${target}/config/.config.php"
+    assert_mode 600 "${target}/eziplc-panel-recovery-test.txt"
+}
+
+assert_normalized_clone() {
+    local target="$1"
+
+    assert_mode 755 "${target}/docker/cron/scheduler"
+    assert_mode 755 "${target}/docker/entrypoint.sh"
+    assert_mode 755 "${target}/public"
+    assert_mode 644 "${target}/public/index.php"
+    assert_mode 600 "${target}/.env"
+    assert_mode 600 "${target}/config/.config.php"
+    assert_mode 600 "${target}/eziplc-panel-recovery-test.txt"
+
+    test -r "${target}/docker/cron/scheduler"
+    test -r "${target}/public/index.php"
+}
+
+test_strict_umask_normalization() (
+    local temp_dir
+    local bootstrap_clone
+    local install_clone
+    local STRICT_UMASK_SUPPORTED="true"
+
+    temp_dir="$(mktemp -d)"
+    chmod 0755 "$temp_dir"
+    bootstrap_clone="${temp_dir}/bootstrap-repo"
+    install_clone="${temp_dir}/install-repo"
+    trap 'rm -rf -- "$temp_dir"' EXIT
+
+    create_strict_clone "$bootstrap_clone"
+    [ "$STRICT_UMASK_SUPPORTED" = "true" ] || return 0
+    (
+        # shellcheck disable=SC1091
+        source "${ROOT_DIR}/bootstrap.sh"
+        trap - EXIT
+        INSTALL_DIR="$bootstrap_clone"
+        normalize_repository_permissions
+    )
+    assert_normalized_clone "$bootstrap_clone"
+
+    create_strict_clone "$install_clone"
+    [ "$STRICT_UMASK_SUPPORTED" = "true" ] || return 0
+    (
+        # shellcheck disable=SC1091
+        source "${ROOT_DIR}/install.sh"
+        trap - EXIT
+        INSTALL_DIR="$install_clone"
+        normalize_repository_permissions
+    )
+    assert_normalized_clone "$install_clone"
+)
+
 test_reader() {
     local variable_name="$1"
     local input_value="EzIPLC"
@@ -137,6 +242,11 @@ assert_help_output "pipeline execution" "$pipe_output"
 
 test_caller
 test_other_return_targets
+assert_git_mode 100755 bootstrap.sh
+assert_git_mode 100755 install.sh
+assert_git_mode 100755 docker/entrypoint.sh
+assert_git_mode 100755 docker/cron/scheduler
+test_strict_umask_normalization
 assert_read_tty_shape install.sh
 assert_read_tty_shape bootstrap.sh
 assert_file_contains docker-compose.yml '      - bash'
@@ -144,6 +254,15 @@ assert_file_contains docker-compose.yml '      - /var/www/html/docker/cron/sched
 assert_file_contains Dockerfile 'bash -n docker/entrypoint.sh; \'
 assert_file_contains Dockerfile 'bash -n docker/cron/scheduler; \'
 assert_file_contains Dockerfile 'test -r docker/cron/scheduler; \'
+assert_file_contains Dockerfile 'gosu www-data test -r /var/www/html/docker/cron/scheduler; \'
+assert_file_contains Dockerfile 'gosu www-data test -x /var/www/html/public; \'
+assert_file_contains Dockerfile 'gosu www-data test -r /var/www/html/src/Utils/Tools.php; \'
+assert_file_contains Dockerfile 'gosu www-data test ! -w /var/www/html/src/Utils/Tools.php; \'
+assert_function_contains clone_repository bootstrap.sh 'normalize_repository_permissions'
+assert_function_contains update_repository bootstrap.sh 'normalize_repository_permissions'
+assert_function_contains build_images install.sh 'normalize_repository_permissions'
+assert_function_contains build_images install.sh 'verify_repository_permissions'
+assert_function_contains require_runtime install.sh 'require_command git'
 assert_function_contains verify_containers install.sh 'local timeout_seconds=60'
 assert_function_contains verify_containers install.sh 'sleep 3'
 assert_function_contains verify_containers install.sh 'docker compose logs --tail=100 "$service"'

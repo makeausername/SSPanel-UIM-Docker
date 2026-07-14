@@ -316,6 +316,59 @@ prepare_git_error_file() {
     chmod 0600 "$GIT_ERROR_FILE"
 }
 
+normalize_repository_permissions() {
+    local record
+    local mode
+    local path
+    local parent
+
+    [ -d "${INSTALL_DIR}/.git" ] \
+        || die "无法规范化权限：${INSTALL_DIR} 不是 Git 仓库。"
+
+    chmod 0755 "$INSTALL_DIR"
+
+    while IFS= read -r -d '' record; do
+        mode="${record%% *}"
+        path="${record#*$'\t'}"
+
+        [ "$path" != "$record" ] \
+            || die "无法解析 Git 文件记录。"
+
+        parent="$(dirname -- "$path")"
+        while [ "$parent" != "." ] && [ "$parent" != "/" ]; do
+            if [ -d "${INSTALL_DIR}/${parent}" ]; then
+                chmod 0755 "${INSTALL_DIR}/${parent}"
+            fi
+            parent="$(dirname -- "$parent")"
+        done
+
+        # Never follow or change tracked symbolic links.
+        if [ -L "${INSTALL_DIR}/${path}" ]; then
+            continue
+        fi
+
+        [ -f "${INSTALL_DIR}/${path}" ] || continue
+
+        case "$path" in
+            bootstrap.sh|install.sh|docker/entrypoint.sh|docker/cron/scheduler)
+                chmod 0755 "${INSTALL_DIR}/${path}"
+                ;;
+            *)
+                case "$mode" in
+                    100755)
+                        chmod 0755 "${INSTALL_DIR}/${path}"
+                        ;;
+                    *)
+                        chmod 0644 "${INSTALL_DIR}/${path}"
+                        ;;
+                esac
+                ;;
+        esac
+    done < <(git -C "$INSTALL_DIR" ls-files -s -z)
+
+    success "Git 跟踪文件权限已规范化。"
+}
+
 clone_repository() {
     local had_token="false"
 
@@ -353,6 +406,7 @@ clone_repository() {
     git -C "$CLONE_TMP_DIR" remote set-url origin "$REPOSITORY_URL"
     mv -- "$CLONE_TMP_DIR" "$INSTALL_DIR"
     CLONE_TMP_DIR=""
+    normalize_repository_permissions
     clear_git_auth
     if [ "$had_token" = "true" ]; then
         success "私有仓库已安全克隆，origin 不包含凭据。"
@@ -411,6 +465,7 @@ update_repository() {
     run_authenticated_git pull --ff-only origin "$REPOSITORY_BRANCH" || die "git pull --ff-only 失败。"
     git -C "$INSTALL_DIR" remote set-url origin "$REPOSITORY_URL"
     clear_git_auth
+    normalize_repository_permissions
     success "仓库已更新，origin 不包含凭据。"
 }
 
@@ -501,6 +556,7 @@ run_upgrade() {
 run_resume() {
     guard_resume_installation
     update_repository
+    normalize_repository_permissions
     cd "$INSTALL_DIR"
     [ -f install.sh ] || die "仓库中缺少 install.sh。"
     unset GITHUB_TOKEN GIT_ASKPASS GIT_TERMINAL_PROMPT || true
@@ -516,6 +572,7 @@ run_install() {
         clone_repository
     fi
 
+    normalize_repository_permissions
     [ -f "${INSTALL_DIR}/install.sh" ] || die "仓库中缺少 install.sh。"
     cd "$INSTALL_DIR"
     unset GITHUB_TOKEN GIT_ASKPASS GIT_TERMINAL_PROMPT || true
@@ -527,6 +584,7 @@ run_reinstall() {
     verify_repository_origin
     confirm_reinstall
     update_repository
+    normalize_repository_permissions
     cd "$INSTALL_DIR"
     unset GITHUB_TOKEN GIT_ASKPASS GIT_TERMINAL_PROMPT || true
     SSPANEL_INSTALL_MODE=reinstall SSPANEL_REINSTALL_CONFIRMED=1 exec bash ./install.sh
