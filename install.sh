@@ -272,17 +272,17 @@ read_tty() {
     local variable_name="$1"
     local prompt="$2"
     local secret="${3:-false}"
-    local value
+    local input_value=""
 
     [ -r /dev/tty ] || die "当前会话没有可用的 /dev/tty，无法安全读取交互输入。"
 
     if [ "$secret" = "true" ]; then
-        IFS= read -r -s -p "$prompt" value </dev/tty
+        IFS= read -r -s -p "$prompt" input_value </dev/tty
         printf '\n' >/dev/tty
     else
-        IFS= read -r -p "$prompt" value </dev/tty
+        IFS= read -r -p "$prompt" input_value </dev/tty
     fi
-    printf -v "$variable_name" '%s' "$value"
+    printf -v "$variable_name" '%s' "$input_value"
 }
 
 prompt_site_name() {
