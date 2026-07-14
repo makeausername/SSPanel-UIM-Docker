@@ -55,66 +55,128 @@ xnode-probe
 - 这些 token 在数据库中只保存哈希值，不保存明文。
 - 不要在截图、日志、README、Issue、PR 或聊天工具里暴露任何 token 明文。
 
-## 3. 生产环境要求
+## 3. 生产环境一键安装
 
-推荐使用 Ubuntu 服务器。生产环境至少需要：
+一键安装位于手动部署之前，推荐新服务器直接使用。安装器固定部署到 `/opt/SSPanel-UIM-Docker`，自动安装缺少的基础依赖、Docker Engine、Docker Compose v2 和 Buildx，并由 Caddy 申请 HTTPS 证书。
 
-- Docker 和 Docker Compose。
-- 域名已经解析到面板服务器。
-- 如启用 HTTPS，反向代理和证书由本项目栈处理。
-- MySQL/MariaDB 和 Redis 容器正常运行。
-- 服务器可以访问 GitHub。
-- 节点服务器可以访问 GitHub release assets，用于安装 `xnode-agent`。
+支持的系统：
 
-部署前检查：
+- Ubuntu 22.04 LTS
+- Ubuntu 24.04 LTS
+- Debian 12
+
+安装前必须确认：
+
+- 域名的 DNS A/AAAA 记录已经指向面板服务器。
+- 公网 TCP 80 和 443 已开放，且没有其他服务占用。
+- 系统已经具备用于下载入口脚本的 `curl` 和 `sudo`；进入 `bootstrap.sh` 后其余依赖会自动检查和安装。
+- 服务器可以访问 GitHub 和 Docker 官方 APT 仓库。
+- 已有服务器应先备份 `.env`、两个 `config` 文件和数据库；不要把首次安装命令当作升级命令重复执行。
+
+### 公共仓库一键命令
+
+仓库可匿名读取时执行：
 
 ```bash
-uname -a
-docker --version
-docker compose version
-git --version
-curl -I https://github.com
+curl -fsSL https://raw.githubusercontent.com/makeausername/SSPanel-UIM-Docker/master/bootstrap.sh | sudo bash
 ```
 
-## 4. 首次部署
+当前仓库为 Private 时，上述匿名命令不能使用，请改用下一节的 GitHub Contents API 命令。
 
-新服务器首次部署可以使用通用路径 `/opt/SSPanel-UIM-Docker`：
+### 私有仓库一键命令
+
+以下命令从 `/dev/tty` 隐藏读取 Token，通过 GitHub Contents API 下载 `bootstrap.sh`，并只把 Token 保存在当前 shell 的临时环境中。Token 不会写入 URL、磁盘、Git remote、`.env` 或凭据文件；命令结束后会立即 `unset`。
 
 ```bash
+read -r -s -p "GitHub Token: " GITHUB_TOKEN </dev/tty
+printf '\n' >/dev/tty
+export GITHUB_TOKEN
+set -o pipefail
+
+if ! {
+  printf '%s\n' \
+    'header = "Accept: application/vnd.github.raw+json"' \
+    "header = \"Authorization: Bearer ${GITHUB_TOKEN}\"" \
+    'url = "https://api.github.com/repos/makeausername/SSPanel-UIM-Docker/contents/bootstrap.sh?ref=master"' \
+    'fail' 'silent' 'show-error' 'location'
+} | curl --config - | sudo --preserve-env=GITHUB_TOKEN bash; then
+  unset GITHUB_TOKEN
+  echo "安装器下载或执行失败。" >&2
+  exit 1
+fi
+
+unset GITHUB_TOKEN
+```
+
+Token 必须使用 Fine-grained Personal Access Token，并且：
+
+- 只授权 `makeausername/SSPanel-UIM-Docker`。
+- `Repository permissions` → `Contents` → `Read-only`。
+- 不需要写入权限，也不需要 `Administration` 权限。
+
+### 安装交互和输出
+
+首次安装只会配置四项内容：
+
+1. 站点名称（默认 `EzIPLC`）。
+2. 站点域名，只填写 `example.com` 或 `panel.example.com` 形式的纯域名。
+3. 管理员邮箱。
+4. 管理员密码（隐藏输入、至少 12 个字符、输入两次）。
+
+HTTPS、80/443 端口和 `Asia/Shanghai` 时区使用固定生产默认值。数据库名、数据库用户、数据库密码、数据库 root 密码、Redis 密码、App Key 和 muKey 均由 OpenSSL 自动生成。
+
+成功后终端只显示一次完整凭据，并同时保存到：
+
+```text
+/root/eziplc-panel-credentials-YYYYMMDD-HHMMSS.txt
+```
+
+该文件权限为 `0600`，包含站点 URL、管理员凭据、数据库凭据、Redis 密码、App Key、muKey、常用命令和备份提示。不要把该文件发送到聊天、工单或公开仓库。
+
+### 升级现有安装
+
+升级会保留 `.env`、`config/.config.php`、`config/appprofile.php` 和全部 Docker volume，不会重新生成任何密码或密钥：
+
+```bash
+cd /opt/SSPanel-UIM-Docker
+sudo bash bootstrap.sh --upgrade
+```
+
+### 重装、卸载和数据删除警告
+
+普通安装检测到已有配置、容器或安装锁时会直接终止。需要进入重装门禁时必须显式执行 `sudo bash bootstrap.sh --reinstall`，并完整输入 `DELETE ALL PANEL DATA`。即使确认后，脚本仍不会自动删除容器或 volume；检测到现有 Docker 数据时会要求先备份并由管理员手工处理。
+
+**永远不要随意执行 `docker compose down -v`。** `-v` 会删除 MariaDB、Redis、Caddy 证书和应用持久化数据。卸载程序文件与删除生产数据是两个独立操作，删除任何 volume 前必须确认备份可以恢复。
+
+### 常用命令、备份和故障排查
+
+```bash
+cd /opt/SSPanel-UIM-Docker
+docker compose ps
+docker compose logs -f app
+docker compose logs -f caddy
+docker compose logs --tail=200 mariadb
+```
+
+备份至少应包含 `.env`、`config/.config.php`、`config/appprofile.php`、数据库导出文件，以及确有需要的 Docker volume。安装失败时脚本会显示失败阶段、`docker compose ps` 和对应日志命令，但不会自动删除数据卷。HTTPS 失败时检查 DNS、80/443、防火墙、端口占用和 Cloudflare 代理状态。
+
+## 4. 手动部署
+
+手动部署只适合已经自行安装 Docker Engine、Compose v2、Buildx、Git、OpenSSL 和 curl 的管理员。一键安装仍是推荐路径。
+
+```bash
+sudo mkdir -p /opt
 cd /opt
-git clone https://github.com/makeausername/SSPanel-UIM-Docker.git
+sudo git clone --depth 1 --branch master https://github.com/makeausername/SSPanel-UIM-Docker.git
 cd /opt/SSPanel-UIM-Docker
-git checkout master
+sudo bash install.sh
 ```
 
-如果服务器已经部署过，不要重新 clone。已有部署应在原目录中拉取更新并重建服务：
-
-```bash
-cd /opt/SSPanel-UIM-Docker
-git pull
-docker compose up -d --build
-docker compose ps
-```
-
-首次生产启动：
-
-```bash
-cd /opt/SSPanel-UIM-Docker
-
-docker compose up -d --build
-docker compose ps
-```
+私有仓库不要把 Token 拼入 clone URL；请使用受控的 Git 凭据或上方一键安装命令。
 
 ## 5. 环境配置
 
-不要提交 `.env`、`config/.config.php` 或任何包含密钥的配置文件。
-
-生产配置应至少确认：
-
-- 面板域名和 `baseUrl` 正确。
-- 数据库密码、Redis 密码足够强。
-- 支付配置、Telegram 配置等私密信息只保存在服务器。
-- 使用项目现有配置模式，不在 README 或脚本中写死真实密钥。
+不要提交 `.env`、`config/.config.php`、`config/appprofile.php`、`docker-compose.override.yml` 或任何凭据文件。支付、Telegram 等安装器范围外的私密配置只应保存在服务器上。
 
 查看容器状态和最近日志：
 
@@ -448,16 +510,10 @@ journalctl -u xnode-probe.service -n 100 --no-pager -o cat
 
 ```bash
 cd /opt/SSPanel-UIM-Docker
-
-git fetch origin master
-git checkout -B master origin/master
-git log --oneline -1
-
-docker compose up -d --build app scheduler
-docker compose restart nginx caddy
-docker compose exec -T app php xcat Migration latest
-docker compose ps
+sudo bash bootstrap.sh --upgrade
 ```
+
+升级器只接受 `master` 的 fast-forward 更新，保留现有 `.env`、两个 PHP 配置和所有 Docker volume，然后重建服务并执行 `Migration latest`。仓库为 Private 时，按一键安装章节临时 `export GITHUB_TOKEN` 后执行升级，完成后立即 `unset GITHUB_TOKEN`。
 
 节点升级：
 
@@ -566,6 +622,8 @@ docker compose logs --since=10m app nginx caddy 2>/dev/null || true
 
 - 不要在截图、聊天记录或工单中贴出 token。
 - 不要提交 `.env`、带真实密钥的 `config/.config.php`、node token、probe token、Reality private key 或 `xray.json`。
+- 不要提交 `config/appprofile.php`、`docker-compose.override.yml` 或 `eziplc-panel-credentials-*.txt`。
+- 永远不要随意执行 `docker compose down -v`；删除 volume 前先验证备份可恢复。
 - `xne_` 一次性 enroll token 应短期有效，用完即失效。
 - `xnp_` probe token 泄露后应立即轮换。
 - 不要在没有强密码、MFA 或访问策略的情况下暴露后台管理入口。

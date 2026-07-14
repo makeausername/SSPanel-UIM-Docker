@@ -55,3 +55,8 @@ package-lock.json
 
 storage/LocalClientVersion.json
 storage/.install_lock
+storage/.install_in_progress
+storage/.install_in_progress.d/
+
+# Installer credentials must live under /root, never in this repository.
+eziplc-panel-credentials-*.txt

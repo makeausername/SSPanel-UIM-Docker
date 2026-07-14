@@ -16,3 +16,7 @@ vendor/
 node_modules/
 npm-debug.log
 docker-compose.override.yml
+eziplc-panel-credentials-*.txt
+storage/.install_lock
+storage/.install_in_progress
+storage/.install_in_progress.d/
