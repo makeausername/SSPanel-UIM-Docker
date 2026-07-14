@@ -13,7 +13,7 @@ INSTALL_LOCK="storage/.install_lock"
 PROCESS_LOCK_FILE="storage/.install_in_progress"
 PROCESS_LOCK_DIR="storage/.install_in_progress.d"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-.}")" && pwd -P)"
 INSTALL_DIR="$SCRIPT_DIR"
 INSTALL_MODE="${SSPANEL_INSTALL_MODE:-install}"
 
@@ -118,8 +118,12 @@ restore_build_files() {
     local stash_file
 
     for index in "${!STASHED_PATHS[@]}"; do
-        path="${STASHED_PATHS[$index]}"
-        stash_file="${STASHED_FILES[$index]}"
+        path="${STASHED_PATHS[$index]:-}"
+        stash_file="${STASHED_FILES[$index]:-}"
+        if [ -z "$path" ] || [ -z "$stash_file" ]; then
+            warn "跳过不完整的构建暂存记录：${index}。"
+            continue
+        fi
         if [ -e "$stash_file" ]; then
             mkdir -p "$(dirname "$path")"
             mv -- "$stash_file" "$path"
@@ -823,6 +827,6 @@ main() {
     print_credentials_summary
 }
 
-if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ "${BASH_SOURCE[0]:-}" = "$0" ]; then
     main "$@"
 fi

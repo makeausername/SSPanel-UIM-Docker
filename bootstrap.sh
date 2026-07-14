@@ -61,7 +61,9 @@ step() {
 usage() {
     cat <<'EOF'
 Usage:
+  curl -fsSL https://raw.githubusercontent.com/makeausername/SSPanel-UIM-Docker/master/bootstrap.sh | sudo bash
   sudo bash bootstrap.sh
+  sudo ./bootstrap.sh
   sudo bash bootstrap.sh --upgrade
   sudo bash bootstrap.sh --reinstall
 
@@ -120,18 +122,20 @@ cleanup() {
 trap cleanup EXIT
 
 ensure_root() {
+    local script_source="${BASH_SOURCE[0]:-}"
+
     if [ "${EUID:-$(id -u)}" -eq 0 ]; then
         return 0
     fi
 
     command -v sudo >/dev/null 2>&1 || die "安装需要 root 权限，且当前系统未安装 sudo。请使用 root 用户重新运行。"
 
-    if [ ! -f "$0" ]; then
+    if [ -z "$script_source" ] || [ ! -f "$script_source" ]; then
         die "无法从管道中自动提权。请使用文档中的 'curl ... | sudo bash' 命令。"
     fi
 
     info "正在通过 sudo 重新执行安装程序。"
-    exec sudo --preserve-env=GITHUB_TOKEN,NO_COLOR bash "$0" "$@"
+    exec sudo --preserve-env=GITHUB_TOKEN,NO_COLOR bash "$script_source" "$@"
 }
 
 check_supported_system() {
@@ -520,6 +524,6 @@ main() {
     esac
 }
 
-if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+if [ -z "${BASH_SOURCE[0]:-}" ] || [ "${BASH_SOURCE[0]}" = "$0" ]; then
     main "$@"
 fi

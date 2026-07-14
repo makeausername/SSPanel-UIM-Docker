@@ -81,6 +81,13 @@ xnode-probe
 curl -fsSL https://raw.githubusercontent.com/makeausername/SSPanel-UIM-Docker/master/bootstrap.sh | sudo bash
 ```
 
+该命令由 `sudo bash` 从标准输入执行入口脚本；安装过程中的所有交互输入均直接从 `/dev/tty` 读取，不会与 `curl` 占用的标准输入冲突。下载到本地后也支持以下两种等价执行方式：
+
+```bash
+sudo bash bootstrap.sh
+sudo ./bootstrap.sh
+```
+
 当前仓库为 Private 时，上述匿名命令不能使用，请改用下一节的 GitHub Contents API 命令。
 
 ### 私有仓库一键命令
