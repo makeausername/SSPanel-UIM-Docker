@@ -28,6 +28,14 @@ return static function (Slim\App $app): void {
     $app->get('/oauth/{type}', App\Controllers\OAuthController::class . ':index');
     // 通用订阅
     $app->get('/sub/{token}/{subtype}', App\Controllers\SubController::class . ':index');
+    // Windows Client API
+    $app->group('/client/api/v1', static function (RouteCollectorProxy $group): void {
+        $group->post('/login', App\Controllers\ClientApiController::class . ':login');
+        $group->get('/me', App\Controllers\ClientApiController::class . ':me');
+        $group->get('/subscription', App\Controllers\ClientApiController::class . ':subscription');
+        $group->post('/logout', App\Controllers\ClientApiController::class . ':logout');
+    });
+
     // User
     $app->group('/user', static function (RouteCollectorProxy $group): void {
         $group->get('', App\Controllers\UserController::class . ':index');
