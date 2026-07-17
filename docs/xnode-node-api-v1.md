@@ -126,7 +126,7 @@ curl -sS https://panel.example.com/node/api/v1/users \
   -H "Authorization: Bearer xn_xxx"
 ```
 
-`GET /node/api/v1/users` returns real eligible users for the authenticated node. During the first XNode rollout it filters users by UUID presence, ban status, class, and node group only; it intentionally does not enforce traffic quota yet so the first real-node end-to-end test is not blocked by quota state.
+`GET /node/api/v1/users` returns real eligible users for the authenticated node. It always excludes banned users and empty or mock UUIDs. Administrators bypass class and node-group restrictions to match the client API's unlimited/connectable behavior; normal users retain the existing class and node-group filters.
 
 The UUIDs in this response must match the UUIDs emitted in `/sub/{token}/v2ray` VLESS Reality links because xnode-agent uses them to render Xray `clients[].id`. The mock user UUID is retained only as a test/helper fallback and is no longer used for normal authenticated nodes.
 
@@ -143,7 +143,7 @@ Report runtime metadata:
 curl -sS -X POST https://panel.example.com/node/api/v1/runtime \
   -H "Authorization: Bearer xn_xxx" \
   -H "Content-Type: application/json" \
-  -d '{"node_id":1001,"agent_version":"dev","core_version":"","state":"running","public_key":"public-key-example","short_ids":["0123456789abcdef"],"capabilities":["vless","reality","vision"],"config_hash":"stub-config-v1","last_error":""}'
+  -d '{"node_id":1001,"agent_version":"dev","core_version":"","state":"running","public_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","short_ids":["fedcba9876543210","0123456789abcdef"],"reality_hash":"15190bdb7c73c3b9f12a4c483e3205ce851f4bee063e99a02c09e5438473e50f","capabilities":["vless","reality","vision"],"config_hash":"stub-config-v1","last_error":""}'
 ```
 
 Send a heartbeat:
@@ -159,7 +159,7 @@ curl -sS -X POST https://panel.example.com/node/api/v1/heartbeat \
 
 `GET /sub/{token}/v2ray` can include XNode `vless://` Reality links alongside the existing legacy VMess lines. The `/v2ray` name is kept for client compatibility.
 
-XNode subscription links require safe runtime metadata in `node_runtimes.public_key` and `node_runtimes.short_ids_json`. If the runtime row is missing, the public key is empty, or the short IDs are malformed, the XNode link is skipped.
+XNode subscription links require a running, error-free runtime seen within the last 180 seconds. The panel validates the base64url public key, canonicalizes and sorts the short IDs, recalculates their SHA-256 Reality hash, and requires it to match `node_runtimes.reality_hash`. Any invalid or stale newest runtime skips that node's XNode link without falling back to older metadata.
 
 The VLESS Reality subscription SNI must match the node config `reality.server_names` / Xray `realitySettings.serverNames`. Xray client JSON uses `realitySettings.password` for the Reality public key, while share links use `pbk=<public key>`. Short IDs are emitted as `sid=<short id>`.
 
@@ -169,7 +169,7 @@ The Reality private key never leaves the node and is not included in panel subsc
 
 - `/users` reads real eligible users from the `user` table for the authenticated node and does not use the mock user for normal node-token requests.
 - `/users` does not enforce traffic quota during the first XNode rollout; the UUID returned here must match the UUID used in `/sub/{token}/v2ray`, and xnode-agent writes it to Xray `clients[].id`.
-- `/runtime` upserts safe runtime metadata in `node_runtimes`.
+- `/runtime` stores `public_key`, normalized `short_ids`, and `reality_hash` together only after the panel recalculates and verifies the canonical hash.
 - `/heartbeat` updates safe runtime heartbeat metadata in `node_runtimes`.
 - `/traffic`, `/online`, and `/detect-log` are accepted-only for now.
 - This pass does not mutate user traffic, online logs, detect logs, hourly usage, billing data, subscriptions, or legacy `/mod_mu` behavior.

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Subscribe;
 
+use App\Services\NodeProfileService;
+use App\Services\XNodeRealityMetadataService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Schema\Blueprint;
 use PHPUnit\Framework\TestCase;
@@ -12,6 +14,8 @@ use stdClass;
 
 class V2RayTest extends TestCase
 {
+    private const PUBLIC_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
     private Capsule $db;
 
     protected function setUp(): void
@@ -81,7 +85,37 @@ class V2RayTest extends TestCase
         ], $payload);
     }
 
-    public function testSort14NodeWithValidRuntimeEmitsVlessRealityLink(): void
+    public function testVerifiedRuntimeUsesSharedProfileFieldsAndCanonicalShortId(): void
+    {
+        $this->seedRuntime(2001, [
+            'short_ids_json' => '["fedcba9876543210","0123456789abcdef"]',
+            'last_error' => '   ',
+        ]);
+        $user = $this->makeObject(['uuid' => '11111111-2222-3333-4444-555555555555']);
+        $node = $this->makeObject([
+            'id' => 2001,
+            'name' => 'XNode Alpha',
+            'server' => 'node.example.com',
+        ]);
+
+        $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [$user, $node]);
+        $profile = (new NodeProfileService())->buildDefaultConfig(2001, 'node.example.com');
+
+        $this->assertSame(
+            'vless://11111111-2222-3333-4444-555555555555@node.example.com:443?'
+            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
+            . '&pbk=' . self::PUBLIC_KEY . '&sid=0123456789abcdef&type=tcp'
+            . '&flow=xtls-rprx-vision#XNode%20Alpha',
+            $url
+        );
+        $this->assertSame(443, $profile['profile']['port']);
+        $this->assertSame('xtls-rprx-vision', $profile['profile']['flow']);
+        $this->assertSame('www.cloudflare.com', $profile['reality']['server_names'][0]);
+        $this->assertSame('chrome', $profile['reality']['fingerprint']);
+        $this->assertSame('tcp', $this->invokeV2Ray('mapProfileNetworkToUriType', ['raw']));
+    }
+
+    public function testRunningFreshErrorFreeHashValidRuntimeProducesSubscriptionLine(): void
     {
         $this->seedNode([
             'id' => 1401,
@@ -89,76 +123,72 @@ class V2RayTest extends TestCase
             'server' => 'sort14.example.com',
             'sort' => 14,
         ]);
-        $this->seedRuntime(1401, 'public-key-sort14', '["0123456789abcdef"]', 'hidden-private-key');
-
-        $content = (new V2Ray())->getContent($this->user());
-
-        $this->assertSame([
-            'vless://11111111-2222-3333-4444-555555555555@sort14.example.com:443?'
-            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
-            . '&pbk=public-key-sort14&sid=0123456789abcdef&type=tcp'
-            . '&flow=xtls-rprx-vision#XNode14',
-        ], $this->subscriptionLines($content));
-        $this->assertStringNotContainsString('vmess://', $content);
-        $this->assertStringNotContainsString('hidden-private-key', $content);
-        $this->assertStringNotContainsString('private_key', $content);
-    }
-
-    public function testSort15NodeWithValidRuntimeEmitsVlessRealityLink(): void
-    {
-        $this->seedNode([
-            'id' => 1501,
-            'name' => 'XNode15',
-            'server' => 'sort15.example.com',
-            'sort' => 15,
-        ]);
-        $this->seedRuntime(1501, 'public-key-sort15', '["0123456789abcdef"]', 'hidden-private-key');
-
-        $content = (new V2Ray())->getContent($this->user());
-
-        $this->assertSame([
-            'vless://11111111-2222-3333-4444-555555555555@sort15.example.com:443?'
-            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
-            . '&pbk=public-key-sort15&sid=0123456789abcdef&type=tcp'
-            . '&flow=xtls-rprx-vision#XNode15',
-        ], $this->subscriptionLines($content));
-        $this->assertStringNotContainsString('vmess://', $content);
-        $this->assertStringNotContainsString('hidden-private-key', $content);
-        $this->assertStringNotContainsString('private_key', $content);
-    }
-
-    public function testSort11NodeKeepsLegacyVmessAndCanAlsoEmitVlessRealityLink(): void
-    {
-        $this->seedNode([
-            'id' => 1101,
-            'name' => 'Sort11Node',
-            'server' => 'sort11.example.com',
-            'sort' => 11,
-            'custom_config' => json_encode([
-                'offset_port_user' => 8443,
-                'security' => 'tls',
-                'network' => 'ws',
-                'path' => '/ray',
-                'host' => 'host.example.com',
-            ]),
-        ]);
-        $this->seedRuntime(1101, 'public-key-sort11', '["fedcba9876543210"]');
+        $this->seedRuntime(1401);
 
         $lines = $this->subscriptionLines((new V2Ray())->getContent($this->user()));
 
-        $this->assertCount(2, $lines);
-        $this->assertStringStartsWith('vmess://', $lines[0]);
-        $payload = json_decode(base64_decode(substr($lines[0], 8)), true);
-        $this->assertSame('Sort11Node', $payload['ps']);
-        $this->assertSame('sort11.example.com', $payload['add']);
-        $this->assertSame(8443, $payload['port']);
-        $this->assertSame(
-            'vless://11111111-2222-3333-4444-555555555555@sort11.example.com:443?'
-            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
-            . '&pbk=public-key-sort11&sid=fedcba9876543210&type=tcp'
-            . '&flow=xtls-rprx-vision#Sort11Node',
-            $lines[1]
-        );
+        $this->assertCount(1, $lines);
+        $this->assertStringStartsWith('vless://', $lines[0]);
+        $this->assertStringContainsString('pbk=' . self::PUBLIC_KEY, $lines[0]);
+    }
+
+    public function testNonRunningRuntimeIsSkipped(): void
+    {
+        $this->assertRuntimeIsSkipped(['state' => 'stopped']);
+    }
+
+    public function testStaleRuntimeIsSkipped(): void
+    {
+        $this->assertRuntimeIsSkipped(['last_seen' => time() - 181]);
+    }
+
+    public function testRuntimeWithLastErrorIsSkipped(): void
+    {
+        $this->assertRuntimeIsSkipped(['last_error' => 'runtime_failed']);
+    }
+
+    public function testRuntimeWithInvalidPublicKeyIsSkipped(): void
+    {
+        $this->assertRuntimeIsSkipped(['public_key' => 'invalid-public-key']);
+    }
+
+    public function testRuntimeWithInvalidShortIdIsSkipped(): void
+    {
+        $this->assertRuntimeIsSkipped(['short_ids_json' => '["invalid-short-id"]']);
+    }
+
+    public function testRuntimeWithMissingRealityHashIsSkipped(): void
+    {
+        $this->assertRuntimeIsSkipped(['reality_hash' => null]);
+    }
+
+    public function testRuntimeWithMismatchedRealityHashIsSkipped(): void
+    {
+        $this->assertRuntimeIsSkipped(['reality_hash' => str_repeat('0', 64)]);
+    }
+
+    public function testMalformedShortIdsJsonIsSkipped(): void
+    {
+        $this->assertRuntimeIsSkipped(['short_ids_json' => '{malformed-json']);
+    }
+
+    public function testNewestUnusableRuntimeDoesNotFallBackToOlderMetadata(): void
+    {
+        $this->seedRuntime(2001, [
+            'updated_at' => time() - 10,
+            'last_seen' => time() - 10,
+        ]);
+        $this->seedRuntime(2001, [
+            'state' => 'stopped',
+            'updated_at' => time(),
+        ]);
+
+        $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [
+            $this->makeObject(['uuid' => '11111111-2222-3333-4444-555555555555']),
+            $this->makeObject(['id' => 2001, 'name' => 'XNode', 'server' => 'node.example.com']),
+        ]);
+
+        $this->assertNull($url);
     }
 
     public function testMissingRuntimeSkipsVlessWithoutDroppingLegacyVmess(): void
@@ -177,85 +207,15 @@ class V2RayTest extends TestCase
         $this->assertStringNotContainsString('vless://', $lines[0]);
     }
 
-    public function testMalformedShortIdsJsonSkipsVlessLinkFromSubscription(): void
+    private function assertRuntimeIsSkipped(array $runtimeOverrides): void
     {
-        $this->seedNode([
-            'id' => 1402,
-            'name' => 'MalformedRuntime',
-            'server' => 'malformed-runtime.example.com',
-            'sort' => 14,
-        ]);
-        $this->seedRuntime(1402, 'public-key-example', '{malformed-json');
-
-        $this->assertSame('', (new V2Ray())->getContent($this->user()));
-    }
-
-    public function testBuildXNodeVlessRealityUrlEmitsExpectedLink(): void
-    {
-        $user = $this->makeObject([
-            'uuid' => '11111111-2222-3333-4444-555555555555',
-        ]);
-        $node = $this->makeObject([
-            'id' => 2001,
-            'name' => 'XNode Alpha',
-            'server' => 'node.example.com',
-        ]);
-        $this->seedRuntime(2001, 'public+key/example=', '["0123456789abcdef"]');
-
-        $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [$user, $node]);
-
-        $this->assertSame(
-            'vless://11111111-2222-3333-4444-555555555555@node.example.com:443?'
-            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
-            . '&pbk=public%2Bkey%2Fexample%3D&sid=0123456789abcdef&type=tcp'
-            . '&flow=xtls-rprx-vision#XNode%20Alpha',
-            $url
-        );
-    }
-
-    public function testParseFirstShortIdReturnsFirstValidEvenLengthHexId(): void
-    {
-        $shortId = $this->invokeV2Ray('parseFirstShortId', [
-            '["", "not-hex", "abcd", "0123456789abcdef"]',
-        ]);
-
-        $this->assertSame('abcd', $shortId);
-    }
-
-    public function testMalformedShortIdsJsonSkipsXNodeLink(): void
-    {
-        $this->seedRuntime(2002, 'public-key-example', '{malformed-json');
+        $this->seedRuntime(2001, $runtimeOverrides);
         $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [
             $this->makeObject(['uuid' => '11111111-2222-3333-4444-555555555555']),
-            $this->makeObject(['id' => 2002, 'name' => 'XNode Alpha', 'server' => 'node.example.com']),
+            $this->makeObject(['id' => 2001, 'name' => 'XNode', 'server' => 'node.example.com']),
         ]);
 
         $this->assertNull($url);
-    }
-
-    public function testEmptyPublicKeySkipsXNodeLink(): void
-    {
-        $this->seedRuntime(2003, '   ', '["0123456789abcdef"]');
-        $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [
-            $this->makeObject(['uuid' => '11111111-2222-3333-4444-555555555555']),
-            $this->makeObject(['id' => 2003, 'name' => 'XNode Alpha', 'server' => 'node.example.com']),
-        ]);
-
-        $this->assertNull($url);
-    }
-
-    public function testXNodeUrlDoesNotExposePrivateKeyData(): void
-    {
-        $this->seedRuntime(2004, 'public-key-example', '["0123456789abcdef"]', 'hidden-private-key');
-
-        $url = $this->invokeV2Ray('buildXNodeVlessRealityUrl', [
-            $this->makeObject(['uuid' => '11111111-2222-3333-4444-555555555555']),
-            $this->makeObject(['id' => 2004, 'name' => 'XNode Alpha', 'server' => 'node.example.com']),
-        ]);
-
-        $this->assertIsString($url);
-        $this->assertStringNotContainsString('hidden-private-key', $url);
-        $this->assertStringNotContainsString('private_key', $url);
     }
 
     private function createSchema(): void
@@ -287,9 +247,14 @@ class V2RayTest extends TestCase
         Capsule::schema()->create('node_runtimes', static function (Blueprint $table): void {
             $table->increments('id');
             $table->integer('node_id');
+            $table->string('state')->nullable();
             $table->string('public_key')->nullable();
             $table->text('short_ids_json')->nullable();
-            $table->string('private_key')->nullable();
+            $table->string('reality_hash', 64)->nullable();
+            $table->integer('last_seen')->nullable();
+            $table->text('last_error')->nullable();
+            $table->integer('created_at');
+            $table->integer('updated_at')->nullable();
         });
     }
 
@@ -322,18 +287,29 @@ class V2RayTest extends TestCase
         ], $overrides));
     }
 
-    private function seedRuntime(
-        int $nodeId,
-        string $publicKey,
-        string $shortIdsJson,
-        ?string $privateKey = null
-    ): void {
-        Capsule::table('node_runtimes')->insert([
+    private function seedRuntime(int $nodeId, array $overrides = []): void
+    {
+        $defaults = [
             'node_id' => $nodeId,
-            'public_key' => $publicKey,
-            'short_ids_json' => $shortIdsJson,
-            'private_key' => $privateKey,
-        ]);
+            'state' => 'running',
+            'public_key' => self::PUBLIC_KEY,
+            'short_ids_json' => '["0123456789abcdef"]',
+            'reality_hash' => null,
+            'last_seen' => time(),
+            'last_error' => null,
+            'created_at' => time(),
+            'updated_at' => time(),
+        ];
+        $runtime = array_merge($defaults, $overrides);
+
+        if (! array_key_exists('reality_hash', $overrides)) {
+            $runtime['reality_hash'] = (new XNodeRealityMetadataService())->calculateRealityHash(
+                $runtime['public_key'],
+                $runtime['short_ids_json']
+            );
+        }
+
+        Capsule::table('node_runtimes')->insert($runtime);
     }
 
     private function user(array $overrides = []): stdClass

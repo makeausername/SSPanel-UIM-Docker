@@ -236,6 +236,102 @@ class NodeRuntimeServiceTest extends TestCase
         $this->assertGreaterThan(0, (int) $logs[0]->datetime);
     }
 
+    public function testValidRealityMetadataIsNormalizedAndStoredAtomically(): void
+    {
+        $this->seedNode(['id' => 3]);
+        $metadata = new XNodeRealityMetadataService();
+        $hash = $metadata->calculateRealityHash(
+            'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+            ['FEDCBA9876543210', '0123456789ABCDEF', 'FEDCBA9876543210']
+        );
+
+        (new NodeRuntimeService())->acceptRuntime([
+            'agent_version' => 'test-agent',
+            'state' => ' RUNNING ',
+            'public_key' => '  AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA  ',
+            'short_ids' => ['FEDCBA9876543210', '0123456789ABCDEF', 'FEDCBA9876543210'],
+            'reality_hash' => strtoupper((string) $hash),
+            'last_error' => '',
+        ], 3);
+
+        $runtime = Capsule::table('node_runtimes')->where('node_id', 3)->first();
+
+        $this->assertSame('running', $runtime->state);
+        $this->assertSame('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', $runtime->public_key);
+        $this->assertSame(
+            '["0123456789abcdef","fedcba9876543210"]',
+            $runtime->short_ids_json
+        );
+        $this->assertSame($hash, $runtime->reality_hash);
+        $this->assertSame('', $runtime->last_error);
+    }
+
+    public function testMismatchedHashPreservesExistingValidRealityMetadata(): void
+    {
+        $this->seedNode(['id' => 4]);
+        $metadata = new XNodeRealityMetadataService();
+        $existingHash = $metadata->calculateRealityHash(
+            'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+            ['0123456789abcdef']
+        );
+        Capsule::table('node_runtimes')->insert([
+            'node_id' => 4,
+            'state' => 'running',
+            'public_key' => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+            'short_ids_json' => '["0123456789abcdef"]',
+            'reality_hash' => $existingHash,
+            'last_seen' => 100,
+            'last_error' => null,
+            'created_at' => 100,
+            'updated_at' => 100,
+        ]);
+
+        (new NodeRuntimeService())->acceptRuntime([
+            'state' => 'running',
+            'public_key' => 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',
+            'short_ids' => ['abcdef'],
+            'reality_hash' => $existingHash,
+            'last_error' => '',
+        ], 4);
+
+        $runtime = Capsule::table('node_runtimes')->where('node_id', 4)->first();
+
+        $this->assertSame('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', $runtime->public_key);
+        $this->assertSame('["0123456789abcdef"]', $runtime->short_ids_json);
+        $this->assertSame($existingHash, $runtime->reality_hash);
+        $this->assertSame('reality_metadata_hash_mismatch', $runtime->last_error);
+        $this->assertGreaterThan(100, (int) $runtime->last_seen);
+
+        (new NodeRuntimeService())->acceptHeartbeat([
+            'state' => 'running',
+            'last_error' => '',
+        ], 4);
+
+        $runtimeAfterHeartbeat = Capsule::table('node_runtimes')->where('node_id', 4)->first();
+        $this->assertSame('reality_metadata_hash_mismatch', $runtimeAfterHeartbeat->last_error);
+    }
+
+    public function testPrivateKeyPayloadIsNeverPersistedOrDefined(): void
+    {
+        $this->seedNode(['id' => 5]);
+        $metadata = new XNodeRealityMetadataService();
+        $hash = $metadata->calculateRealityHash(
+            'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+            ['0123456789abcdef']
+        );
+
+        (new NodeRuntimeService())->acceptRuntime([
+            'state' => 'running',
+            'public_key' => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+            'short_ids' => ['0123456789abcdef'],
+            'reality_hash' => $hash,
+            'private_key' => 'synthetic-value-that-must-be-ignored',
+        ], 5);
+
+        $this->assertSame(1, Capsule::table('node_runtimes')->where('node_id', 5)->count());
+        $this->assertFalse(Capsule::schema()->hasColumn('node_runtimes', 'private_key'));
+    }
+
     private function createSchema(): void
     {
         Capsule::schema()->create('config', static function (Blueprint $table): void {
@@ -257,6 +353,7 @@ class NodeRuntimeServiceTest extends TestCase
             $table->integer('dynamic_rate_type')->default(0);
             $table->text('dynamic_rate_config')->nullable();
             $table->integer('node_bandwidth')->default(0);
+            $table->integer('node_heartbeat')->default(0);
         });
 
         Capsule::schema()->create('user', static function (Blueprint $table): void {
@@ -296,6 +393,23 @@ class NodeRuntimeServiceTest extends TestCase
             $table->integer('datetime')->default(0);
             $table->integer('node_id')->default(0);
             $table->integer('status')->default(0);
+        });
+
+        Capsule::schema()->create('node_runtimes', static function (Blueprint $table): void {
+            $table->increments('id');
+            $table->integer('node_id')->unique();
+            $table->string('agent_version')->nullable();
+            $table->string('core_version')->nullable();
+            $table->string('state')->nullable();
+            $table->string('public_key')->nullable();
+            $table->text('short_ids_json')->nullable();
+            $table->string('reality_hash', 64)->nullable();
+            $table->text('capabilities_json')->nullable();
+            $table->string('config_hash')->nullable();
+            $table->integer('last_seen')->nullable();
+            $table->text('last_error')->nullable();
+            $table->integer('created_at');
+            $table->integer('updated_at')->nullable();
         });
     }
 
