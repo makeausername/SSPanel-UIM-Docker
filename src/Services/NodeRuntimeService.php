@@ -16,6 +16,8 @@ use App\Utils\Tools;
 use Illuminate\Database\QueryException;
 use function array_key_exists;
 use function date;
+use function hash_equals;
+use function in_array;
 use function is_array;
 use function is_bool;
 use function is_float;
@@ -27,12 +29,18 @@ use function json_decode;
 use function json_encode;
 use function max;
 use function strlen;
+use function strtolower;
 use function substr;
 use function time;
 use function trim;
 
 final class NodeRuntimeService
 {
+    private const REALITY_METADATA_ERROR_CODES = [
+        'reality_metadata_invalid',
+        'reality_metadata_hash_mismatch',
+    ];
+
     public function acceptRuntime(array $payload = [], ?int $nodeId = null): array
     {
         if ($nodeId !== null && $nodeId > 0) {
@@ -296,7 +304,11 @@ final class NodeRuntimeService
     private function upsertRuntime(int $nodeId, array $payload, bool $includeRuntimeFields): void
     {
         $now = time();
-        $runtime = (new NodeRuntime())->where('node_id', $nodeId)->first();
+        $runtime = (new NodeRuntime())
+            ->where('node_id', $nodeId)
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->first();
 
         if ($runtime === null) {
             $runtime = new NodeRuntime();
@@ -306,14 +318,13 @@ final class NodeRuntimeService
 
         $this->assignString($runtime, $payload, 'agent_version', 64);
         $this->assignString($runtime, $payload, 'core_version', 64);
-        $this->assignString($runtime, $payload, 'state', 32);
+        $this->assignNormalizedState($runtime, $payload);
         $this->assignString($runtime, $payload, 'config_hash', 128);
-        $this->assignString($runtime, $payload, 'last_error');
+        $this->assignRuntimeLastError($runtime, $payload, $includeRuntimeFields);
 
         if ($includeRuntimeFields) {
-            $this->assignString($runtime, $payload, 'public_key', 255);
-            $this->assignJson($runtime, $payload, 'short_ids', 'short_ids_json');
             $this->assignJson($runtime, $payload, 'capabilities', 'capabilities_json');
+            $this->assignRealityMetadata($runtime, $payload);
         }
 
         $runtime->last_seen = $now;
@@ -324,6 +335,81 @@ final class NodeRuntimeService
             $node->node_heartbeat = $now;
             $node->save();
         }
+    }
+
+    private function assignNormalizedState(NodeRuntime $runtime, array $payload): void
+    {
+        if (! array_key_exists('state', $payload)) {
+            return;
+        }
+
+        if ($payload['state'] === null) {
+            $runtime->state = null;
+            return;
+        }
+
+        if (is_scalar($payload['state'])) {
+            $runtime->state = substr(strtolower(trim((string) $payload['state'])), 0, 32);
+        }
+    }
+
+    private function assignRuntimeLastError(
+        NodeRuntime $runtime,
+        array $payload,
+        bool $includeRuntimeFields
+    ): void
+    {
+        if (
+            ! $includeRuntimeFields
+            && in_array($runtime->last_error, self::REALITY_METADATA_ERROR_CODES, true)
+        ) {
+            return;
+        }
+
+        $this->assignString($runtime, $payload, 'last_error');
+    }
+
+    private function assignRealityMetadata(NodeRuntime $runtime, array $payload): void
+    {
+        $metadata = new XNodeRealityMetadataService();
+        $publicKey = $metadata->normalizePublicKey($payload['public_key'] ?? null);
+        $shortIds = $metadata->normalizeShortIds($payload['short_ids'] ?? null);
+        $suppliedHash = $metadata->normalizeRealityHash($payload['reality_hash'] ?? null);
+        $calculatedHash = $metadata->calculateRealityHash($publicKey, $shortIds);
+
+        if (
+            $publicKey !== null
+            && $metadata->validatePublicKey($publicKey)
+            && $shortIds !== null
+            && $suppliedHash !== null
+            && $calculatedHash !== null
+            && hash_equals($calculatedHash, $suppliedHash)
+        ) {
+            $runtime->public_key = $publicKey;
+            $runtime->short_ids_json = json_encode($shortIds);
+            $runtime->reality_hash = $suppliedHash;
+
+            if (
+                ! array_key_exists('last_error', $payload)
+                && in_array($runtime->last_error, self::REALITY_METADATA_ERROR_CODES, true)
+            ) {
+                $runtime->last_error = null;
+            }
+
+            return;
+        }
+
+        if (
+            $suppliedHash !== null
+            && $calculatedHash !== null
+            && ! hash_equals($calculatedHash, $suppliedHash)
+        ) {
+            $runtime->last_error = 'reality_metadata_hash_mismatch';
+
+            return;
+        }
+
+        $runtime->last_error = 'reality_metadata_invalid';
     }
 
     private function assignString(NodeRuntime $runtime, array $payload, string $field, ?int $maxLength = null): void

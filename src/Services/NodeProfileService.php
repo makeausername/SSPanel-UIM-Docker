@@ -82,7 +82,7 @@ final class NodeProfileService
 
         return (new User())
             ->orderBy('id')
-            ->get(['id', 'uuid', 'is_banned', 'class', 'node_group'])
+            ->get(['id', 'uuid', 'is_admin', 'is_banned', 'class', 'node_group'])
             ->filter(static function (User $user) use ($nodeClass, $nodeGroup): bool {
                 $uuid = trim((string) $user->uuid);
 
@@ -90,7 +90,15 @@ final class NodeProfileService
                     return false;
                 }
 
-                if ((int) $user->is_banned !== 0 || (int) $user->class < $nodeClass) {
+                if ((int) $user->is_banned !== 0) {
+                    return false;
+                }
+
+                if ((int) $user->is_admin === 1) {
+                    return true;
+                }
+
+                if ((int) $user->class < $nodeClass) {
                     return false;
                 }
 

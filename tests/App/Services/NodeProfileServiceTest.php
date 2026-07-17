@@ -192,6 +192,67 @@ class NodeProfileServiceTest extends TestCase
         ], array_column($users, 'uuid'));
     }
 
+    public function testAdministratorsBypassClassAndGroupButStillHonorSafetyExclusions(): void
+    {
+        $this->seedNode([
+            'id' => 1003,
+            'node_class' => 10,
+            'node_group' => 20,
+        ]);
+        $this->seedUser([
+            'id' => 11,
+            'uuid' => 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            'is_admin' => 1,
+            'class' => 0,
+            'node_group' => 0,
+        ]);
+        $this->seedUser([
+            'id' => 12,
+            'uuid' => 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            'is_admin' => 1,
+            'is_banned' => 1,
+            'class' => 0,
+            'node_group' => 0,
+        ]);
+        $this->seedUser([
+            'id' => 13,
+            'uuid' => 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+            'class' => 9,
+            'node_group' => 20,
+        ]);
+        $this->seedUser([
+            'id' => 14,
+            'uuid' => 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+            'class' => 10,
+            'node_group' => 21,
+        ]);
+        $this->seedUser([
+            'id' => 15,
+            'uuid' => 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+            'class' => 10,
+            'node_group' => 20,
+        ]);
+        $this->seedUser([
+            'id' => 16,
+            'uuid' => '   ',
+            'is_admin' => 1,
+        ]);
+        $this->seedUser([
+            'id' => 17,
+            'uuid' => '11111111-1111-1111-1111-111111111111',
+            'is_admin' => 1,
+        ]);
+
+        $users = (new NodeProfileService())->buildUsersForNode(1003);
+
+        $this->assertSame([11, 15], array_column($users, 'id'));
+        $this->assertSame(
+            ['id', 'uuid', 'email', 'speed_limit_mbps', 'ip_limit', 'enabled', 'updated_at'],
+            array_keys($users[0])
+        );
+        $this->assertArrayNotHasKey('is_admin', $users[0]);
+    }
+
     public function testBuildUsersForNodeReturnsEmptyArrayForMissingNode(): void
     {
         $this->seedUser([
@@ -228,6 +289,7 @@ class NodeProfileServiceTest extends TestCase
         Capsule::schema()->create('user', static function (Blueprint $table): void {
             $table->integer('id')->primary();
             $table->string('uuid')->nullable();
+            $table->integer('is_admin')->default(0);
             $table->integer('is_banned')->default(0);
             $table->integer('class')->default(0);
             $table->integer('node_group')->default(0);
@@ -251,6 +313,7 @@ class NodeProfileServiceTest extends TestCase
         Capsule::table('user')->insert(array_merge([
             'id' => 1,
             'uuid' => '00000000-0000-0000-0000-000000000000',
+            'is_admin' => 0,
             'is_banned' => 0,
             'class' => 0,
             'node_group' => 0,

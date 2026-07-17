@@ -5,26 +5,24 @@ declare(strict_types=1);
 namespace App\Services\Subscribe;
 
 use App\Models\Config;
-use App\Models\NodeRuntime;
+use App\Services\NodeProfileService;
 use App\Services\Subscribe;
-use Throwable;
+use App\Services\XNodeRealityMetadataService;
 use function base64_encode;
 use function http_build_query;
 use function is_array;
+use function is_numeric;
 use function is_scalar;
-use function is_string;
 use function json_decode;
 use function json_encode;
-use function preg_match;
 use function rawurlencode;
+use function strtolower;
 use function trim;
 use const PHP_EOL;
 use const PHP_QUERY_RFC3986;
 
 final class V2Ray extends Base
 {
-    private const DEFAULT_REALITY_SNI = 'www.cloudflare.com';
-
     public function getContent($user): string
     {
         $links = '';
@@ -79,84 +77,91 @@ final class V2Ray extends Base
         return 'vmess://' . base64_encode(json_encode($v2rayn_array));
     }
 
-    private function getRuntimeForNode(int $nodeId): ?NodeRuntime
-    {
-        if ($nodeId <= 0) {
-            return null;
-        }
-
-        try {
-            $runtime = (new NodeRuntime())->where('node_id', $nodeId)->first();
-        } catch (Throwable) {
-            return null;
-        }
-
-        return $runtime instanceof NodeRuntime ? $runtime : null;
-    }
-
-    private function parseFirstShortId(?string $shortIdsJson): ?string
-    {
-        if ($shortIdsJson === null || trim($shortIdsJson) === '') {
-            return null;
-        }
-
-        $short_ids = json_decode($shortIdsJson, true);
-        if (! is_array($short_ids)) {
-            return null;
-        }
-
-        foreach ($short_ids as $short_id) {
-            if (! is_scalar($short_id)) {
-                continue;
-            }
-
-            $short_id = trim((string) $short_id);
-            if ($short_id !== '' && $this->isValidShortId($short_id)) {
-                return $short_id;
-            }
-        }
-
-        return null;
-    }
-
     private function buildXNodeVlessRealityUrl($user, $node): ?string
     {
-        $runtime = $this->getRuntimeForNode((int) ($node->id ?? 0));
+        $nodeId = (int) ($node->id ?? 0);
+        $metadata = new XNodeRealityMetadataService();
+        $runtime = $metadata->selectUsableRuntimeForNode($nodeId);
         if ($runtime === null) {
             return null;
         }
 
         $uuid = isset($user->uuid) ? trim((string) $user->uuid) : '';
         $server = isset($node->server) ? trim((string) $node->server) : '';
-        $public_key = isset($runtime->public_key) ? trim((string) $runtime->public_key) : '';
-        $short_id = $this->parseFirstShortId(
-            is_string($runtime->short_ids_json ?? null) ? $runtime->short_ids_json : null
-        );
+        $publicKey = $metadata->normalizePublicKey($runtime->getAttribute('public_key'));
+        $shortIds = $metadata->normalizeShortIds($runtime->getAttribute('short_ids_json'));
+        $profileConfig = (new NodeProfileService())->buildDefaultConfig($nodeId, $server);
+        $profile = $profileConfig['profile'] ?? null;
+        $reality = $profileConfig['reality'] ?? null;
 
-        if ($uuid === '' || $server === '' || $public_key === '' || $short_id === null) {
+        if (
+            $uuid === ''
+            || $server === ''
+            || $publicKey === null
+            || $shortIds === null
+            || ! is_array($profile)
+            || ! is_array($reality)
+        ) {
+            return null;
+        }
+
+        $port = $profile['port'] ?? null;
+        $flow = $this->profileString($profile['flow'] ?? null);
+        $security = $this->profileString($profile['security'] ?? null);
+        $networkType = $this->mapProfileNetworkToUriType($profile['network'] ?? null);
+        $serverNames = $reality['server_names'] ?? null;
+        $sni = is_array($serverNames) ? $this->profileString($serverNames[0] ?? null) : null;
+        $fingerprint = $this->profileString($reality['fingerprint'] ?? null);
+
+        if (
+            ! is_numeric($port)
+            || (int) $port <= 0
+            || $flow === null
+            || $security === null
+            || $networkType === null
+            || $sni === null
+            || $fingerprint === null
+        ) {
             return null;
         }
 
         $query = [
             'encryption' => 'none',
-            'security' => 'reality',
-            'sni' => self::DEFAULT_REALITY_SNI,
-            'fp' => 'chrome',
-            'pbk' => $public_key,
-            'sid' => $short_id,
-            'type' => 'tcp',
-            'flow' => 'xtls-rprx-vision',
+            'security' => $security,
+            'sni' => $sni,
+            'fp' => $fingerprint,
+            'pbk' => $publicKey,
+            'sid' => $shortIds[0],
+            'type' => $networkType,
+            'flow' => $flow,
         ];
 
         $name = isset($node->name) ? (string) $node->name : '';
 
-        return 'vless://' . $uuid . '@' . $server . ':443?'
+        return 'vless://' . $uuid . '@' . $server . ':' . (int) $port . '?'
             . http_build_query($query, '', '&', PHP_QUERY_RFC3986)
             . '#' . rawurlencode($name);
     }
 
-    private function isValidShortId(string $shortId): bool
+    private function mapProfileNetworkToUriType(mixed $network): ?string
     {
-        return preg_match('/^(?:[0-9a-fA-F]{2}){1,8}$/', $shortId) === 1;
+        $network = $this->profileString($network);
+
+        return match ($network === null ? null : strtolower($network)) {
+            'raw' => 'tcp',
+            'tcp' => 'tcp',
+            default => null,
+        };
+    }
+
+    private function profileString(mixed $value): ?string
+    {
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 }
