@@ -15,6 +15,7 @@ use function array_key_exists;
 use function is_array;
 use function json_decode;
 use function max;
+use function min;
 use function preg_match;
 use function strtolower;
 use function strtotime;
@@ -116,6 +117,8 @@ final class ClientApiController extends BaseController
         $upload = (int) $user->u;
         $download = (int) $user->d;
         $used = $upload + $download;
+        $todayUsed = min(max((int) $user->transfer_today, 0), max($used, 0));
+        $pastUsed = max($used - $todayUsed, 0);
         $total = (int) $user->transfer_enable;
         $remaining = max($total - $used, 0);
         $expireAt = (string) $user->class_expire;
@@ -130,6 +133,8 @@ final class ClientApiController extends BaseController
             'upload' => $upload,
             'download' => $download,
             'used' => $used,
+            'todayUsed' => $todayUsed,
+            'pastUsed' => $pastUsed,
             'total' => $total,
             'remaining' => $remaining,
             'expireAt' => $expireAt,
