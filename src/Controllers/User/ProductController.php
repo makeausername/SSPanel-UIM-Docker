@@ -29,11 +29,6 @@ final class ProductController extends BaseController
             ->orderBy('id')
             ->get();
 
-        $times = (new Product())->where('status', '1')
-            ->where('type', 'time')
-            ->orderBy('id')
-            ->get();
-
         foreach ($tabps as $tabp) {
             $tabp->content = self::normalizeContent(json_decode($tabp->content));
         }
@@ -42,15 +37,10 @@ final class ProductController extends BaseController
             $bandwidth->content = self::normalizeContent(json_decode($bandwidth->content));
         }
 
-        foreach ($times as $time) {
-            $time->content = self::normalizeContent(json_decode($time->content));
-        }
-
         return $response->write(
             $this->view()
                 ->assign('tabps', $tabps)
                 ->assign('bandwidths', $bandwidths)
-                ->assign('times', $times)
                 ->fetch('user/product.tpl')
         );
     }
