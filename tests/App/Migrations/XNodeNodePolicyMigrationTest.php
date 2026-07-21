@@ -52,10 +52,10 @@ class XNodeNodePolicyMigrationTest extends TestCase
         $xnode = $this->findNode(1);
         $legacy = $this->findNode(2);
 
-        $this->assertSame(5.0, (float) $xnode['traffic_rate']);
+        $this->assertSame(2.0, (float) $xnode['traffic_rate']);
         $this->assertSame(0, (int) $xnode['is_dynamic_rate']);
         $this->assertSame(0, (int) $xnode['dynamic_rate_type']);
-        $this->assertSame(XNodeNodePolicy::dynamicRateConfig(5.0), json_decode(
+        $this->assertSame(XNodeNodePolicy::dynamicRateConfig(), json_decode(
             $xnode['dynamic_rate_config'],
             true,
             512,

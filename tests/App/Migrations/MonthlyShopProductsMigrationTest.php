@@ -39,6 +39,28 @@ class MonthlyShopProductsMigrationTest extends TestCase
                 (type, name, price, content, \"limit\", status, create_time, update_time, sale_count, stock)
             VALUES ('bandwidth', 'Existing custom product', 5, '{}', '{}', 1, 1, 1, 0, -1)
         ");
+        $this->pdo->exec('
+            CREATE TABLE node (
+                id INTEGER PRIMARY KEY,
+                sort INTEGER NOT NULL,
+                custom_config TEXT NOT NULL,
+                traffic_rate REAL NOT NULL,
+                is_dynamic_rate INTEGER NOT NULL,
+                dynamic_rate_type INTEGER NOT NULL,
+                dynamic_rate_config TEXT NOT NULL,
+                node_class INTEGER NOT NULL,
+                node_group INTEGER NOT NULL,
+                node_speedlimit INTEGER NOT NULL,
+                node_bandwidth INTEGER NOT NULL,
+                node_bandwidth_limit INTEGER NOT NULL,
+                bandwidthlimit_resetday INTEGER NOT NULL
+            )
+        ');
+        $this->pdo->exec("
+            INSERT INTO node VALUES
+                (1, 15, '{\"xnode\":{\"billing_profile\":\"hkg_as3_pro_medium\",\"profit_policy_version\":2}}',
+                    36, 1, 1, '{\"max_rate\":36}', 10, 9, 100, 123456, 500, 15)
+        ");
     }
 
     public function testMigrationCreatesExactBilingualPlansAndMonthlyAddonsIdempotently(): void
@@ -74,6 +96,8 @@ class MonthlyShopProductsMigrationTest extends TestCase
             $this->assertSame($bandwidth, $content['auto_reset_bandwidth']);
             $this->assertSame(1, $content['auto_reset_day']);
             $this->assertTrue($content['monthly_plan']);
+            $this->assertSame('annual', $content['billing_cycle']);
+            $this->assertFalse($content['unlimited_bandwidth']);
             $this->assertSame(0, $content['node_group']);
             $this->assertSame('0', $content['speed_limit']);
             $this->assertSame('0', $content['ip_limit']);
@@ -88,6 +112,49 @@ class MonthlyShopProductsMigrationTest extends TestCase
             $this->assertSame($bandwidth, $content['bandwidth']);
             $this->assertTrue($content['current_month_only']);
         }
+
+        $this->assertSame(0, (int) $this->pdo->query(
+            'SELECT COUNT(*) FROM product WHERE content LIKE \'%"sku":"unlimited"%\''
+        )->fetchColumn());
+    }
+
+    public function testForwardSyncMigrationRepairsPreviouslyAppliedProfitRatesAndShopValues(): void
+    {
+        $this->pdo->exec("
+            INSERT INTO product
+                (type, name, price, content, \"limit\", status, create_time, update_time, sale_count, stock)
+            VALUES
+                ('tabp', 'Legacy managed unlimited', 1800,
+                    '{\"managed_by\":\"eziplc_monthly_shop_v1\",\"sku\":\"unlimited\"}',
+                    '{}', 1, 1, 1, 0, -1)
+        ");
+        $migration = require dirname(__DIR__, 3)
+            . '/db/migrations/2026072103-sync_monthly_shop_and_uniform_xnode_rate.php';
+
+        $migration->apply($this->pdo);
+        $migration->apply($this->pdo);
+
+        $node = $this->pdo->query('SELECT * FROM node WHERE id = 1')->fetch(PDO::FETCH_ASSOC);
+        $config = json_decode($node['custom_config'], true, 512, JSON_THROW_ON_ERROR);
+        $ultra = $this->pdo->query("SELECT * FROM product WHERE name LIKE 'Ultra / %'")->fetch(PDO::FETCH_ASSOC);
+        $ultraContent = json_decode($ultra['content'], true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame(2.0, (float) $node['traffic_rate']);
+        $this->assertSame(0, (int) $node['is_dynamic_rate']);
+        $this->assertSame(0, (int) $node['node_class']);
+        $this->assertSame(0, (int) $node['node_group']);
+        $this->assertSame(0, (int) $node['node_speedlimit']);
+        $this->assertSame(0, (int) $node['node_bandwidth_limit']);
+        $this->assertSame(1, (int) $node['bandwidthlimit_resetday']);
+        $this->assertSame(123456, (int) $node['node_bandwidth']);
+        $this->assertArrayNotHasKey('billing_profile', $config['xnode']);
+        $this->assertArrayNotHasKey('profit_policy_version', $config['xnode']);
+        $this->assertSame(1500.0, (float) $ultra['price']);
+        $this->assertSame(2100, $ultraContent['bandwidth']);
+        $this->assertSame(1, $ultraContent['auto_reset_day']);
+        $this->assertSame(0, (int) $this->pdo->query(
+            "SELECT status FROM product WHERE name = 'Legacy managed unlimited'"
+        )->fetchColumn());
     }
 
     public function testDownDisablesOnlyManagedProducts(): void

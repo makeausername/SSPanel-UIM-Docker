@@ -26,16 +26,16 @@ class XNodeProfitPolicyMigrationTest extends TestCase
         $this->seedProducts();
     }
 
-    public function testMigrationAppliesCostProfilesAndDisablesOnlyManagedUnlimitedPlan(): void
+    public function testMigrationAppliesUniformRateAndDisablesOnlyManagedUnlimitedPlan(): void
     {
         $migration = require dirname(__DIR__, 3) . '/db/migrations/2026072102-apply_xnode_profit_policy.php';
 
         $migration->apply($this->pdo);
         $migration->apply($this->pdo);
 
-        $this->assertNodePolicy(1, XNodeNodePolicy::PROFILE_LAX_MICRO, 5.0);
-        $this->assertNodePolicy(2, XNodeNodePolicy::PROFILE_HKG_MEDIUM, 36.0);
-        $this->assertNodePolicy(3, XNodeNodePolicy::PROFILE_HKG_MICRO, 32.0);
+        $this->assertNodePolicy(1);
+        $this->assertNodePolicy(2);
+        $this->assertNodePolicy(3);
 
         $legacy = $this->findNode(4);
         $this->assertSame(2.0, (float) $legacy['traffic_rate']);
@@ -82,16 +82,13 @@ class XNodeProfitPolicyMigrationTest extends TestCase
 
     private function seedNodes(): void
     {
-        $explicitProfile = XNodeNodePolicy::customConfigWithProfile(
-            '{"xnode":{"enabled":true}}',
-            XNodeNodePolicy::PROFILE_HKG_MICRO
-        );
+        $legacyProfile = '{"xnode":{"enabled":true,"billing_profile":"hkg_as3_pro_micro","profit_policy_version":2}}';
         $insert = $this->pdo->prepare(
             'INSERT INTO node VALUES (?, ?, ?, ?, 2, 1, 1, ?, 10, 9, 100, ?, 500, 15)'
         );
         $insert->execute([1, 'LAX.AS3.Pro.MICRO', 15, '{}', '{"max_rate":3}', 123456]);
         $insert->execute([2, 'HKG.AS3.Pro.MEDIUM', 15, '{}', '{"max_rate":3}', 223456]);
-        $insert->execute([3, 'Custom Hong Kong', 15, $explicitProfile, '{"max_rate":3}', 323456]);
+        $insert->execute([3, 'Custom Hong Kong', 15, $legacyProfile, '{"max_rate":3}', 323456]);
         $insert->execute([4, 'Legacy Trojan', 14, '{}', '{"max_rate":3}', 654321]);
     }
 
@@ -115,19 +112,20 @@ class XNodeProfitPolicyMigrationTest extends TestCase
         $insert->execute([3, $managedUltra]);
     }
 
-    private function assertNodePolicy(int $id, string $profile, float $rate): void
+    private function assertNodePolicy(int $id): void
     {
         $node = $this->findNode($id);
         $config = json_decode($node['custom_config'], true, 512, JSON_THROW_ON_ERROR);
 
-        $this->assertSame($rate, (float) $node['traffic_rate']);
+        $this->assertSame(2.0, (float) $node['traffic_rate']);
         $this->assertSame(0, (int) $node['is_dynamic_rate']);
         $this->assertSame(0, (int) $node['node_class']);
         $this->assertSame(0, (int) $node['node_group']);
         $this->assertSame(0, (int) $node['node_speedlimit']);
         $this->assertSame(0, (int) $node['node_bandwidth_limit']);
         $this->assertSame(1, (int) $node['bandwidthlimit_resetday']);
-        $this->assertSame($profile, $config['xnode']['billing_profile']);
+        $this->assertArrayNotHasKey('billing_profile', $config['xnode'] ?? []);
+        $this->assertArrayNotHasKey('profit_policy_version', $config['xnode'] ?? []);
     }
 
     private function findNode(int $id): array
