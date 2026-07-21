@@ -92,13 +92,6 @@ return new class() implements MigrationInterface {
             ['standard', 'Standard / 标准套餐', 1000, '900.00', false],
             ['pro', 'Pro / 专业套餐', 1500, '1200.00', false],
             ['ultra', 'Ultra / 超级套餐', 2100, '1500.00', false],
-            [
-                'unlimited',
-                'Unlimited / 无限套餐',
-                MonthlyPlanService::UNLIMITED_BANDWIDTH_GB,
-                '1800.00',
-                true,
-            ],
         ];
         $products = [];
 

@@ -22,7 +22,7 @@ return new class() implements MigrationInterface {
 
     public function apply(\PDO $pdo): void
     {
-        $values = XNodeNodePolicy::databaseValues();
+        $values = XNodeNodePolicy::databaseValues(XNodeNodePolicy::DEFAULT_PROFILE);
         $statement = $pdo->prepare('
             UPDATE `node`
             SET `traffic_rate` = ?,

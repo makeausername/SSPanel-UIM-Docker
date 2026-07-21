@@ -113,6 +113,8 @@ final class NodeController extends BaseController
         return $response->write(
             $this->view()
                 ->assign('update_field', self::$update_field)
+                ->assign('xnode_billing_profiles', XNodeNodePolicy::profiles())
+                ->assign('xnode_default_billing_profile', XNodeNodePolicy::DEFAULT_PROFILE)
                 ->fetch('admin/node/create.tpl')
         );
     }
@@ -154,7 +156,8 @@ final class NodeController extends BaseController
         $node->password = Tools::genRandomChar(32);
 
         if (XNodeNodePolicy::appliesTo($node->sort)) {
-            XNodeNodePolicy::apply($node);
+            $billingProfile = $request->getParam('xnode_billing_profile');
+            XNodeNodePolicy::apply($node, is_string($billingProfile) ? $billingProfile : null);
         }
 
         if (! $node->save()) {
@@ -206,6 +209,10 @@ final class NodeController extends BaseController
         $node->min_rate = $dynamic_rate_config?->min_rate ?? 1;
         $node->min_rate_time = $dynamic_rate_config?->min_rate_time ?? 3;
         $node->sort = (int) $node->sort;
+        $node->xnode_billing_profile = XNodeNodePolicy::resolveProfile(
+            XNodeNodePolicy::profileFromCustomConfig((string) $node->custom_config),
+            (string) $node->name
+        );
 
         $node->node_bandwidth = Tools::autoBytes($node->node_bandwidth);
         $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
@@ -216,6 +223,7 @@ final class NodeController extends BaseController
                 ->assign('xnode_summary', $this->buildXNodeEditSummary($runtime, (int) $node->id, $nodeBandwidth))
                 ->assign('xnode_probe_summary', NodeProbeService::summarizeNode((int) $node->id))
                 ->assign('update_field', self::$update_field)
+                ->assign('xnode_billing_profiles', XNodeNodePolicy::profiles())
                 ->fetch('admin/node/edit.tpl')
         );
     }
@@ -256,7 +264,8 @@ final class NodeController extends BaseController
         $node->bandwidthlimit_resetday = $request->getParam('bandwidthlimit_resetday');
 
         if (XNodeNodePolicy::appliesTo($node->sort)) {
-            XNodeNodePolicy::apply($node);
+            $billingProfile = $request->getParam('xnode_billing_profile');
+            XNodeNodePolicy::apply($node, is_string($billingProfile) ? $billingProfile : null);
         }
 
         if (! $node->save()) {

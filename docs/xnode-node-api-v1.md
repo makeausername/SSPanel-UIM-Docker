@@ -130,17 +130,22 @@ curl -sS https://panel.example.com/node/api/v1/users \
 
 The UUIDs in this response must match the UUIDs emitted in `/sub/{token}/v2ray` VLESS Reality links because xnode-agent uses them to render Xray `clients[].id`. The mock user UUID is retained only as a test/helper fallback and is no longer used for normal authenticated nodes.
 
-## Managed XNode access and accounting policy
+## Managed XNode access and profit policy
 
-XNode nodes (`sort = 15`) use a panel-managed policy so operators only need to provide the node name, address, and connection profile:
+XNode nodes (`sort = 15`) use a panel-managed policy. Operators select the matching server cost profile and the panel applies the rate automatically:
 
 - `node_class = 0` and `node_group = 0`: available to every eligible paid user without node tiers.
-- `traffic_rate = 1`: Xray uplink and downlink are billed exactly once. The agent reports both directions separately, and the panel sums them.
+- `LAX AS3 Pro MICRO`: `traffic_rate = 5`.
+- `LAX AS3 Pro MEDIUM`: `traffic_rate = 6`.
+- `HKG AS3 Pro MICRO`: `traffic_rate = 32`.
+- `HKG AS3 Pro MEDIUM`: `traffic_rate = 36`.
 - Dynamic traffic rate is disabled: a byte always consumes the same quota regardless of time.
 - `node_speedlimit = 0` and `node_bandwidth_limit = 0`: no panel-side speed or node quota limit.
 - `bandwidthlimit_resetday = 1`: the displayed node traffic counter resets on day 1 while remaining unlimited.
 
-The migration normalizes existing XNode rows to the same policy without clearing their current `node_bandwidth` value. Non-XNode node types retain the original configurable SSPanel-UIM behavior.
+The rates use the Ultra plan as the worst finite revenue-per-GB case, an effective USD/CNY budget rate of 7.00, a 15% operating-cost reserve, full consumption of the provider's high-speed bidirectional quota, and a target of at least 50% net margin. They do not guarantee profit when subscriber revenue is insufficient to cover a server, provider pricing changes, or actual non-server expenses exceed the reserve.
+
+The managed Unlimited plan is disabled because no finite traffic multiplier can guarantee a margin for an unbounded quota. Existing XNode rows are migrated by an explicit stored cost profile, then by recognizable LAX/HKG names, and finally by the conservative HKG MEDIUM fallback. Current `node_bandwidth` counters are preserved. Non-XNode node types retain the original configurable SSPanel-UIM behavior.
 
 Fetch detect rules:
 
