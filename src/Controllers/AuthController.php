@@ -34,6 +34,7 @@ use Slim\Http\ServerRequest;
 use function array_rand;
 use function date;
 use function explode;
+use function hash_equals;
 use function is_string;
 use function strlen;
 use function strtolower;
@@ -108,7 +109,7 @@ final class AuthController extends BaseController
                 ->withJson([
                     'ret' => 1,
                     'msg' => '请完成二步认证',
-            ]);
+                ]);
         }
 
         $time = $rememberMe ? 86400 * ($_ENV['rememberMeDuration'] ?? 7) : 3600; // Cookie 过期时间
@@ -373,7 +374,7 @@ final class AuthController extends BaseController
             $email_verify_code = trim($this->antiXss->xss_clean($request->getParam('emailcode')));
             $email_verify = $redis->get('email_verify:' . $email_verify_code);
 
-            if (! $email_verify) {
+            if (! is_string($email_verify) || ! hash_equals(strtolower(trim($email_verify)), $email)) {
                 return ResponseHelper::error($response, '你的邮箱验证码不正确');
             }
 

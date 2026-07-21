@@ -27,6 +27,7 @@ use function is_scalar;
 use function is_string;
 use function json_decode;
 use function json_encode;
+use function ksort;
 use function max;
 use function strlen;
 use function strtolower;
@@ -82,11 +83,25 @@ final class NodeRuntimeService
                     return $this->accepted($this->trafficResult(['duplicate' => true]));
                 }
 
-                $this->createReceipt($reportId, 'traffic', (int) $node->id, $payload);
+                $lockedNode = (new Node())
+                    ->where('id', (int) $node->id)
+                    ->lockForUpdate()
+                    ->first();
 
-                $rate = $this->trafficRate($node);
+                if ($lockedNode === null) {
+                    return $this->rejected('node_not_found', $this->trafficResult());
+                }
+
+                if ((int) $lockedNode->type === 0) {
+                    return $this->rejected('node_disabled', $this->trafficResult());
+                }
+
+                $this->createReceipt($reportId, 'traffic', (int) $lockedNode->id, $payload);
+
+                $rate = $this->trafficRate($lockedNode);
                 $result = $this->trafficResult();
                 $isTrafficLog = (bool) Config::obtain('traffic_log');
+                $trafficByUser = [];
 
                 foreach ($payload['data'] as $item) {
                     if (! is_array($item)) {
@@ -101,15 +116,29 @@ final class NodeRuntimeService
                         continue;
                     }
 
-                    $user = (new User())->find($userId);
+                    $u = $this->nonNegativeInt($item['u'] ?? 0);
+                    $d = $this->nonNegativeInt($item['d'] ?? 0);
+
+                    if (! isset($trafficByUser[$userId])) {
+                        $trafficByUser[$userId] = ['u' => 0, 'd' => 0];
+                    }
+
+                    $trafficByUser[$userId]['u'] += $u;
+                    $trafficByUser[$userId]['d'] += $d;
+                }
+
+                ksort($trafficByUser, SORT_NUMERIC);
+
+                foreach ($trafficByUser as $userId => $traffic) {
+                    $user = (new User())->where('id', $userId)->lockForUpdate()->first();
 
                     if ($user === null) {
                         $result['skipped']++;
                         continue;
                     }
 
-                    $u = $this->nonNegativeInt($item['u'] ?? 0);
-                    $d = $this->nonNegativeInt($item['d'] ?? 0);
+                    $u = $traffic['u'];
+                    $d = $traffic['d'];
                     $billedU = $u * $rate;
                     $billedD = $d * $rate;
                     $now = time();
@@ -130,8 +159,8 @@ final class NodeRuntimeService
                     $result['bytes'] += $u + $d;
                 }
 
-                $node->update([
-                    'node_bandwidth' => $node->node_bandwidth + $result['bytes'],
+                $lockedNode->update([
+                    'node_bandwidth' => $lockedNode->node_bandwidth + $result['bytes'],
                 ]);
 
                 return $this->accepted($result);

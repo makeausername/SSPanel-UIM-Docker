@@ -11,8 +11,6 @@ declare(strict_types=1);
 namespace App\Services\Gateway;
 
 use App\Models\Config;
-use App\Models\Invoice;
-use App\Models\Paylist;
 use App\Services\Auth;
 use App\Services\Gateway\Epay\EpayNotify;
 use App\Services\Gateway\Epay\EpaySubmit;
@@ -24,7 +22,6 @@ use GuzzleHttp\Exception\GuzzleException;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
-use voku\helper\AntiXSS;
 use function json_decode;
 use function trim;
 
@@ -34,7 +31,7 @@ final class Epay extends Base
 
     public function __construct()
     {
-        $this->antiXss = new AntiXSS();
+        parent::__construct();
         $this->epay['apiurl'] = Config::obtain('epay_url');//易支付API地址
         $this->epay['partner'] = Config::obtain('epay_pid');//易支付商户pid
         $this->epay['key'] = Config::obtain('epay_key');//易支付商户Key
@@ -60,11 +57,11 @@ final class Epay extends Base
 
     public function purchase(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $invoice_id = $this->antiXss->xss_clean($request->getParam('invoice_id'));
+        $invoiceId = $this->antiXss->xss_clean($request->getParam('invoice_id'));
         // EPay 特定参数
         $type = $this->antiXss->xss_clean($request->getParam('type'));
-        $redir = $this->antiXss->xss_clean($request->getParam('redir'));
-        $invoice = (new Invoice())->find($invoice_id);
+        $user = Auth::getUser();
+        $invoice = $this->getPayableInvoiceForUser($invoiceId, $user);
 
         if ($invoice === null) {
             return $response->withJson([
@@ -82,17 +79,6 @@ final class Epay extends Base
             ]);
         }
 
-        $user = Auth::getUser();
-        $pl = (new Paylist())->where('invoice_id', $invoice_id)->first();
-
-        if ($pl === null) {
-            $pl = new Paylist();
-            $pl->userid = $user->id;
-            $pl->total = $price;
-            $pl->invoice_id = $invoice_id;
-            $pl->tradeno = self::generateGuid();
-        }
-
         $type_text = match ($type) {
             'qqpay' => 'QQ',
             'wxpay' => 'WeChat',
@@ -100,20 +86,20 @@ final class Epay extends Base
             default => 'Alipay',
         };
 
-        $pl->gateway = self::_readableName() . ' ' . $type_text;
-
-        $pl->save();
+        $paylist = $this->createPaylist($user, $invoice);
+        $paylist->gateway = self::_readableName() . ' ' . $type_text;
+        $paylist->save();
         //请求参数
         $data = [
             'pid' => trim($this->epay['partner']),
             'type' => $type,
-            'out_trade_no' => $pl->tradeno,
+            'out_trade_no' => $paylist->tradeno,
             'notify_url' => self::getCallbackUrl(),
-            'return_url' => $redir,
-            'name' => $pl->tradeno,
+            'return_url' => $this->getInvoiceReturnUrl($invoice),
+            'name' => $paylist->tradeno,
             'money' => $price,
             'sitename' => $_ENV['appName'],
-            'clientip' => $_SERVER['REMOTE_ADDR'],
+            'clientip' => $_SERVER['REMOTE_ADDR'] ?? '',
         ];
 
         $epaySubmit = new EpaySubmit($this->epay);

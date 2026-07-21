@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Gateway;
 
 use App\Models\Config;
-use App\Models\Paylist;
 use App\Services\Auth;
 use App\Services\Gateway\Cryptomus\Payment as CryptomusPayment;
 use App\Services\View;
@@ -13,7 +12,6 @@ use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
-use voku\helper\AntiXSS;
 use function json_decode;
 use function trim;
 
@@ -26,7 +24,7 @@ final class Cryptomus extends Base
 
     public function __construct()
     {
-        $this->antiXss = new AntiXSS();
+        parent::__construct();
 
         $this->cryptomus['cryptomus_api_key'] = Config::obtain('cryptomus_api_key');
         $this->cryptomus['cryptomus_uuid'] = Config::obtain('cryptomus_uuid');
@@ -61,42 +59,29 @@ final class Cryptomus extends Base
      */
     public function purchase(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $price = $this->antiXss->xss_clean($request->getParam('price'));
         $invoiceId = $this->antiXss->xss_clean($request->getParam('invoice_id'));
+        $user = Auth::getUser();
+        $invoice = $this->getPayableInvoiceForUser($invoiceId, $user);
 
-        $type = $this->antiXss->xss_clean($request->getParam('type'));
-        $redir = $this->antiXss->xss_clean($request->getParam('redir'));
-
-        if ($price <= 0) {
+        if ($invoice === null || (float) $invoice->price <= 0) {
             return $response->withJson([
                 'ret' => 0,
-                'msg' => '非法的金额',
+                'msg' => 'Invoice not found or not payable',
             ]);
         }
 
-        $user = Auth::getUser();
-        $pl = new Paylist();
-
-        $tradeNumber = self::generateGuid();
-
-        $pl->userid = $user->id;
-        $pl->total = $price;
-        $pl->invoice_id = $invoiceId;
-        $pl->tradeno = $tradeNumber;
-        $pl->gateway = self::_readableName();
-
-        $pl->save();
+        $paylist = $this->createPaylist($user, $invoice);
 
         $paymentData = [
-            'amount' => $price,
+            'amount' => $paylist->total,
             'currency' => $this->cryptomus['cryptomus_currency'] ?? 'CNY',
-            'order_id' => 'sspanel_' . $invoiceId,
-            'url_return' => $redir,
+            'order_id' => 'sspanel_' . $invoice->id,
+            'url_return' => $this->getInvoiceReturnUrl($invoice),
             'url_callback' => self::getCallbackUrl(),
             'lifetime' => $this->cryptomus['cryptomus_lifetime'] ?? '3600',
             'subtract' => $this->cryptomus['cryptomus_subtract'] ?? '0',
             'plugin_name' => 'sspanel:2024.1',
-            'additional_data' => json_encode(['tradeno' => $tradeNumber]),
+            'additional_data' => json_encode(['tradeno' => $paylist->tradeno]),
         ];
 
         $paymentInstance = $this->getPayment();
@@ -127,15 +112,19 @@ final class Cryptomus extends Base
     {
         $payload = trim(file_get_contents('php://input'));
         $data = json_decode($payload, true);
-        $additionalData = json_decode($data['additional_data'], true);
 
-        if (! $this->hashEqual($data)) {
+        if (! is_array($data) || ! $this->hashEqual($data)) {
             return $response->withJson(['state' => 'fail', 'msg' => 'Sign is not valid']);
         }
 
-        $success = isset($data['is_final']) && $data['is_final'] && ($data['status'] === 'paid' || $data['status'] === 'paid_over' || $data['status'] === 'wrong_amount');
+        $additionalData = json_decode((string) ($data['additional_data'] ?? ''), true);
+        $success = ($data['is_final'] ?? false) === true &&
+            in_array($data['status'] ?? '', ['paid', 'paid_over'], true) &&
+            is_array($additionalData) &&
+            isset($additionalData['tradeno']) &&
+            is_string($additionalData['tradeno']);
+
         if ($success) {
-//            $orderId = preg_replace('/^sspanel(?:_upd)?_/', '', $data['order_id'] ?? '');
             $this->postPayment($additionalData['tradeno']);
 
             return $response->withJson([

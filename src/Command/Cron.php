@@ -8,9 +8,15 @@ use App\Models\Config;
 use App\Services\Cron as CronService;
 use App\Services\Detect;
 use Exception;
+use RuntimeException;
 use Telegram\Bot\Exceptions\TelegramSDKException;
+use Throwable;
+use function date;
+use function fwrite;
+use function implode;
 use function mktime;
 use function time;
+use const STDERR;
 
 final class Cron extends Command
 {
@@ -26,116 +32,189 @@ EOL;
     {
         ini_set('memory_limit', '-1');
 
-        // Log current hour & minute
-        $hour = (int) date('H');
-        $minute = (int) date('i');
-
+        $now = time();
+        $dayStart = mktime(0, 0, 0, (int) date('m'), (int) date('d'), (int) date('Y'));
+        $dailyScheduledAt = mktime(
+            (int) Config::obtain('daily_job_hour'),
+            (int) Config::obtain('daily_job_minute'),
+            0,
+            (int) date('m'),
+            (int) date('d'),
+            (int) date('Y')
+        );
+        $weekStart = mktime(
+            0,
+            0,
+            0,
+            (int) date('m'),
+            (int) date('d') - ((int) date('N') - 1),
+            (int) date('Y')
+        );
+        $monthStart = mktime(0, 0, 0, (int) date('m'), 1, (int) date('Y'));
+        $hourStart = mktime((int) date('H'), 0, 0, (int) date('m'), (int) date('d'), (int) date('Y'));
         $jobs = new CronService();
-        $runDailyJob = $hour === Config::obtain('daily_job_hour')
-            && $minute === Config::obtain('daily_job_minute')
-            && time() - Config::obtain('last_daily_job_time') > 86399;
+        $runDailyJob = self::isDue('last_daily_job_time', $dailyScheduledAt, $now);
+        $failures = [];
+        $runJob = static function (string $name, callable $job) use (&$failures): bool {
+            try {
+                $job();
+
+                return true;
+            } catch (Throwable $exception) {
+                $failures[] = $name;
+                fwrite(STDERR, '[cron] ' . $name . ' failed: ' . $exception::class . PHP_EOL);
+
+                return false;
+            }
+        };
+        $dailyJobSucceeded = true;
+        $monthlyBaselineReady = true;
 
         // Reset the monthly baseline before activating add-ons bought on the reset day.
-        if ($runDailyJob) {
-            $jobs->resetUserBandwidth();
+        if ($runDailyJob && ! $runJob('resetUserBandwidth', [$jobs, 'resetUserBandwidth'])) {
+            $dailyJobSucceeded = false;
+            $monthlyBaselineReady = false;
         }
 
-        // Run new shop related jobs
-        $jobs->processPendingOrder();
-        $jobs->processTabpOrderActivation();
-        $jobs->processBandwidthOrderActivation();
-        $jobs->processTimeOrderActivation();
-        $jobs->processTopupOrderActivation();
+        $runJob('processPendingOrder', [$jobs, 'processPendingOrder']);
 
-        // Run user related jobs
-        $jobs->deleteUnpaidRegistrations();
-        $jobs->expirePaidUserAccount();
-        $jobs->sendPaidUserUsageLimitNotification();
+        if ($monthlyBaselineReady) {
+            foreach ([
+                'processTabpOrderActivation',
+                'processBandwidthOrderActivation',
+                'processTimeOrderActivation',
+                'processTopupOrderActivation',
+            ] as $jobName) {
+                $runJob($jobName, [$jobs, $jobName]);
+            }
+        }
 
-        // Run node related jobs
-        $jobs->updateNodeIp();
+        foreach ([
+            'deleteUnpaidRegistrations',
+            'expirePaidUserAccount',
+            'sendPaidUserUsageLimitNotification',
+            'updateNodeIp',
+        ] as $jobName) {
+            $runJob($jobName, [$jobs, $jobName]);
+        }
 
         if ($_ENV['enable_detect_offline']) {
-            $jobs->detectNodeOffline();
+            $runJob('detectNodeOffline', [$jobs, 'detectNodeOffline']);
         }
 
         // Run daily job
         if ($runDailyJob) {
-            $jobs->cleanDb();
-            $jobs->resetNodeBandwidth();
-            $jobs->sendDailyTrafficReport();
-
-            if (Config::obtain('enable_detect_inactive_user')) {
-                $jobs->detectInactiveUser();
+            foreach (['cleanDb', 'resetNodeBandwidth', 'sendDailyTrafficReport'] as $jobName) {
+                if (! $runJob($jobName, [$jobs, $jobName])) {
+                    $dailyJobSucceeded = false;
+                }
             }
 
-            if (Config::obtain('remove_inactive_user_link_and_invite')) {
-                $jobs->removeInactiveUserLinkAndInvite();
+            if (Config::obtain('enable_detect_inactive_user')
+                && ! $runJob('detectInactiveUser', [$jobs, 'detectInactiveUser'])
+            ) {
+                $dailyJobSucceeded = false;
             }
 
-            if (Config::obtain('im_bot_group_notify_diary')) {
-                $jobs->sendDiaryNotification();
+            if (Config::obtain('remove_inactive_user_link_and_invite')
+                && ! $runJob('removeInactiveUserLinkAndInvite', [$jobs, 'removeInactiveUserLinkAndInvite'])
+            ) {
+                $dailyJobSucceeded = false;
             }
 
-            $jobs->resetTodayBandwidth();
-
-            if (Config::obtain('im_bot_group_notify_daily_job')) {
-                $jobs->sendDailyJobNotification();
+            if (Config::obtain('im_bot_group_notify_diary')
+                && ! $runJob('sendDiaryNotification', [$jobs, 'sendDiaryNotification'])
+            ) {
+                $dailyJobSucceeded = false;
             }
 
-            (new Config())->where('item', 'last_daily_job_time')->update([
-                'value' => mktime(
-                    Config::obtain('daily_job_hour'),
-                    Config::obtain('daily_job_minute'),
-                    0,
-                    (int) date('m'),
-                    (int) date('d'),
-                    (int) date('Y')
-                ),
-            ]);
+            if (! $runJob('resetTodayBandwidth', [$jobs, 'resetTodayBandwidth'])) {
+                $dailyJobSucceeded = false;
+            }
+
+            if (Config::obtain('im_bot_group_notify_daily_job')
+                && ! $runJob('sendDailyJobNotification', [$jobs, 'sendDailyJobNotification'])
+            ) {
+                $dailyJobSucceeded = false;
+            }
+
+            if ($dailyJobSucceeded) {
+                $runJob(
+                    'markDailyJobComplete',
+                    static function () use ($dailyScheduledAt): void {
+                        self::markRun('last_daily_job_time', $dailyScheduledAt);
+                    }
+                );
+            }
         }
 
         // Daily finance report
         if (Config::obtain('enable_daily_finance_mail')
-            && $hour === 0
-            && $minute === 0
+            && self::isDue('last_daily_finance_mail_time', $dayStart, $now)
         ) {
-            $jobs->sendDailyFinanceMail();
+            $runJob('sendDailyFinanceMail', static function () use ($jobs, $dayStart): void {
+                $jobs->sendDailyFinanceMail();
+                self::markRun('last_daily_finance_mail_time', $dayStart);
+            });
         }
 
         // Weekly finance report
         if (Config::obtain('enable_weekly_finance_mail')
-            && $hour === 0
-            && $minute === 0
-            && date('w') === '1'
+            && self::isDue('last_weekly_finance_mail_time', $weekStart, $now)
         ) {
-            $jobs->sendWeeklyFinanceMail();
+            $runJob('sendWeeklyFinanceMail', static function () use ($jobs, $weekStart): void {
+                $jobs->sendWeeklyFinanceMail();
+                self::markRun('last_weekly_finance_mail_time', $weekStart);
+            });
         }
 
         // Monthly finance report
         if (Config::obtain('enable_monthly_finance_mail')
-            && $hour === 0
-            && $minute === 0
-            && date('d') === '01'
+            && self::isDue('last_monthly_finance_mail_time', $monthStart, $now)
         ) {
-            $jobs->sendMonthlyFinanceMail();
+            $runJob('sendMonthlyFinanceMail', static function () use ($jobs, $monthStart): void {
+                $jobs->sendMonthlyFinanceMail();
+                self::markRun('last_monthly_finance_mail_time', $monthStart);
+            });
         }
 
         // Detect GFW
-        if (Config::obtain('enable_detect_gfw') && $minute === 0
+        if (Config::obtain('enable_detect_gfw')
+            && self::isDue('last_detect_gfw_job_time', $hourStart, $now)
         ) {
-            $detect = new Detect();
-            $detect->gfw();
+            $runJob('detectGfw', static function () use ($hourStart): void {
+                (new Detect())->gfw();
+                self::markRun('last_detect_gfw_job_time', $hourStart);
+            });
         }
 
         // Detect ban
-        if (Config::obtain('enable_detect_ban') && $minute === 0
+        if (Config::obtain('enable_detect_ban')
+            && self::isDue('last_detect_ban_job_time', $hourStart, $now)
         ) {
-            $detect = new Detect();
-            $detect->ban();
+            $runJob('detectBan', static function () use ($hourStart): void {
+                (new Detect())->ban();
+                self::markRun('last_detect_ban_job_time', $hourStart);
+            });
         }
 
         // Run email queue
-        $jobs->processEmailQueue();
+        $runJob('processEmailQueue', [$jobs, 'processEmailQueue']);
+
+        if ($failures !== []) {
+            throw new RuntimeException('Cron jobs failed: ' . implode(', ', $failures));
+        }
+    }
+
+    public static function isDue(string $checkpoint, int $scheduledAt, int $now): bool
+    {
+        return $now >= $scheduledAt && (int) Config::obtain($checkpoint) < $scheduledAt;
+    }
+
+    private static function markRun(string $checkpoint, int $scheduledAt): void
+    {
+        if (! Config::set($checkpoint, $scheduledAt)) {
+            throw new RuntimeException('Unable to persist cron checkpoint: ' . $checkpoint);
+        }
     }
 }

@@ -8,7 +8,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Schema\Blueprint;
 use PHPUnit\Framework\TestCase;
 
-class NodeRuntimeServiceTest extends TestCase
+final class NodeRuntimeServiceTest extends TestCase
 {
     private Capsule $db;
 
@@ -128,6 +128,27 @@ class NodeRuntimeServiceTest extends TestCase
         $this->assertSame(400, (int) $user->u + (int) $user->d);
         $this->assertSame(400, (int) $user->transfer_total);
         $this->assertSame(400, (int) $node->node_bandwidth);
+    }
+
+    public function testTrafficReportAggregatesDuplicateUsersBeforeUpdatingCounters(): void
+    {
+        $this->seedNode(['id' => 6, 'traffic_rate' => 1]);
+        $this->seedUser(['id' => 60]);
+
+        $result = (new NodeRuntimeService())->acceptTraffic([
+            'report_id' => 'duplicate-user-items',
+            'data' => [
+                ['user_id' => 60, 'u' => 10, 'd' => 20],
+                ['user_id' => 60, 'u' => 30, 'd' => 40],
+            ],
+        ], 6);
+
+        $user = Capsule::table('user')->where('id', 60)->first();
+        $this->assertTrue($result['accepted']);
+        $this->assertSame(1, $result['users']);
+        $this->assertSame(100, $result['bytes']);
+        $this->assertSame(40, (int) $user->u);
+        $this->assertSame(60, (int) $user->d);
     }
 
     public function testOnlineReportConvertsIpv4ToIpv4MappedIpv6(): void

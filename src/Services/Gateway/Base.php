@@ -9,20 +9,31 @@ use App\Models\Invoice;
 use App\Models\Paylist;
 use App\Models\User;
 use App\Models\UserMoneyLog;
+use App\Services\DB;
 use App\Services\Reward;
 use App\Utils\Tools;
 use Psr\Http\Message\ResponseInterface;
+use RuntimeException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use voku\helper\AntiXSS;
+use function bcadd;
+use function bccomp;
+use function bcsub;
 use function get_called_class;
 use function in_array;
 use function json_decode;
+use function json_encode;
 use function time;
 
 abstract class Base
 {
     protected AntiXSS $antiXss;
+
+    public function __construct()
+    {
+        $this->antiXss = new AntiXSS();
+    }
 
     abstract public function purchase(ServerRequest $request, Response $response, array $args): ResponseInterface;
 
@@ -52,42 +63,146 @@ abstract class Base
 
     public function postPayment(string $trade_no): void
     {
-        $paylist = (new Paylist())->where('tradeno', $trade_no)->first();
+        DB::connection()->transaction(function () use ($trade_no): void {
+            $paylist = (new Paylist())
+                ->where('tradeno', $trade_no)
+                ->lockForUpdate()
+                ->first();
 
-        if ($paylist?->status === 0) {
+            if ($paylist === null) {
+                throw new RuntimeException('Payment record not found.');
+            }
+
+            if ((int) $paylist->status === 1) {
+                return;
+            }
+
+            $invoice = (new Invoice())
+                ->where('id', $paylist->invoice_id)
+                ->lockForUpdate()
+                ->first();
+            $user = (new User())
+                ->where('id', $paylist->userid)
+                ->lockForUpdate()
+                ->first();
+
+            if ($invoice === null || $user === null || (int) $invoice->user_id !== (int) $user->id) {
+                throw new RuntimeException('Payment ownership validation failed.');
+            }
+
+            $paidAmount = self::money($paylist->total);
+
+            if (bccomp($paidAmount, '0.00', 2) <= 0) {
+                throw new RuntimeException('Payment amount must be positive.');
+            }
+
             $paylist->datetime = time();
             $paylist->status = 1;
-            $paylist->save();
-        }
 
-        $invoice = (new Invoice())->where('id', $paylist?->invoice_id)->first();
+            if (! in_array($invoice->status, ['unpaid', 'partially_paid'], true)) {
+                $paylist->save();
+                $this->creditBalance($user, $paidAmount, (int) $invoice->id, 'Duplicate invoice payment');
 
-        if (($invoice?->status === 'unpaid' || $invoice?->status === 'partially_paid') &&
-            (int) $paylist?->total >= (int) $invoice?->price) {
-            $invoice->status = 'paid_gateway';
+                return;
+            }
+
+            $invoiceDue = self::money($invoice->price);
+            $comparison = bccomp($paidAmount, $invoiceDue, 2);
             $invoice->update_time = time();
             $invoice->pay_time = time();
+
+            if ($comparison < 0) {
+                $invoice->price = bcsub($invoiceDue, $paidAmount, 2);
+                $invoice->status = 'partially_paid';
+                $content = json_decode((string) $invoice->content, true);
+                $content = is_array($content) ? $content : [];
+                $content[] = [
+                    'content_id' => count($content),
+                    'name' => 'Gateway partial payment',
+                    'price' => '-' . $paidAmount,
+                ];
+                $invoice->content = json_encode($content);
+            } else {
+                $invoice->status = 'paid_gateway';
+            }
+
+            $paylist->save();
             $invoice->save();
+
+            if ($comparison > 0) {
+                $this->creditBalance(
+                    $user,
+                    bcsub($paidAmount, $invoiceDue, 2),
+                    (int) $invoice->id,
+                    'Overpayment'
+                );
+            }
+
+            if ($comparison >= 0 && $user->ref_by > 0 && Config::obtain('invite_mode') === 'reward') {
+                Reward::issuePaybackReward(
+                    $user->id,
+                    $user->ref_by,
+                    (float) $invoiceDue,
+                    (int) $invoice->id
+                );
+            }
+        });
+    }
+
+    protected function getPayableInvoiceForUser(mixed $invoiceId, User $user): ?Invoice
+    {
+        if (! is_numeric($invoiceId) || (int) $invoiceId <= 0) {
+            return null;
         }
 
-        $user = (new User())->find($paylist?->userid);
+        return (new Invoice())
+            ->where('id', (int) $invoiceId)
+            ->where('user_id', (int) $user->id)
+            ->whereIn('status', ['unpaid', 'partially_paid'])
+            ->first();
+    }
 
-        if ($paylist?->total > $invoice?->price) {
-            $money_before = $user->money;
-            $user->money += $paylist?->total - $invoice?->price;
-            $user->save();
-            (new UserMoneyLog())->add(
-                $user->id,
-                $money_before,
-                $user->money,
-                $paylist?->total - $invoice?->price,
-                '超额支付账单 #' . $invoice?->id
-            );
+    protected function createPaylist(User $user, Invoice $invoice): Paylist
+    {
+        $paylist = new Paylist();
+        $paylist->userid = $user->id;
+        $paylist->total = self::money($invoice->price);
+        $paylist->status = 0;
+        $paylist->invoice_id = $invoice->id;
+        $paylist->tradeno = self::generateGuid();
+        $paylist->gateway = static::_readableName();
+        $paylist->save();
+
+        return $paylist;
+    }
+
+    protected function getInvoiceReturnUrl(Invoice $invoice): string
+    {
+        return $_ENV['baseUrl'] . '/user/invoice/' . $invoice->id . '/view';
+    }
+
+    private static function money(mixed $amount): string
+    {
+        return bcadd((string) $amount, '0.00', 2);
+    }
+
+    private function creditBalance(User $user, string $amount, int $invoiceId, string $reason): void
+    {
+        if (bccomp($amount, '0.00', 2) <= 0) {
+            return;
         }
 
-        if ($user !== null && $user->ref_by > 0 && Config::obtain('invite_mode') === 'reward') {
-            Reward::issuePaybackReward($user->id, $user->ref_by, $invoice?->price, $paylist?->invoice_id);
-        }
+        $moneyBefore = self::money($user->money);
+        $moneyAfter = bcadd($moneyBefore, $amount, 2);
+        $user->money = $moneyAfter;
+        $user->save();
+        (new UserMoneyLog())->add(
+            (int) $user->id,
+            (float) $moneyBefore,
+            (float) $moneyAfter,
+            (float) $amount,
+            $reason . ' invoice #' . $invoiceId
+        );
     }
 
     public static function generateGuid(): string

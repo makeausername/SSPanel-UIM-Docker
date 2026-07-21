@@ -1584,6 +1584,51 @@
         "mark": "上次执行每日任务的时间"
     },
     {
+        "item": "last_daily_finance_mail_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次执行每日财务报告的时间"
+    },
+    {
+        "item": "last_weekly_finance_mail_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次执行每周财务报告的时间"
+    },
+    {
+        "item": "last_monthly_finance_mail_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次执行每月财务报告的时间"
+    },
+    {
+        "item": "last_detect_gfw_job_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次执行节点被墙检测的时间"
+    },
+    {
+        "item": "last_detect_ban_job_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次执行审计封禁的时间"
+    },
+    {
         "item": "db_version",
         "value": "2023020100",
         "class": "db",
