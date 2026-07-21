@@ -1,7 +1,7 @@
 {include file='user/header.tpl'}
-{assign var=eziplcWindowsDownloadUrl value='/downloads/eziplc-windows.zip'}
+{assign var=eziplcWindowsDownloadUrl value='/downloads/eziplc-windows.exe'}
 {assign var=eziplcAndroidDownloadUrl value='/downloads/eziplc-android.apk'}
-{assign var=eziplcWindowsGuideUrl value='/docs/windows'}
+{assign var=eziplcWindowsGuideUrl value='/user/docs/windows'}
 {assign var=eziplcAndroidGuideUrl value='/docs/android'}
 {assign var=eziplcAppleGuideUrl value='/docs/shadowrocket'}
 

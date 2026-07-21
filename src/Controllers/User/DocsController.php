@@ -17,6 +17,16 @@ final class DocsController extends BaseController
     /**
      * @throws Exception
      */
+    public function windows(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        return $response->write(
+            $this->view()->fetch('user/docs/windows.tpl')
+        );
+    }
+
+    /**
+     * @throws Exception
+     */
     public function index(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         if (! Config::obtain('display_docs') ||

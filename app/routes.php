@@ -46,6 +46,7 @@ return static function (Slim\App $app): void {
         $group->get('/announcement', App\Controllers\UserController::class . ':announcement');
         // 文档
         $group->get('/docs', App\Controllers\User\DocsController::class . ':index');
+        $group->get('/docs/windows', App\Controllers\User\DocsController::class . ':windows');
         $group->get('/docs/{id:[0-9]+}/view', App\Controllers\User\DocsController::class . ':detail');
         // 个人资料
         $group->get('/profile', App\Controllers\User\ProfileController::class . ':index');
