@@ -58,8 +58,8 @@
                                 <label class="form-label col-3 col-form-label">接入类型</label>
                                 <div class="col">
                                     <select id="sort" class="col form-select">
+                                        <option value="15" selected>XNode / VLESS Reality Vision</option>
                                         <option value="14">Trojan</option>
-                                        <option value="15">XNode / VLESS Reality Vision</option>
                                         <option value="11">Vmess</option>
                                         <option value="2">TUIC</option>
                                         <option value="1">Shadowsocks2022</option>
@@ -74,6 +74,11 @@
                                         使用 XNode Reality 模板
                                     </button>
                                 </div>
+                            </div>
+                            <div id="xnode-managed-policy" class="alert alert-info" role="alert">
+                                <strong>XNode 全站策略 / Managed policy</strong><br>
+                                全站用户可用，按实际上下行流量 1× 计费，关闭动态倍率，不限速、不限制节点流量，每月 1 日重置节点统计。
+                                / Available to all users, 1× bidirectional billing, dynamic rate disabled, no speed or node quota limit, reset on day 1.
                             </div>
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">自定义配置</label>
@@ -214,24 +219,40 @@
         }
     };
 
-    function fillIfEmpty(selector, value) {
-        let input = $(selector);
-        if (String(input.val() || '').trim() === '') {
-            input.val(value);
+    function applyXNodeManagedPolicy() {
+        const isXNode = $('#sort').val() === '15';
+        const values = {
+            '#traffic_rate': '1',
+            '#max_rate': '1',
+            '#max_rate_time': '22',
+            '#min_rate': '1',
+            '#min_rate_time': '3',
+            '#node_class': '0',
+            '#node_group': '0',
+            '#node_speedlimit': '0',
+            '#node_bandwidth_limit': '0',
+            '#bandwidthlimit_resetday': '1'
+        };
+
+        if (isXNode) {
+            Object.entries(values).forEach(([selector, value]) => $(selector).val(value));
+            $('#is_dynamic_rate').prop('checked', false);
+            $('#dynamic_rate_type').val('0');
         }
+
+        Object.keys(values).forEach(selector => $(selector).prop('readonly', isXNode));
+        $('#is_dynamic_rate, #dynamic_rate_type').prop('disabled', isXNode);
+        $('#xnode-managed-policy').toggleClass('d-none', !isXNode);
     }
 
     $("#apply-xnode-reality-template").click(function () {
-        $('#sort').val('15');
-        fillIfEmpty('#traffic_rate', '1');
-        fillIfEmpty('#node_class', '0');
-        fillIfEmpty('#node_group', '0');
-        fillIfEmpty('#node_speedlimit', '0');
-        fillIfEmpty('#node_bandwidth_limit', '0');
-        fillIfEmpty('#bandwidthlimit_resetday', '0');
-        $('#is_dynamic_rate').prop('checked', false);
+        $('#sort').val('15').trigger('change');
         editor.set(xnodeRealityTemplate);
     });
+
+    $('#sort').on('change', applyXNodeManagedPolicy);
+    applyXNodeManagedPolicy();
+    editor.set(xnodeRealityTemplate);
 
     $("#create-node").click(function () {
         $.ajax({

@@ -15,6 +15,7 @@ use App\Services\I18n;
 use App\Services\NodeEnrollmentService;
 use App\Services\NodeProbeService;
 use App\Services\Notification;
+use App\Services\XNodeNodePolicy;
 use App\Utils\Tools;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\Http\Message\ResponseInterface;
@@ -152,6 +153,10 @@ final class NodeController extends BaseController
         $node->bandwidthlimit_resetday = $request->getParam('bandwidthlimit_resetday');
         $node->password = Tools::genRandomChar(32);
 
+        if (XNodeNodePolicy::appliesTo($node->sort)) {
+            XNodeNodePolicy::apply($node);
+        }
+
         if (! $node->save()) {
             return $response->withJson([
                 'ret' => 0,
@@ -249,6 +254,10 @@ final class NodeController extends BaseController
         $node->node_class = $request->getParam('node_class');
         $node->node_bandwidth_limit = Tools::gbToB($request->getParam('node_bandwidth_limit'));
         $node->bandwidthlimit_resetday = $request->getParam('bandwidthlimit_resetday');
+
+        if (XNodeNodePolicy::appliesTo($node->sort)) {
+            XNodeNodePolicy::apply($node);
+        }
 
         if (! $node->save()) {
             return $response->withJson([
