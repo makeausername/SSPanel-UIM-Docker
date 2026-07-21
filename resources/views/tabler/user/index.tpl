@@ -182,7 +182,7 @@
                                     </h2>
                                     <div id="eziplc-windows" class="accordion-collapse collapse"
                                          data-bs-parent="#eziplc-platform-accordion">
-                                        <div class="accordion-body">
+                                        <div class="accordion-body py-4">
                                             <div class="client-item d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between p-3 border rounded gap-3">
                                                 <div class="flex-fill">
                                                     <h5 class="mb-1">EzIPLC</h5>
@@ -211,7 +211,7 @@
                                     </h2>
                                     <div id="eziplc-android" class="accordion-collapse collapse"
                                          data-bs-parent="#eziplc-platform-accordion">
-                                        <div class="accordion-body">
+                                        <div class="accordion-body py-4">
                                             <div class="client-item d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between p-3 border rounded gap-3">
                                                 <div class="flex-fill">
                                                     <h5 class="mb-1">EzIPLC</h5>
@@ -240,7 +240,7 @@
                                     </h2>
                                     <div id="eziplc-apple" class="accordion-collapse collapse"
                                          data-bs-parent="#eziplc-platform-accordion">
-                                        <div class="accordion-body">
+                                        <div class="accordion-body py-4">
                                             <div class="client-item d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between p-3 border rounded gap-3">
                                                 <div class="flex-fill">
                                                     <h5 class="mb-1">Shadowrocket</h5>
