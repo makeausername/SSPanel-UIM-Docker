@@ -16,7 +16,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 use Slim\Factory\AppFactory;
 use function json_decode;
 
-class ProbeApiTokenTest extends TestCase
+final class ProbeApiTokenTest extends TestCase
 {
     private Capsule $db;
 

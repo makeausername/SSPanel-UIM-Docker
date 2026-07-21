@@ -20,10 +20,7 @@ final class SecurityHeaders implements MiddlewareInterface
             ->withHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
             ->withHeader(
                 'Content-Security-Policy-Report-Only',
-                "default-src 'self'; script-src 'self' 'unsafe-inline' https:; "
-                . "style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; "
-                . "font-src 'self' data: https:; connect-src 'self' https: wss:; "
-                . "frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+                "default-src 'self'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https: wss:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
             );
     }
 }

@@ -114,7 +114,12 @@ final class OAuthController extends BaseController
         ]);
 
         $tokenResponse = json_decode($code_response->getBody()->__toString(), true);
-        if (! is_array($tokenResponse) || ! ($tokenResponse['ok'] ?? false) || empty($tokenResponse['access_token'])) {
+        if (
+            ! is_array($tokenResponse)
+            || ! ($tokenResponse['ok'] ?? false)
+            || ! is_string($tokenResponse['access_token'] ?? null)
+            || $tokenResponse['access_token'] === ''
+        ) {
             return ResponseHelper::error($response, self::$err_msg);
         }
 

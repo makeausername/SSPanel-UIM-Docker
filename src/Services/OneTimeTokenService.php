@@ -14,8 +14,7 @@ final class OneTimeTokenService
     public static function consume(Redis $redis, string $key): string|false
     {
         $value = $redis->eval(
-            'local value = redis.call("GET", KEYS[1]); '
-            . 'if value then redis.call("DEL", KEYS[1]); end; return value',
+            'local value = redis.call("GET", KEYS[1]); if value then redis.call("DEL", KEYS[1]); end; return value',
             [$key],
             1
         );
@@ -35,8 +34,7 @@ final class OneTimeTokenService
                 continue;
             }
             $created = $redis->eval(
-                'if redis.call("EXISTS", KEYS[1]) == 0 then '
-                . 'redis.call("SETEX", KEYS[1], ARGV[1], ARGV[2]); return 1; end; return 0',
+                'if redis.call("EXISTS", KEYS[1]) == 0 then redis.call("SETEX", KEYS[1], ARGV[1], ARGV[2]); return 1; end; return 0',
                 ['email_verify:' . $code, $ttl, $email],
                 1
             );

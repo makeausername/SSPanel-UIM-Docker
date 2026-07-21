@@ -38,9 +38,9 @@ final class InfoController extends BaseController
     {
         $themes = Tools::getDir(BASE_PATH . '/resources/views');
         $methods = Tools::getSsMethod();
-        $webauthnDevices = array_map(fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'passkey')->get()->toArray());
-        $totpDevices = array_map(fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'totp')->get()->toArray());
-        $fidoDevices = array_map(fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'fido')->get()->toArray());
+        $webauthnDevices = array_map(static fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'passkey')->get()->toArray());
+        $totpDevices = array_map(static fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'totp')->get()->toArray());
+        $fidoDevices = array_map(static fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'fido')->get()->toArray());
 
         return $response->write($this->view()
             ->assign('user', $this->user)
