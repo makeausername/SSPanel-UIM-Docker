@@ -176,6 +176,7 @@ final class Cron
                 $user->d = 0;
                 $user->transfer_today = 0;
                 $user->class = 0;
+                MonthlyPlanService::clearUser($user);
                 $user->save();
             }
         }
@@ -281,6 +282,7 @@ final class Cron
                 $user->node_group = $content->node_group;
                 $user->node_speedlimit = $content->speed_limit;
                 $user->node_iplimit = $content->ip_limit;
+                MonthlyPlanService::applyProductToUser($user, $content);
                 $user->save();
                 $order->status = 'activated';
                 $order->update_time = time();
@@ -457,29 +459,38 @@ final class Cron
         echo Tools::toDateTime(time()) . ' 重设用户每日流量完成' . PHP_EOL;
     }
 
-    public static function resetFreeUserBandwidth(): void
+    public static function resetUserBandwidth(): void
     {
-        $freeUsers = (new User())->where('class', 0)
-            ->where('auto_reset_day', date('d'))->get();
+        $users = (new User())->where('auto_reset_day', (int) date('d'))
+            ->where('auto_reset_bandwidth', '>', 0)
+            ->get();
 
-        foreach ($freeUsers as $user) {
+        foreach ($users as $user) {
+            $quotaText = (float) $user->auto_reset_bandwidth >= MonthlyPlanService::UNLIMITED_BANDWIDTH_GB
+                ? '无限 / Unlimited'
+                : $user->auto_reset_bandwidth . ' GB';
+
             try {
                 Notification::notifyUser(
                     $user,
-                    $_ENV['appName'] . '-免费流量重置通知',
-                    '你好，你的免费流量已经被重置为' . $user->auto_reset_bandwidth . 'GB。'
+                    $_ENV['appName'] . '-流量重置通知 / Traffic Reset',
+                    '你好，你的本月流量已重置为 ' . $quotaText
+                        . '。 / Your monthly traffic quota has been reset to ' . $quotaText . '.'
                 );
             } catch (GuzzleException|ClientExceptionInterface|TelegramSDKException $e) {
                 echo $e->getMessage() . PHP_EOL;
             }
 
-            $user->u = 0;
-            $user->d = 0;
-            $user->transfer_enable = $user->auto_reset_bandwidth * 1024 * 1024 * 1024;
+            MonthlyPlanService::resetUserBandwidth($user);
             $user->save();
         }
 
-        echo Tools::toDateTime(time()) . ' 免费用户流量重置完成' . PHP_EOL;
+        echo Tools::toDateTime(time()) . ' 用户月流量重置完成' . PHP_EOL;
+    }
+
+    public static function resetFreeUserBandwidth(): void
+    {
+        self::resetUserBandwidth();
     }
 
     public static function sendDailyFinanceMail(): void

@@ -31,6 +31,14 @@ EOL;
         $minute = (int) date('i');
 
         $jobs = new CronService();
+        $runDailyJob = $hour === Config::obtain('daily_job_hour')
+            && $minute === Config::obtain('daily_job_minute')
+            && time() - Config::obtain('last_daily_job_time') > 86399;
+
+        // Reset the monthly baseline before activating add-ons bought on the reset day.
+        if ($runDailyJob) {
+            $jobs->resetUserBandwidth();
+        }
 
         // Run new shop related jobs
         $jobs->processPendingOrder();
@@ -51,13 +59,9 @@ EOL;
         }
 
         // Run daily job
-        if ($hour === Config::obtain('daily_job_hour') &&
-            $minute === Config::obtain('daily_job_minute') &&
-            time() - Config::obtain('last_daily_job_time') > 86399
-        ) {
+        if ($runDailyJob) {
             $jobs->cleanDb();
             $jobs->resetNodeBandwidth();
-            $jobs->resetFreeUserBandwidth();
             $jobs->sendDailyTrafficReport();
 
             if (Config::obtain('enable_detect_inactive_user')) {

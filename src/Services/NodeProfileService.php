@@ -10,6 +10,8 @@ use App\Models\User;
 use Throwable;
 use function is_string;
 use function strcasecmp;
+use function strtotime;
+use function time;
 use function trim;
 
 final class NodeProfileService
@@ -82,7 +84,18 @@ final class NodeProfileService
 
         return (new User())
             ->orderBy('id')
-            ->get(['id', 'uuid', 'is_admin', 'is_banned', 'class', 'node_group'])
+            ->get([
+                'id',
+                'uuid',
+                'is_admin',
+                'is_banned',
+                'class',
+                'class_expire',
+                'node_group',
+                'transfer_enable',
+                'u',
+                'd',
+            ])
             ->filter(static function (User $user) use ($nodeClass, $nodeGroup): bool {
                 $uuid = trim((string) $user->uuid);
 
@@ -98,7 +111,15 @@ final class NodeProfileService
                     return true;
                 }
 
-                if ((int) $user->class < $nodeClass) {
+                if ((int) $user->class <= 0 || (int) $user->class < $nodeClass) {
+                    return false;
+                }
+
+                if (strtotime((string) $user->class_expire) <= time()) {
+                    return false;
+                }
+
+                if ((int) $user->transfer_enable <= (int) $user->u + (int) $user->d) {
                     return false;
                 }
 

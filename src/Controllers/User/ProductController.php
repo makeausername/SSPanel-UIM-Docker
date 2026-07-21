@@ -35,15 +35,15 @@ final class ProductController extends BaseController
             ->get();
 
         foreach ($tabps as $tabp) {
-            $tabp->content = json_decode($tabp->content);
+            $tabp->content = self::normalizeContent(json_decode($tabp->content));
         }
 
         foreach ($bandwidths as $bandwidth) {
-            $bandwidth->content = json_decode($bandwidth->content);
+            $bandwidth->content = self::normalizeContent(json_decode($bandwidth->content));
         }
 
         foreach ($times as $time) {
-            $time->content = json_decode($time->content);
+            $time->content = self::normalizeContent(json_decode($time->content));
         }
 
         return $response->write(
@@ -53,5 +53,14 @@ final class ProductController extends BaseController
                 ->assign('times', $times)
                 ->fetch('user/product.tpl')
         );
+    }
+
+    private static function normalizeContent(object $content): object
+    {
+        $content->monthly_plan = $content->monthly_plan ?? false;
+        $content->unlimited_bandwidth = $content->unlimited_bandwidth ?? false;
+        $content->current_month_only = $content->current_month_only ?? false;
+
+        return $content;
     }
 }
