@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Gateway;
 
 use App\Models\Config;
-use App\Models\Invoice;
-use App\Models\Paylist;
 use App\Services\Auth;
 use App\Services\Exchange;
 use App\Services\View;
@@ -21,16 +19,12 @@ use Stripe\Exception\SignatureVerificationException;
 use Stripe\StripeClient;
 use Stripe\Webhook;
 use UnexpectedValueException;
-use voku\helper\AntiXSS;
 use function in_array;
+use function strtolower;
+use function strtoupper;
 
 final class Stripe extends Base
 {
-    public function __construct()
-    {
-        $this->antiXss = new AntiXSS();
-    }
-
     public static function _name(): string
     {
         return 'stripe';
@@ -48,8 +42,9 @@ final class Stripe extends Base
 
     public function purchase(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $invoice_id = $this->antiXss->xss_clean($request->getParam('invoice_id'));
-        $invoice = (new Invoice())->find($invoice_id);
+        $invoiceId = $this->antiXss->xss_clean($request->getParam('invoice_id'));
+        $user = Auth::getUser();
+        $invoice = $this->getPayableInvoiceForUser($invoiceId, $user);
 
         if ($invoice === null) {
             return $response->withJson([
@@ -69,24 +64,11 @@ final class Stripe extends Base
             ]);
         }
 
-        $user = Auth::getUser();
-        $pl = (new Paylist())->where('invoice_id', $invoice_id)->first();
-
-        if ($pl === null) {
-            $pl = new Paylist();
-            $pl->userid = $user->id;
-            $pl->total = $price;
-            $pl->invoice_id = $invoice_id;
-            $pl->tradeno = self::generateGuid();
-        }
-
-        $pl->gateway = self::_readableName();
-        $pl->save();
-
-        $stripe_currency = Config::obtain('stripe_currency');
+        $paylist = $this->createPaylist($user, $invoice);
+        $stripeCurrency = strtoupper((string) Config::obtain('stripe_currency'));
 
         try {
-            $exchange_amount = (new Exchange())->exchange((float) $price, 'CNY', $stripe_currency);
+            $exchangeAmount = (new Exchange())->exchange((float) $price, 'CNY', $stripeCurrency);
         } catch (GuzzleException|RedisException) {
             return $response->withJson([
                 'ret' => 0,
@@ -94,13 +76,19 @@ final class Stripe extends Base
             ]);
         }
         // https://docs.stripe.com/currencies?presentment-currency=US#zero-decimal
-        if (! in_array(
-            $stripe_currency,
+        $unitAmount = in_array(
+            $stripeCurrency,
             ['BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW',
                 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
-            ]
-        )) {
-            $exchange_amount *= 100;
+            ],
+            true
+        ) ? (int) round($exchangeAmount) : (int) round($exchangeAmount * 100);
+
+        if ($unitAmount <= 0) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => 'Price out of range',
+            ]);
         }
 
         $stripe = new StripeClient(Config::obtain('stripe_api_key'));
@@ -112,11 +100,11 @@ final class Stripe extends Base
                 'line_items' => [
                     [
                         'price_data' => [
-                            'currency' => Config::obtain('stripe_currency'),
+                            'currency' => strtolower($stripeCurrency),
                             'product_data' => [
-                                'name' => 'Invoice #' . $invoice_id,
+                                'name' => 'Invoice #' . $invoice->id,
                             ],
-                            'unit_amount' => (int) ($exchange_amount * 100),
+                            'unit_amount' => $unitAmount,
                         ],
                         'quantity' => 1,
                     ],
@@ -124,11 +112,11 @@ final class Stripe extends Base
                 'mode' => 'payment',
                 'payment_intent_data' => [
                     'metadata' => [
-                        'trade_no' => $pl->tradeno,
+                        'trade_no' => $paylist->tradeno,
                     ],
                 ],
-                'success_url' => $_ENV['baseUrl'] . '/user/invoice/' . $invoice_id . '/view',
-                'cancel_url' => $_ENV['baseUrl'] . '/user/invoice/' . $invoice_id . '/view',
+                'success_url' => $this->getInvoiceReturnUrl($invoice),
+                'cancel_url' => $this->getInvoiceReturnUrl($invoice),
             ]);
         } catch (ApiErrorException) {
             return $response->withJson([

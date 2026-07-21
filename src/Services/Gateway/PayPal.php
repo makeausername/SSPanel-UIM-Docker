@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Gateway;
 
 use App\Models\Config;
-use App\Models\Invoice;
-use App\Models\Paylist;
 use App\Services\Auth;
 use App\Services\Exchange;
 use App\Services\View;
@@ -18,7 +16,6 @@ use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Srmklive\PayPal\Services\PayPal as PayPalClient;
 use Throwable;
-use voku\helper\AntiXSS;
 
 final class PayPal extends Base
 {
@@ -26,7 +23,7 @@ final class PayPal extends Base
 
     public function __construct()
     {
-        $this->antiXss = new AntiXSS();
+        parent::__construct();
         $configs = Config::getClass('billing');
 
         $this->gateway_config = [
@@ -66,8 +63,9 @@ final class PayPal extends Base
 
     public function purchase(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $invoice_id = $this->antiXss->xss_clean($request->getParam('invoice_id'));
-        $invoice = (new Invoice())->find($invoice_id);
+        $invoiceId = $this->antiXss->xss_clean($request->getParam('invoice_id'));
+        $user = Auth::getUser();
+        $invoice = $this->getPayableInvoiceForUser($invoiceId, $user);
 
         if ($invoice === null) {
             return $response->withJson([
@@ -85,19 +83,7 @@ final class PayPal extends Base
             ]);
         }
 
-        $user = Auth::getUser();
-        $pl = (new Paylist())->where('invoice_id', $invoice_id)->first();
-
-        if ($pl === null) {
-            $pl = new Paylist();
-            $pl->userid = $user->id;
-            $pl->total = $price;
-            $pl->invoice_id = $invoice_id;
-            $pl->tradeno = self::generateGuid();
-        }
-
-        $pl->gateway = self::_readableName();
-        $pl->save();
+        $paylist = $this->createPaylist($user, $invoice);
 
         try {
             $exchange_amount = (new Exchange())->exchange(
@@ -120,7 +106,7 @@ final class PayPal extends Base
                         'currency_code' => Config::obtain('paypal_currency'),
                         'value' => $exchange_amount,
                     ],
-                    'invoice_id' => $pl->tradeno,
+                    'invoice_id' => $paylist->tradeno,
                 ],
             ],
         ];

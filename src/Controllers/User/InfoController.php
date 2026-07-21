@@ -21,8 +21,11 @@ use RedisException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use function in_array;
+use function hash_equals;
+use function is_string;
 use function strlen;
 use function strtolower;
+use function trim;
 use const BASE_PATH;
 
 final class InfoController extends BaseController
@@ -54,7 +57,7 @@ final class InfoController extends BaseController
      */
     public function updateEmail(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $new_email = $this->antiXss->xss_clean($request->getParam('newemail'));
+        $new_email = strtolower(trim($this->antiXss->xss_clean($request->getParam('newemail'))));
         $user = $this->user;
         $old_email = $user->email;
 
@@ -80,10 +83,10 @@ final class InfoController extends BaseController
 
         if (Config::obtain('reg_email_verify')) {
             $redis = (new Cache())->initRedis();
-            $email_verify_code = $request->getParam('emailcode');
+            $email_verify_code = trim($this->antiXss->xss_clean($request->getParam('emailcode')));
             $email_verify = $redis->get('email_verify:' . $email_verify_code);
 
-            if (! $email_verify) {
+            if (! is_string($email_verify) || ! hash_equals(strtolower(trim($email_verify)), $new_email)) {
                 return ResponseHelper::error($response, '你的邮箱验证码不正确');
             }
 

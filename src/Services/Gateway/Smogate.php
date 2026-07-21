@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Gateway;
 
 use App\Models\Config;
-use App\Models\Paylist;
 use App\Services\Auth;
 use App\Services\View;
-// use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
@@ -30,14 +28,16 @@ final class Smogate extends Base
         return '支付宝在线充值';
     }
 
-    public function post($data)
+    public function post(array $data): string|false
     {
         $curl = curl_init();
         curl_setopt($curl, CURLOPT_URL, 'https://' . Config::obtain('smogate_app_id') . '.vless.org/v1/gateway/pay');
         curl_setopt($curl, CURLOPT_HEADER, 0);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($curl, CURLOPT_TIMEOUT, 15);
         curl_setopt($curl, CURLOPT_POST, 1);
         curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
         curl_setopt($curl, CURLOPT_HTTPHEADER, ['User-Agent: Smogate ' . Config::obtain('smogate_app_id')]);
@@ -47,55 +47,57 @@ final class Smogate extends Base
         return $data;
     }
 
-    public function prepareSign($data)
+    public function prepareSign(array $data): string
     {
         ksort($data);
         return http_build_query($data);
     }
 
-    public function sign($data)
+    public function sign(string $data): string
     {
         return strtolower(md5($data . Config::obtain('smogate_app_secret')));
     }
 
-    public function verify($data, $signature)
+    public function verify(array $data, mixed $signature): bool
     {
         unset($data['sign']);
         $mySign = $this->sign($this->prepareSign($data));
-        return $mySign === $signature;
+        return is_string($signature) && hash_equals($mySign, $signature);
     }
 
     public function purchase(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $amount = $this->antiXss->xss_clean($request->getParam('amount'));
-        $invoice_id = $this->antiXss->xss_clean($request->getParam('invoice_id'));
-
+        $invoiceId = $this->antiXss->xss_clean($request->getParam('invoice_id'));
         $user = Auth::getUser();
-        if ($amount === '') {
+        $invoice = $this->getPayableInvoiceForUser($invoiceId, $user);
+
+        if ($invoice === null || (float) $invoice->price <= 0) {
             return $response->withJson([
                 'ret' => 0,
-                'msg' => '订单金额错误：' . $amount,
+                'msg' => 'Invoice not found or not payable',
             ]);
         }
 
-        $pl = new Paylist();
-        $pl->userid = $user->id;
-        $pl->total = $amount;
-        $pl->invoice_id = $invoice_id;
-        $pl->tradeno = self::generateGuid();
-        $pl->gateway = self::_readableName();
-        $pl->save();
+        $paylist = $this->createPaylist($user, $invoice);
 
         $data = [
             'method' => 'alipay',
             'app_id' => Config::obtain('smogate_app_id'),
-            'out_trade_no' => $pl->tradeno,
-            'total_amount' => (int) ($pl->total * 100),
+            'out_trade_no' => $paylist->tradeno,
+            'total_amount' => (int) round((float) $paylist->total * 100),
             'notify_url' => self::getCallbackUrl(),
         ];
         $params = $this->prepareSign($data);
         $data['sign'] = $this->sign($params);
-        $result = json_decode($this->post($data), true);
+        $rawResult = $this->post($data);
+        $result = is_string($rawResult) ? json_decode($rawResult, true) : null;
+
+        if (! is_array($result)) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '支付网关连接失败',
+            ]);
+        }
 
         if (isset($result['errors'])) {
             return $response->withJson([
@@ -114,18 +116,19 @@ final class Smogate extends Base
             'ret' => 1,
             'type' => $this->isMobile() ? 'url' : 'qrcode',
             'qrcode' => $result['data'],
-            'amount' => $pl->total,
-            'pid' => $pl->tradeno,
+            'amount' => $paylist->total,
+            'pid' => $paylist->tradeno,
         ]);
     }
 
-    public function notify($request, $response, $args): ResponseInterface
+    public function notify(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         if (! $this->verify($request->getParams(), $request->getParam('sign'))) {
-            die('FAIL');
+            return $response->withStatus(400)->write('FAIL');
         }
-        $this->postPayment($request->getParam('out_trade_no'), 'smogate');
-        die('SUCCESS');
+        $this->postPayment((string) $request->getParam('out_trade_no'));
+
+        return $response->write('SUCCESS');
     }
 
     public static function getPurchaseHTML(): string
@@ -133,8 +136,8 @@ final class Smogate extends Base
         return View::getSmarty()->fetch('gateway/smogate.tpl');
     }
 
-    private function isMobile()
+    private function isMobile(): bool
     {
-        return strpos(strtolower($_SERVER['HTTP_USER_AGENT']), 'mobile') !== false;
+        return strpos(strtolower($_SERVER['HTTP_USER_AGENT'] ?? ''), 'mobile') !== false;
     }
 }

@@ -7,6 +7,11 @@ LOCK_DIR="${CRON_LOCK_DIR:-${APP_DIR}/storage/framework/sspanel-cron.lock}"
 STALE_AFTER_SECONDS="${CRON_STALE_AFTER_SECONDS:-900}"
 HEARTBEAT_FILE="${SCHEDULER_HEARTBEAT_FILE:-${APP_DIR}/storage/framework/scheduler.last_success}"
 
+if ! [[ "${INTERVAL_SECONDS}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "[scheduler] CRON_INTERVAL_SECONDS must be a positive integer" >&2
+    exit 64
+fi
+
 cd "${APP_DIR}"
 
 cleanup_lock() {
@@ -18,8 +23,6 @@ cleanup_lock() {
 trap cleanup_lock EXIT INT TERM
 
 while true; do
-    start_time="$(date +%s)"
-
     if mkdir "${LOCK_DIR}" 2>/dev/null; then
         echo "$$" > "${LOCK_DIR}/owner"
         echo "[scheduler] $(date -Iseconds) running php xcat Cron"
@@ -45,11 +48,11 @@ while true; do
         fi
     fi
 
-    elapsed="$(( $(date +%s) - start_time ))"
-    sleep_for="$(( INTERVAL_SECONDS - elapsed ))"
+    now="$(date +%s)"
+    sleep_for="$(( INTERVAL_SECONDS - (now % INTERVAL_SECONDS) ))"
 
-    if [ "${sleep_for}" -lt 1 ]; then
-        sleep_for=1
+    if [ "${sleep_for}" -lt 1 ] || [ "${sleep_for}" -gt "${INTERVAL_SECONDS}" ]; then
+        sleep_for="${INTERVAL_SECONDS}"
     fi
 
     sleep "${sleep_for}"
