@@ -64,6 +64,35 @@ final class GatewayPaymentTest extends TestCase
         $invoice = Capsule::table('invoice')->find(100);
         $this->assertSame('partially_paid', $invoice->status);
         $this->assertSame('0.98', self::decimal($invoice->price));
+        $this->assertSame('9.99', self::decimal($invoice->original_price));
+        $this->assertSame('9.01', self::decimal($invoice->paid_amount));
+    }
+
+    public function testGatewayRejectsProviderAmountMismatch(): void
+    {
+        $this->seedUser(1, '0.00');
+        $this->seedInvoice(100, 1, '10.00');
+        $this->seedPaylist('trade-provider', 1, 100, '10.00', '1000', 'USD');
+
+        $this->expectException(RuntimeException::class);
+        self::gateway()->postPayment('trade-provider', '999', 'USD', 'provider-1');
+    }
+
+    public function testRefundUsesAccumulatedPaymentsAfterPartialPayment(): void
+    {
+        $this->seedUser(1, '0.00');
+        $this->seedInvoice(100, 1, '10.00');
+        $this->seedPaylist('trade-part-1', 1, 100, '4.00');
+        self::gateway()->postPayment('trade-part-1');
+        $this->seedPaylist('trade-part-2', 1, 100, '6.00');
+        self::gateway()->postPayment('trade-part-2');
+
+        (new InvoiceRefundService())->refund(100);
+
+        $invoice = Capsule::table('invoice')->find(100);
+        $this->assertSame('refunded_balance', $invoice->status);
+        $this->assertSame('10', self::decimal($invoice->refunded_amount));
+        $this->assertSame('10', self::decimal(Capsule::table('user')->find(1)->money));
     }
 
     public function testGatewayRejectsMismatchedInvoiceOwnership(): void
@@ -122,6 +151,9 @@ final class GatewayPaymentTest extends TestCase
             $table->integer('id')->primary();
             $table->integer('user_id');
             $table->decimal('price', 12, 2);
+            $table->decimal('original_price', 12, 2)->nullable();
+            $table->decimal('paid_amount', 12, 2)->default(0);
+            $table->decimal('refunded_amount', 12, 2)->default(0);
             $table->string('status');
             $table->text('content');
             $table->integer('update_time')->default(0);
@@ -135,6 +167,9 @@ final class GatewayPaymentTest extends TestCase
             $table->integer('invoice_id');
             $table->string('tradeno')->unique();
             $table->string('gateway');
+            $table->decimal('expected_provider_amount', 20, 8)->nullable();
+            $table->string('expected_provider_currency', 16)->nullable();
+            $table->string('provider_transaction_id')->nullable();
             $table->integer('datetime')->default(0);
         });
         Capsule::schema()->create('user_money_log', static function (Blueprint $table): void {
@@ -164,7 +199,14 @@ final class GatewayPaymentTest extends TestCase
         ]);
     }
 
-    private function seedPaylist(string $tradeNo, int $userId, int $invoiceId, string $total): void
+    private function seedPaylist(
+        string $tradeNo,
+        int $userId,
+        int $invoiceId,
+        string $total,
+        ?string $providerAmount = null,
+        ?string $providerCurrency = null
+    ): void
     {
         Capsule::table('paylist')->insert([
             'userid' => $userId,
@@ -173,6 +215,8 @@ final class GatewayPaymentTest extends TestCase
             'invoice_id' => $invoiceId,
             'tradeno' => $tradeNo,
             'gateway' => 'Test',
+            'expected_provider_amount' => $providerAmount,
+            'expected_provider_currency' => $providerCurrency,
         ]);
     }
 

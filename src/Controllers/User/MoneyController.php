@@ -7,6 +7,9 @@ namespace App\Controllers\User;
 use App\Controllers\BaseController;
 use App\Models\GiftCard;
 use App\Models\UserMoneyLog;
+use App\Models\User;
+use App\Services\DB;
+use App\Services\InvoiceAccountingService;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -41,44 +44,40 @@ final class MoneyController extends BaseController
     public function applyGiftCard(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $giftcard_raw = $this->antiXss->xss_clean($request->getParam('giftcard'));
-        $giftcard = (new GiftCard())->where('card', $giftcard_raw)->first();
+        $result = DB::connection()->transaction(function () use ($giftcard_raw): array {
+            $giftcard = (new GiftCard())->where('card', $giftcard_raw)->lockForUpdate()->first();
 
-        if ($giftcard === null || $giftcard->status !== 0) {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '礼品卡无效',
-            ]);
-        }
+            if ($giftcard === null || (int) $giftcard->status !== 0) {
+                return ['ret' => 0, 'msg' => '礼品卡无效'];
+            }
 
-        $user = $this->user;
+            $user = (new User())->where('id', $this->user->id)->lockForUpdate()->first();
 
-        if ($user->is_shadow_banned) {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '礼品卡无效',
-            ]);
-        }
+            if ($user === null || $user->is_shadow_banned) {
+                return ['ret' => 0, 'msg' => '礼品卡无效'];
+            }
 
-        $giftcard->status = 1;
-        $giftcard->use_time = time();
-        $giftcard->use_user = $user->id;
-        $giftcard->save();
+            $giftcard->status = 1;
+            $giftcard->use_time = time();
+            $giftcard->use_user = $user->id;
+            $giftcard->save();
 
-        $money_before = $user->money;
-        $user->money += $giftcard->balance;
-        $user->save();
+            $moneyBefore = InvoiceAccountingService::money($user->money);
+            $moneyAfter = bcadd($moneyBefore, InvoiceAccountingService::money($giftcard->balance), 2);
+            $user->money = $moneyAfter;
+            $user->save();
 
-        (new UserMoneyLog())->add(
-            $user->id,
-            $money_before,
-            (float) $user->money,
-            $giftcard->balance,
-            '礼品卡充值 ' . $giftcard->card
-        );
+            (new UserMoneyLog())->add(
+                (int) $user->id,
+                (float) $moneyBefore,
+                (float) $moneyAfter,
+                (float) $giftcard->balance,
+                '礼品卡充值 ' . $giftcard->card
+            );
 
-        return $response->withJson([
-            'ret' => 1,
-            'msg' => '充值成功',
-        ]);
+            return ['ret' => 1, 'msg' => '充值成功'];
+        });
+
+        return $response->withJson($result);
     }
 }

@@ -29,6 +29,13 @@ final class EmailQueue extends Model
         $this->subject = $subject;
         $this->template = $template;
         $this->time = time();
+        $this->status = 'pending';
+        $this->attempts = 0;
+        $this->next_attempt_at = time();
+        $this->locked_at = null;
+        $this->lock_token = null;
+        $this->last_error = null;
+        $this->sent_at = null;
         $this->array = json_encode($array);
         $this->save();
     }

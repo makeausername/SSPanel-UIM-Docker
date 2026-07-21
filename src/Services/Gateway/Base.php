@@ -10,6 +10,7 @@ use App\Models\Paylist;
 use App\Models\User;
 use App\Models\UserMoneyLog;
 use App\Services\DB;
+use App\Services\InvoiceAccountingService;
 use App\Services\Reward;
 use App\Utils\Tools;
 use Psr\Http\Message\ResponseInterface;
@@ -22,9 +23,13 @@ use function bccomp;
 use function bcsub;
 use function get_called_class;
 use function in_array;
+use function is_numeric;
 use function json_decode;
 use function json_encode;
+use function strlen;
 use function time;
+use function trim;
+use function strtoupper;
 
 abstract class Base
 {
@@ -61,9 +66,19 @@ abstract class Base
 
     abstract public static function getPurchaseHTML(): string;
 
-    public function postPayment(string $trade_no): void
+    public function postPayment(
+        string $trade_no,
+        mixed $providerAmount = null,
+        ?string $providerCurrency = null,
+        ?string $providerTransactionId = null
+    ): void
     {
-        DB::connection()->transaction(function () use ($trade_no): void {
+        $reward = DB::connection()->transaction(function () use (
+            $trade_no,
+            $providerAmount,
+            $providerCurrency,
+            $providerTransactionId
+        ): ?array {
             $paylist = (new Paylist())
                 ->where('tradeno', $trade_no)
                 ->lockForUpdate()
@@ -73,9 +88,12 @@ abstract class Base
                 throw new RuntimeException('Payment record not found.');
             }
 
-            if ((int) $paylist->status === 1) {
-                return;
-            }
+            $this->validateProviderSettlement(
+                $paylist,
+                $providerAmount,
+                $providerCurrency,
+                $providerTransactionId
+            );
 
             $invoice = (new Invoice())
                 ->where('id', $paylist->invoice_id)
@@ -88,6 +106,12 @@ abstract class Base
 
             if ($invoice === null || $user === null || (int) $invoice->user_id !== (int) $user->id) {
                 throw new RuntimeException('Payment ownership validation failed.');
+            }
+
+            InvoiceAccountingService::initialize($invoice);
+
+            if ((int) $paylist->status === 1) {
+                return $this->rewardContext($invoice, $user);
             }
 
             $paidAmount = self::money($paylist->total);
@@ -103,11 +127,12 @@ abstract class Base
                 $paylist->save();
                 $this->creditBalance($user, $paidAmount, (int) $invoice->id, 'Duplicate invoice payment');
 
-                return;
+                return null;
             }
 
-            $invoiceDue = self::money($invoice->price);
+            $invoiceDue = InvoiceAccountingService::remaining($invoice);
             $comparison = bccomp($paidAmount, $invoiceDue, 2);
+            InvoiceAccountingService::recordPayment($invoice, $paidAmount);
             $invoice->update_time = time();
             $invoice->pay_time = time();
 
@@ -138,15 +163,17 @@ abstract class Base
                 );
             }
 
-            if ($comparison >= 0 && $user->ref_by > 0 && Config::obtain('invite_mode') === 'reward') {
-                Reward::issuePaybackReward(
-                    $user->id,
-                    $user->ref_by,
-                    (float) $invoiceDue,
-                    (int) $invoice->id
-                );
-            }
+            return $comparison >= 0 ? $this->rewardContext($invoice, $user) : null;
         });
+
+        if ($reward !== null) {
+            Reward::issuePaybackReward(
+                $reward['user_id'],
+                $reward['ref_user_id'],
+                $reward['total'],
+                $reward['invoice_id']
+            );
+        }
     }
 
     protected function getPayableInvoiceForUser(mixed $invoiceId, User $user): ?Invoice
@@ -171,9 +198,18 @@ abstract class Base
         $paylist->invoice_id = $invoice->id;
         $paylist->tradeno = self::generateGuid();
         $paylist->gateway = static::_readableName();
+        $paylist->expected_provider_amount = self::providerMoney($paylist->total);
+        $paylist->expected_provider_currency = 'CNY';
         $paylist->save();
 
         return $paylist;
+    }
+
+    protected function setExpectedProviderSettlement(Paylist $paylist, mixed $amount, string $currency): void
+    {
+        $paylist->expected_provider_amount = self::providerMoney($amount);
+        $paylist->expected_provider_currency = strtoupper($currency);
+        $paylist->save();
     }
 
     protected function getInvoiceReturnUrl(Invoice $invoice): string
@@ -184,6 +220,74 @@ abstract class Base
     private static function money(mixed $amount): string
     {
         return bcadd((string) $amount, '0.00', 2);
+    }
+
+    private static function providerMoney(mixed $amount): string
+    {
+        return bcadd((string) $amount, '0.00000000', 8);
+    }
+
+    private function validateProviderSettlement(
+        Paylist $paylist,
+        mixed $providerAmount,
+        ?string $providerCurrency,
+        ?string $providerTransactionId
+    ): void {
+        if ($paylist->expected_provider_amount !== null) {
+            if ($providerAmount === null || ! is_numeric($providerAmount) || $providerCurrency === null) {
+                throw new RuntimeException('Provider settlement amount and currency are required.');
+            }
+
+            $providerCurrency = strtoupper(trim($providerCurrency));
+            if ($providerCurrency === '') {
+                throw new RuntimeException('Provider settlement currency is required.');
+            }
+
+            if (bccomp(
+                self::providerMoney($providerAmount),
+                self::providerMoney($paylist->expected_provider_amount),
+                8
+            ) !== 0 || $providerCurrency !== strtoupper((string) $paylist->expected_provider_currency)) {
+                throw new RuntimeException('Provider settlement amount or currency mismatch.');
+            }
+        }
+
+        if ($providerTransactionId !== null && $providerTransactionId !== '') {
+            $providerTransactionId = trim($providerTransactionId);
+            if ($providerTransactionId === '' || strlen($providerTransactionId) > 255) {
+                throw new RuntimeException('Provider transaction identifier is invalid.');
+            }
+
+            if (
+                $paylist->provider_transaction_id !== null
+                && ! hash_equals((string) $paylist->provider_transaction_id, $providerTransactionId)
+            ) {
+                throw new RuntimeException('Provider transaction identifier mismatch.');
+            }
+
+            $paylist->provider_transaction_id = $providerTransactionId;
+        }
+    }
+
+    /**
+     * @return array{user_id:int,ref_user_id:int,total:float,invoice_id:int}|null
+     */
+    private function rewardContext(Invoice $invoice, User $user): ?array
+    {
+        if (
+            $invoice->status !== 'paid_gateway'
+            || (int) $user->ref_by <= 0
+            || Config::obtain('invite_mode') !== 'reward'
+        ) {
+            return null;
+        }
+
+        return [
+            'user_id' => (int) $user->id,
+            'ref_user_id' => (int) $user->ref_by,
+            'total' => (float) InvoiceAccountingService::money($invoice->original_price),
+            'invoice_id' => (int) $invoice->id,
+        ];
     }
 
     private function creditBalance(User $user, string $amount, int $invoiceId, string $reason): void

@@ -8,6 +8,8 @@ use App\Controllers\BaseController;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Paylist;
+use App\Services\DB;
+use App\Services\InvoiceAccountingService;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -75,38 +77,38 @@ final class InvoiceController extends BaseController
 
     public function markPaid(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $invoice_id = $args['id'];
-        $invoice = (new Invoice())->find($invoice_id);
+        $invoiceId = (int) $args['id'];
+        $result = DB::connection()->transaction(static function () use ($invoiceId): array {
+            $invoice = (new Invoice())->where('id', $invoiceId)->lockForUpdate()->first();
 
-        if (in_array($invoice->status, ['paid_gateway', 'paid_balance', 'paid_admin'])) {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '不能标记已经支付的账单',
-            ]);
-        }
+            if ($invoice === null) {
+                return ['ret' => 0, 'msg' => '账单不存在'];
+            }
 
-        $order = (new Order())->find($invoice->order_id);
+            if (in_array($invoice->status, ['paid_gateway', 'paid_balance', 'paid_admin'], true)) {
+                return ['ret' => 0, 'msg' => '不能标记已经支付的账单'];
+            }
 
-        if ($order->status === 'cancelled') {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '关联订单已被取消，标记失败',
-            ]);
-        }
+            $order = (new Order())->where('id', $invoice->order_id)->lockForUpdate()->first();
+            if ($order === null || $order->status === 'cancelled') {
+                return ['ret' => 0, 'msg' => '关联订单已被取消，标记失败'];
+            }
 
-        $order->update_time = time();
-        $order->status = 'pending_activation';
-        $order->save();
+            InvoiceAccountingService::initialize($invoice);
+            $invoice->paid_amount = InvoiceAccountingService::money($invoice->original_price);
+            $invoice->update_time = time();
+            $invoice->pay_time = time();
+            $invoice->status = 'paid_admin';
+            $invoice->save();
 
-        $invoice->update_time = time();
-        $invoice->pay_time = time();
-        $invoice->status = 'paid_admin';
-        $invoice->save();
+            $order->update_time = time();
+            $order->status = 'pending_activation';
+            $order->save();
 
-        return $response->withJson([
-            'ret' => 1,
-            'msg' => '成功标记账单为已支付（管理员）',
-        ]);
+            return ['ret' => 1, 'msg' => '成功标记账单为已支付（管理员）'];
+        });
+
+        return $response->withJson($result);
     }
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface

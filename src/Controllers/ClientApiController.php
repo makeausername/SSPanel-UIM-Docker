@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Models\User;
+use App\Services\RateLimit;
 use App\Services\Subscribe;
 use App\Services\UserAccessPolicy;
 use App\Utils\Hash;
@@ -22,16 +23,40 @@ use function strtolower;
 use function strtotime;
 use function time;
 use function trim;
+use Throwable;
 
 final class ClientApiController extends BaseController
 {
     public function login(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
+        try {
+            $ipAllowed = (new RateLimit())->checkRateLimit(
+                'login_ip',
+                (string) ($request->getServerParams()['REMOTE_ADDR'] ?? 'unknown')
+            );
+        } catch (Throwable) {
+            return ResponseHelper::error($response, '登录服务暂时不可用，请稍后重试', 503);
+        }
+
+        if (! $ipAllowed) {
+            return ResponseHelper::error($response, '登录请求过于频繁，请稍后重试', 429);
+        }
+
         $email = strtolower(trim((string) $this->getBodyParam($request, 'email', '')));
         $password = (string) $this->getBodyParam($request, 'password', '');
 
         if ($email === '' || $password === '') {
             return ResponseHelper::error($response, '请输入邮箱和密码', 400);
+        }
+
+        try {
+            $accountAllowed = (new RateLimit())->checkRateLimit('login_account', hash('sha256', $email));
+        } catch (Throwable) {
+            return ResponseHelper::error($response, '登录服务暂时不可用，请稍后重试', 503);
+        }
+
+        if (! $accountAllowed) {
+            return ResponseHelper::error($response, '登录请求过于频繁，请稍后重试', 429);
         }
 
         $user = (new User())->where('email', $email)->first();

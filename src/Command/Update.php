@@ -13,6 +13,9 @@ use function preg_match_all;
 use function str_replace;
 use function strpos;
 use function substr;
+use function rename;
+use function tempnam;
+use function unlink;
 use const BASE_PATH;
 use const PHP_EOL;
 
@@ -32,10 +35,16 @@ END;
             echo '.config.php 文件备份成功。' . PHP_EOL;
         } else {
             echo '.config.php 文件备份失败，迁移终止。' . PHP_EOL;
+            return;
         }
 
         $config_old = file_get_contents(BASE_PATH . '/config/.config.php');
         $config_new = file_get_contents(BASE_PATH . '/config/.config.example.php');
+
+        if ($config_old === false || $config_new === false) {
+            echo '.config.php 文件读取失败，迁移终止。' . PHP_EOL;
+            return;
+        }
         //将旧config迁移到新config上
         $migrated = [];
 
@@ -51,6 +60,11 @@ END;
 
             $matches_old = [];
             preg_match($regex, $config_old, $matches_old);
+
+            if (! isset($matches_old[0])) {
+                echo '旧配置项读取失败：' . $key . '，迁移终止。' . PHP_EOL;
+                return;
+            }
 
             $config_new = str_replace($matches_new[0], $matches_old[0], $config_new);
             $migrated[] = '_ENV[\'' . $key . '\']';
@@ -88,7 +102,20 @@ END;
         }
 
         echo '没有任何新 .config.php 配置项需要添加。' . PHP_EOL;
-        file_put_contents(BASE_PATH . '/config/.config.php', $config_new);
+        $temporary = tempnam(BASE_PATH . '/config', '.config.php.');
+        if ($temporary === false || file_put_contents($temporary, $config_new) === false) {
+            if (is_string($temporary)) {
+                unlink($temporary);
+            }
+            echo '.config.php 临时文件写入失败，迁移终止。' . PHP_EOL;
+            return;
+        }
+
+        if (! rename($temporary, BASE_PATH . '/config/.config.php')) {
+            unlink($temporary);
+            echo '.config.php 原子替换失败，原配置保持不变。' . PHP_EOL;
+            return;
+        }
         echo '迁移完成。' . PHP_EOL;
     }
 }

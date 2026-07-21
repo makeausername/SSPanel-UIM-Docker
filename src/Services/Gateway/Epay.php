@@ -141,7 +141,12 @@ final class Epay extends Base
 
         if ($verify_result) {
             if ($_GET['trade_status'] === 'TRADE_SUCCESS') {
-                $this->postPayment($_GET['out_trade_no']);
+                $this->postPayment(
+                    (string) $_GET['out_trade_no'],
+                    $_GET['money'] ?? null,
+                    'CNY',
+                    isset($_GET['trade_no']) ? (string) $_GET['trade_no'] : null
+                );
                 // EPay just fucking copied from Alipay's method of determining whether the payment is successful
                 // which is retarded
                 // https://pay.v8jisu.cn/doc.html

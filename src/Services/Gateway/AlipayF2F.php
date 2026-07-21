@@ -114,14 +114,24 @@ final class AlipayF2F extends Base
      */
     public function notify($request, $response, $args): ResponseInterface
     {
+        $outTradeNo = isset($_POST['out_trade_no']) ? (string) $_POST['out_trade_no'] : '';
+        if ($outTradeNo === '') {
+            return $response->write('failed');
+        }
+
         $api = $this->createApi();
 
         $aliRequest = new AlipayTradeQueryModel();
-        $aliRequest->setOutTradeNo($_POST['out_trade_no']);
+        $aliRequest->setOutTradeNo($outTradeNo);
         $aliResponse = $api->query($aliRequest);
 
-        if ($aliResponse->getTradeStatus() === 'TRADE_SUCCESS') {
-            $this->postPayment($aliResponse->getOutTradeNo());
+        if (in_array($aliResponse->getTradeStatus(), ['TRADE_SUCCESS', 'TRADE_FINISHED'], true)) {
+            $this->postPayment(
+                (string) $aliResponse->getOutTradeNo(),
+                $aliResponse->getTotalAmount(),
+                'CNY',
+                (string) $aliResponse->getTradeNo()
+            );
             // https://opendocs.alipay.com/open/194/103296#%E5%BC%82%E6%AD%A5%E9%80%9A%E7%9F%A5%E7%89%B9%E6%80%A7
             return $response->write('success');
         }

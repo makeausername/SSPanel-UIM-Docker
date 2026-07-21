@@ -83,6 +83,11 @@ final class Cryptomus extends Base
             'plugin_name' => 'sspanel:2024.1',
             'additional_data' => json_encode(['tradeno' => $paylist->tradeno]),
         ];
+        $this->setExpectedProviderSettlement(
+            $paylist,
+            $paymentData['amount'],
+            (string) $paymentData['currency']
+        );
 
         $paymentInstance = $this->getPayment();
 
@@ -125,7 +130,12 @@ final class Cryptomus extends Base
             is_string($additionalData['tradeno']);
 
         if ($success) {
-            $this->postPayment($additionalData['tradeno']);
+            $this->postPayment(
+                $additionalData['tradeno'],
+                $data['amount'] ?? null,
+                isset($data['currency']) ? (string) $data['currency'] : null,
+                isset($data['uuid']) ? (string) $data['uuid'] : null
+            );
 
             return $response->withJson([
                 'ret' => 1,

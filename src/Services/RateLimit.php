@@ -32,6 +32,8 @@ final class RateLimit
             'admin_api_key' => $this->getAdminApiKeyLimiter(),
             'node_api_ip' => $this->getNodeApiIpLimiter(),
             'node_api_key' => $this->getNodeApiKeyLimiter(),
+            'login_ip' => $this->getLoginIpLimiter(),
+            'login_account' => $this->getLoginAccountLimiter(),
             'email_request_ip' => $this->getEmailIpLimiter(),
             'email_request_address' => $this->getEmailAddressLimiter(),
             'ticket' => $this->getTicketLimiter(),
@@ -126,7 +128,7 @@ final class RateLimit
     public function getNodeApiIpLimiter(): RedisRateLimiter
     {
         return new RedisRateLimiter(
-            Rate::perMinute((int) $_ENV['rate_limit_node_api_ip']),
+            Rate::perMinute((int) ($_ENV['rate_limit_node_api_ip'] ?? 60)),
             $this->redis,
             'sspanel_node_api_ip:'
         );
@@ -135,9 +137,27 @@ final class RateLimit
     public function getNodeApiKeyLimiter(): RedisRateLimiter
     {
         return new RedisRateLimiter(
-            Rate::perMinute((int) $_ENV['rate_limit_node_api']),
+            Rate::perMinute((int) ($_ENV['rate_limit_node_api'] ?? 60)),
             $this->redis,
             'sspanel_node_api_key:'
+        );
+    }
+
+    public function getLoginIpLimiter(): RedisRateLimiter
+    {
+        return new RedisRateLimiter(
+            Rate::perMinute((int) ($_ENV['rate_limit_login_ip'] ?? 10)),
+            $this->redis,
+            'sspanel_login_ip:'
+        );
+    }
+
+    public function getLoginAccountLimiter(): RedisRateLimiter
+    {
+        return new RedisRateLimiter(
+            Rate::perMinute((int) ($_ENV['rate_limit_login_account'] ?? 5)),
+            $this->redis,
+            'sspanel_login_account:'
         );
     }
 

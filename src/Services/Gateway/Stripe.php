@@ -91,6 +91,8 @@ final class Stripe extends Base
             ]);
         }
 
+        $this->setExpectedProviderSettlement($paylist, $unitAmount, $stripeCurrency);
+
         $stripe = new StripeClient(Config::obtain('stripe_api_key'));
         $session = null;
 
@@ -151,7 +153,12 @@ final class Stripe extends Base
         $payment_intent = $event->data->object;
 
         if ($event->type === 'payment_intent.succeeded' && $payment_intent->status === 'succeeded') {
-            $this->postPayment($payment_intent->metadata->trade_no);
+            $this->postPayment(
+                (string) $payment_intent->metadata->trade_no,
+                $payment_intent->amount_received,
+                (string) $payment_intent->currency,
+                (string) $payment_intent->id
+            );
 
             return $response->withStatus(204);
         }

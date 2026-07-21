@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Auth;
 use App\Services\Cache;
 use App\Services\Filter;
+use App\Services\OneTimeTokenService;
 use App\Utils\Hash;
 use App\Utils\ResponseHelper;
 use App\Utils\Tools;
@@ -37,9 +38,9 @@ final class InfoController extends BaseController
     {
         $themes = Tools::getDir(BASE_PATH . '/resources/views');
         $methods = Tools::getSsMethod();
-        $webauthnDevices = array_map(fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'passkey')->get()->toArray());
-        $totpDevices = array_map(fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'totp')->get()->toArray());
-        $fidoDevices = array_map(fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'fido')->get()->toArray());
+        $webauthnDevices = array_map(static fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'passkey')->get()->toArray());
+        $totpDevices = array_map(static fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'totp')->get()->toArray());
+        $fidoDevices = array_map(static fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'fido')->get()->toArray());
 
         return $response->write($this->view()
             ->assign('user', $this->user)
@@ -84,13 +85,12 @@ final class InfoController extends BaseController
         if (Config::obtain('reg_email_verify')) {
             $redis = (new Cache())->initRedis();
             $email_verify_code = trim($this->antiXss->xss_clean($request->getParam('emailcode')));
-            $email_verify = $redis->get('email_verify:' . $email_verify_code);
+            $email_verify = OneTimeTokenService::consume($redis, 'email_verify:' . $email_verify_code);
 
             if (! is_string($email_verify) || ! hash_equals(strtolower(trim($email_verify)), $new_email)) {
                 return ResponseHelper::error($response, '你的邮箱验证码不正确');
             }
 
-            $redis->del('email_verify:' . $email_verify_code);
         }
 
         $user->email = $new_email;

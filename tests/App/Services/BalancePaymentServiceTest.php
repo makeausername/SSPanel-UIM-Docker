@@ -72,6 +72,9 @@ final class BalancePaymentServiceTest extends TestCase
             $table->integer('user_id');
             $table->string('type');
             $table->decimal('price', 12, 2);
+            $table->decimal('original_price', 12, 2)->nullable();
+            $table->decimal('paid_amount', 12, 2)->default(0);
+            $table->decimal('refunded_amount', 12, 2)->default(0);
             $table->string('status');
             $table->text('content');
             $table->integer('update_time')->default(0);

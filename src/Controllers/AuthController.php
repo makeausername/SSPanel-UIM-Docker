@@ -17,6 +17,7 @@ use App\Services\Mail;
 use App\Services\MFA\FIDO;
 use App\Services\MFA\TOTP;
 use App\Services\MFA\WebAuthn;
+use App\Services\OneTimeTokenService;
 use App\Services\RateLimit;
 use App\Services\Reward;
 use App\Services\UserAccessPolicy;
@@ -40,6 +41,7 @@ use function strlen;
 use function strtolower;
 use function time;
 use function trim;
+use Throwable;
 
 final class AuthController extends BaseController
 {
@@ -62,6 +64,13 @@ final class AuthController extends BaseController
 
     public function loginHandle(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
+        if (! $this->loginRateAllowed('login_ip', (string) ($request->getServerParams()['REMOTE_ADDR'] ?? 'unknown'))) {
+            return $response->withStatus(429)->withHeader('Retry-After', '60')->withJson([
+                'ret' => 0,
+                'msg' => '登录请求过于频繁，请稍后再试。',
+            ]);
+        }
+
         if (Config::obtain('enable_login_captcha') && ! Captcha::verify($request->getParams())) {
             return $response->withJson([
                 'ret' => 0,
@@ -72,6 +81,12 @@ final class AuthController extends BaseController
         $password = $request->getParam('password');
         $rememberMe = $request->getParam('remember_me') === 'true' ? 1 : 0;
         $email = strtolower(trim($this->antiXss->xss_clean($request->getParam('email'))));
+        if (! $this->loginRateAllowed('login_account', hash('sha256', $email))) {
+            return $response->withStatus(429)->withHeader('Retry-After', '60')->withJson([
+                'ret' => 0,
+                'msg' => '登录请求过于频繁，请稍后再试。',
+            ]);
+        }
         $redir = $this->redirectTarget(Cookie::get('redir'));
         $user = (new User())->where('email', $email)->first();
         $loginIp = new LoginIp();
@@ -121,6 +136,15 @@ final class AuthController extends BaseController
         $user->save();
 
         return $response->withHeader('HX-Redirect', $redir);
+    }
+
+    private function loginRateAllowed(string $type, string $value): bool
+    {
+        try {
+            return (new RateLimit())->checkRateLimit($type, $value);
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     public function mfaPage(ServerRequest $request, Response $response, $next): ResponseInterface
@@ -192,9 +216,12 @@ final class AuthController extends BaseController
                 return ResponseHelper::error($response, '此邮箱已经注册');
             }
 
-            $email_code = Tools::genRandomChar(6);
             $redis = (new Cache())->initRedis();
-            $redis->setex('email_verify:' . $email_code, Config::obtain('email_verify_code_ttl'), $email);
+            $email_code = OneTimeTokenService::issueEmailCode(
+                $redis,
+                $email,
+                (int) Config::obtain('email_verify_code_ttl')
+            );
 
             try {
                 Mail::send(
@@ -207,6 +234,7 @@ final class AuthController extends BaseController
                     ]
                 );
             } catch (Exception|ClientExceptionInterface) {
+                OneTimeTokenService::consume($redis, 'email_verify:' . $email_code);
                 return ResponseHelper::error($response, '邮件发送失败，请联系网站管理员。');
             }
 
@@ -372,13 +400,12 @@ final class AuthController extends BaseController
         if (Config::obtain('reg_email_verify')) {
             $redis = (new Cache())->initRedis();
             $email_verify_code = trim($this->antiXss->xss_clean($request->getParam('emailcode')));
-            $email_verify = $redis->get('email_verify:' . $email_verify_code);
+            $email_verify = OneTimeTokenService::consume($redis, 'email_verify:' . $email_verify_code);
 
             if (! is_string($email_verify) || ! hash_equals(strtolower(trim($email_verify)), $email)) {
                 return ResponseHelper::error($response, '你的邮箱验证码不正确');
             }
 
-            $redis->del('email_verify:' . $email_verify_code);
         }
 
         return $this->registerHelper($response, $name, $email, $password, $invite_code, $imtype, $imvalue, 0, 0);

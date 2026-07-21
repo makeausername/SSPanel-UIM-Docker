@@ -7,24 +7,29 @@ namespace App\Controllers;
 use App\Models\Config;
 use App\Models\User;
 use App\Services\Cache;
+use App\Services\OneTimeTokenService;
 use App\Utils\ResponseHelper;
 use App\Utils\Tools;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
-use Lcobucci\JWT\Encoding\JoseEncoder;
-use Lcobucci\JWT\Token\Parser;
 use Psr\Http\Message\ResponseInterface;
 use RedisException;
+use RuntimeException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Smarty\Exception as SmartyException;
 use function hash;
+use function hash_equals;
 use function hash_hmac;
+use function http_build_query;
 use function implode;
+use function is_array;
+use function is_scalar;
+use function is_string;
 use function json_decode;
-use function strcmp;
 use function time;
+use function trim;
 
 final class OAuthController extends BaseController
 {
@@ -56,7 +61,10 @@ final class OAuthController extends BaseController
         $redis = (new Cache())->initRedis();
 
         if ($request->getParam('code') === null) {
-            $state = Tools::genRandomChar(16);
+            $state = Tools::genRandomChar(32);
+            if (! is_string($state)) {
+                throw new RuntimeException('Unable to generate OAuth state.');
+            }
             $redis->setex('slack_state:' . $user->id, 300, $state);
             $client_id = Config::obtain('slack_client_id');
             $team_id = Config::obtain('slack_team_id');
@@ -64,16 +72,23 @@ final class OAuthController extends BaseController
 
             return $response->withJson([
                 'ret' => 1,
-                'redir' => 'https://slack.com/openid/connect/authorize?response_type=code&scope=openid profile&client_id='
-                    . $client_id . '&state=' . $state . '&team=' . $team_id .
-                    '&nonce=' . $state . '&redirect_uri=' . $redirect_uri,
+                'redir' => 'https://slack.com/openid/connect/authorize?' . http_build_query([
+                    'response_type' => 'code',
+                    'scope' => 'openid profile',
+                    'client_id' => $client_id,
+                    'state' => $state,
+                    'team' => $team_id,
+                    'nonce' => $state,
+                    'redirect_uri' => $redirect_uri,
+                ]),
             ]);
         }
 
         $code = $request->getParam('code');
         $state = $request->getParam('state');
 
-        if ($state !== $redis->get('slack_state:' . $user->id)) {
+        $expectedState = OneTimeTokenService::consume($redis, 'slack_state:' . $user->id);
+        if ($expectedState === false || ! hash_equals($expectedState, (string) $state)) {
             return ResponseHelper::error($response, self::$err_msg);
         }
 
@@ -98,14 +113,36 @@ final class OAuthController extends BaseController
             'timeout' => 3,
         ]);
 
-        if (! json_decode($code_response->getBody()->__toString())->ok) {
+        $tokenResponse = json_decode($code_response->getBody()->__toString(), true);
+        if (
+            ! is_array($tokenResponse)
+            || ! ($tokenResponse['ok'] ?? false)
+            || ! is_string($tokenResponse['access_token'] ?? null)
+            || $tokenResponse['access_token'] === ''
+        ) {
             return ResponseHelper::error($response, self::$err_msg);
         }
 
-        $parser = new Parser(new JoseEncoder());
-        $id_token = $parser->parse(json_decode($code_response->getBody()->__toString())->id_token);
-
-        $slack_user_id = $id_token->claims()->get('https://slack.com/user_id');
+        $identityResponse = $client->post('https://slack.com/api/openid.connect.userInfo', [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $tokenResponse['access_token'],
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ],
+            'timeout' => 3,
+        ]);
+        $identity = json_decode($identityResponse->getBody()->__toString(), true);
+        $slack_user_id = is_array($identity) && ($identity['ok'] ?? false)
+            ? ($identity['https://slack.com/user_id'] ?? $identity['sub'] ?? null)
+            : null;
+        $configuredTeamId = trim((string) Config::obtain('slack_team_id'));
+        $identityTeamId = is_array($identity) ? (string) ($identity['https://slack.com/team_id'] ?? '') : '';
+        if (
+            ! is_string($slack_user_id)
+            || $slack_user_id === ''
+            || ($configuredTeamId !== '' && ! hash_equals($configuredTeamId, $identityTeamId))
+        ) {
+            return ResponseHelper::error($response, self::$err_msg);
+        }
 
         if ((new User())->where('im_type', 1)->where('im_value', $slack_user_id)->first() !== null ||
             ($user->im_type === 1 && $user->im_value === $slack_user_id)) {
@@ -129,23 +166,31 @@ final class OAuthController extends BaseController
         $redis = (new Cache())->initRedis();
 
         if ($request->getParam('code') === null) {
-            $state = Tools::genRandomChar(16);
+            $state = Tools::genRandomChar(32);
+            if (! is_string($state)) {
+                throw new RuntimeException('Unable to generate OAuth state.');
+            }
             $redis->setex('discord_state:' . $user->id, 300, $state);
             $client_id = Config::obtain('discord_client_id');
             $redirect_uri = $_ENV['baseUrl'] . '/oauth/discord';
 
             return $response->withJson([
                 'ret' => 1,
-                'redir' => 'https://discord.com/api/oauth2/authorize?client_id=' . $client_id .
-                    '&redirect_uri=' . $redirect_uri .
-                    '&response_type=code&scope=guilds.join identify&state=' . $state,
+                'redir' => 'https://discord.com/api/oauth2/authorize?' . http_build_query([
+                    'client_id' => $client_id,
+                    'redirect_uri' => $redirect_uri,
+                    'response_type' => 'code',
+                    'scope' => 'guilds.join identify',
+                    'state' => $state,
+                ]),
             ]);
         }
 
         $code = $request->getParam('code');
         $state = $request->getParam('state');
 
-        if ($state !== $redis->get('discord_state:' . $user->id)) {
+        $expectedState = OneTimeTokenService::consume($redis, 'discord_state:' . $user->id);
+        if ($expectedState === false || ! hash_equals($expectedState, (string) $state)) {
             return ResponseHelper::error($response, self::$err_msg);
         }
 
@@ -225,13 +270,20 @@ final class OAuthController extends BaseController
 
     public function telegram(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $user_auth = json_decode($request->getParam('user'), true);
+        $user_auth = json_decode((string) $request->getParam('user'), true);
 
-        $check_hash = $user_auth['hash'];
+        if (! is_array($user_auth) || ! isset($user_auth['hash'], $user_auth['auth_date'], $user_auth['id'])) {
+            return ResponseHelper::error($response, self::$err_msg);
+        }
+
+        $check_hash = (string) $user_auth['hash'];
         unset($user_auth['hash']);
         $data_check_arr = [];
 
         foreach ($user_auth as $key => $value) {
+            if (! is_scalar($value)) {
+                return ResponseHelper::error($response, self::$err_msg);
+            }
             $data_check_arr[] = $key . '=' . $value;
         }
 
@@ -240,7 +292,9 @@ final class OAuthController extends BaseController
         $secret_key = hash('sha256', Config::obtain('telegram_token'), true);
         $hash = hash_hmac('sha256', $data_check_string, $secret_key);
 
-        if (strcmp($hash, $check_hash) !== 0 || (time() - $user_auth['auth_date']) > 86400) {
+        $authDate = (int) $user_auth['auth_date'];
+        $age = time() - $authDate;
+        if (! hash_equals($hash, $check_hash) || $age < -30 || $age > 300) {
             return ResponseHelper::error($response, self::$err_msg);
         }
 

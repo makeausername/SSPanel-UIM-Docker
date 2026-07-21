@@ -66,93 +66,143 @@ final class NodeProbeService
         $now = time();
         $checkedAt = (int) ($payload['checked_at'] ?? $now);
         $checkedAt = $checkedAt > 0 ? $checkedAt : $now;
+
+        if ($checkedAt > $now + 300) {
+            throw new InvalidArgumentException('checked_at is too far in the future');
+        }
+
         $status = self::normalizeStatus((string) ($payload['status'] ?? self::STATUS_ERROR));
         $latencyMs = self::nullableUnsignedInt($payload['latency_ms'] ?? null);
         $targetPort = self::unsignedInt($payload['target_port'] ?? 443, 443);
+        $resultData = [
+            'probe_region' => self::cleanString($payload['probe_region'] ?? '', 64),
+            'probe_provider' => self::nullableString($payload['probe_provider'] ?? null, 64),
+            'probe_location' => self::nullableString($payload['probe_location'] ?? null, 128),
+            'probe_type' => self::cleanString($payload['probe_type'] ?? '', 32),
+            'target_host' => self::cleanString($payload['target_host'] ?? '', 255),
+            'target_port' => $targetPort,
+            'status' => $status,
+            'latency_ms' => $latencyMs,
+            'error' => self::nullableString($payload['error'] ?? null, 512),
+            'checked_at' => $checkedAt,
+        ];
 
-        $result = new NodeProbeResult();
-        $result->node_id = $nodeId;
-        $result->probe_region = self::cleanString($payload['probe_region'] ?? '', 64);
-        $result->probe_provider = self::nullableString($payload['probe_provider'] ?? null, 64);
-        $result->probe_location = self::nullableString($payload['probe_location'] ?? null, 128);
-        $result->probe_type = self::cleanString($payload['probe_type'] ?? '', 32);
-        $result->target_host = self::cleanString($payload['target_host'] ?? '', 255);
-        $result->target_port = $targetPort;
-        $result->status = $status;
-        $result->latency_ms = $latencyMs;
-        $result->error = self::nullableString($payload['error'] ?? null, 512);
-        $result->checked_at = $checkedAt;
-        $result->created_at = $now;
-        $result->save();
+        $outcome = DB::connection()->transaction(static function () use (
+            $nodeId,
+            $now,
+            $checkedAt,
+            $status,
+            $resultData,
+            $notify
+        ): array {
+            $result = new NodeProbeResult();
+            foreach ($resultData as $key => $value) {
+                $result->{$key} = $value;
+            }
+            $result->node_id = $nodeId;
+            $result->created_at = $now;
+            $result->save();
 
-        $state = (new NodeProbeState())->where('node_id', $nodeId)->first();
+            (new NodeProbeState())->newQuery()->insertOrIgnore([
+                'node_id' => $nodeId,
+                'status' => self::STATUS_UNKNOWN,
+                'target_port' => 443,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            $state = (new NodeProbeState())->where('node_id', $nodeId)->lockForUpdate()->first();
 
-        if ($state === null) {
-            $state = new NodeProbeState();
-            $state->node_id = $nodeId;
-            $state->created_at = $now;
-        }
+            if ($state === null) {
+                throw new InvalidArgumentException('probe state could not be created');
+            }
 
-        $oldStatus = self::normalizeStatus((string) ($state->status ?? self::STATUS_UNKNOWN));
+            $oldStatus = self::normalizeStatus((string) ($state->status ?? self::STATUS_UNKNOWN));
+            $lastCheckedAt = (int) ($state->last_checked_at ?? 0);
 
-        if (
-            $oldStatus === self::STATUS_SUSPECTED_BLOCKED
-            && $status === self::STATUS_OK
-            && ! self::isMainlandProbeRegion($result->probe_region)
-        ) {
-            return self::summaryFromState($state);
-        }
-
-        $statusChanged = $oldStatus !== $status;
-
-        $state->status = $status;
-        $state->probe_region = $result->probe_region;
-        $state->probe_provider = $result->probe_provider;
-        $state->probe_location = $result->probe_location;
-        $state->probe_type = $result->probe_type;
-        $state->target_host = $result->target_host;
-        $state->target_port = $targetPort;
-        $state->latency_ms = $latencyMs;
-        $state->error = $result->error;
-        $state->last_checked_at = $checkedAt;
-        $state->updated_at = $now;
-
-        if ($statusChanged) {
-            $state->previous_status = $oldStatus;
-            $state->last_changed_at = $checkedAt;
-        }
-
-        $state->save();
-
-        $node = (new Node())->where('id', $nodeId)->first();
-
-        if ($node !== null) {
-            self::updateNodeGfwBlock($node, $oldStatus, $status);
+            if ($lastCheckedAt > 0 && $checkedAt <= $lastCheckedAt) {
+                return ['summary' => self::summaryFromState($state), 'notification' => null];
+            }
 
             if (
-                $notify
-                && $statusChanged
-                && NodeProbeNotificationService::shouldNotifyTransition($oldStatus, $status)
+                $oldStatus === self::STATUS_SUSPECTED_BLOCKED
+                && $status === self::STATUS_OK
+                && ! self::isMainlandProbeRegion((string) $result->probe_region)
             ) {
-                NodeProbeNotificationService::notifyTransition($node, $oldStatus, $status, [
-                    'probe_region' => $result->probe_region,
-                    'probe_provider' => $result->probe_provider,
-                    'probe_location' => $result->probe_location,
-                    'probe_type' => $result->probe_type,
-                    'target_host' => $result->target_host,
-                    'target_port' => $targetPort,
-                    'latency_ms' => $latencyMs,
-                    'error' => $result->error,
-                    'checked_at' => $checkedAt,
-                ]);
-
-                $state->last_notified_status = $status;
-                $state->last_notified_at = $now;
-                $state->save();
+                return ['summary' => self::summaryFromState($state), 'notification' => null];
             }
+
+            $statusChanged = $oldStatus !== $status;
+            foreach ($resultData as $key => $value) {
+                if ($key !== 'checked_at') {
+                    $state->{$key} = $value;
+                }
+            }
+            $state->last_checked_at = $checkedAt;
+            $state->updated_at = $now;
+
+            if ($statusChanged) {
+                $state->previous_status = $oldStatus;
+                $state->last_changed_at = $checkedAt;
+            }
+
+            $state->save();
+            $node = (new Node())->where('id', $nodeId)->lockForUpdate()->first();
+            if ($node !== null) {
+                self::updateNodeGfwBlock($node, $oldStatus, $status);
+            }
+
+            $shouldNotify = $notify
+                && $node !== null
+                && $statusChanged
+                && NodeProbeNotificationService::shouldNotifyTransition($oldStatus, $status);
+
+            return [
+                'summary' => self::summaryFromState($state),
+                'notification' => $shouldNotify ? [
+                    'node_id' => $nodeId,
+                    'old_status' => $oldStatus,
+                    'new_status' => $status,
+                    'checked_at' => $checkedAt,
+                    'context' => $resultData,
+                ] : null,
+            ];
+        });
+
+        if ($outcome['notification'] !== null) {
+            self::sendNotification($outcome['notification'], $now);
         }
 
-        return self::summaryFromState($state);
+        return $outcome['summary'];
+    }
+
+    private static function sendNotification(array $notification, int $notifiedAt): void
+    {
+        $node = (new Node())->where('id', $notification['node_id'])->first();
+        if ($node === null) {
+            return;
+        }
+
+        NodeProbeNotificationService::notifyTransition(
+            $node,
+            $notification['old_status'],
+            $notification['new_status'],
+            $notification['context']
+        );
+
+        DB::connection()->transaction(static function () use ($notification, $notifiedAt): void {
+            $state = (new NodeProbeState())
+                ->where('node_id', $notification['node_id'])
+                ->where('status', $notification['new_status'])
+                ->where('last_checked_at', $notification['checked_at'])
+                ->lockForUpdate()
+                ->first();
+
+            if ($state !== null) {
+                $state->last_notified_status = $notification['new_status'];
+                $state->last_notified_at = $notifiedAt;
+                $state->save();
+            }
+        });
     }
 
     public static function isMainlandProbeRegion(string $region): bool

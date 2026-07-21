@@ -16,6 +16,7 @@ require_once __DIR__ . '/../app/predefine.php';
 
 use App\Middleware\ErrorHandler;
 use App\Middleware\Locale as LocaleMiddleware;
+use App\Middleware\SecurityHeaders;
 use App\Services\Boot;
 use GuzzleHttp\Psr7\HttpFactory;
 use GuzzleHttp\Psr7\ServerRequest;
@@ -32,6 +33,7 @@ $app = AppFactory::create($response_factory);
 
 $app->add(new LocaleMiddleware());
 $app->add(new ErrorHandler());
+$app->add(new SecurityHeaders());
 
 $routes = require __DIR__ . '/../app/routes.php';
 $routes($app);

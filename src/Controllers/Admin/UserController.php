@@ -10,6 +10,8 @@ use App\Models\Config;
 use App\Models\User;
 use App\Models\UserMoneyLog;
 use App\Services\I18n;
+use App\Services\DB;
+use App\Services\InvoiceAccountingService;
 use App\Utils\Hash;
 use App\Utils\Tools;
 use Exception;
@@ -174,59 +176,73 @@ final class UserController extends BaseController
     public function update(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $id = (int) $args['id'];
-        $user = (new User())->find($id);
+        $result = DB::connection()->transaction(static function () use ($id, $request): array {
+            $user = (new User())->where('id', $id)->lockForUpdate()->first();
 
-        if ($request->getParam('pass') !== '' && $request->getParam('pass') !== null) {
-            $user->pass = Hash::passwordHash($request->getParam('pass'));
-
-            if (Config::obtain('enable_forced_replacement')) {
-                $user->removeLink();
+            if ($user === null) {
+                return ['ret' => 0, 'msg' => '用户不存在'];
             }
-        }
 
-        if ($request->getParam('money') !== '' &&
-            $request->getParam('money') !== null &&
-            (float) $request->getParam('money') !== $user->money
-        ) {
-            $money = (float) $request->getParam('money');
-            $diff = $money - $user->money;
-            $remark = ($diff > 0 ? '管理员添加余额' : '管理员扣除余额');
-            (new UserMoneyLog())->add($id, (float) $user->money, $money, $diff, $remark);
-            $user->money = $money;
-        }
+            if ($request->getParam('pass') !== '' && $request->getParam('pass') !== null) {
+                $user->pass = Hash::passwordHash($request->getParam('pass'));
 
-        $user->email = $request->getParam('email');
-        $user->user_name = $request->getParam('user_name');
-        $user->ref_by = $request->getParam('ref_by');
-        $user->port = $request->getParam('port');
-        $user->method = $request->getParam('method');
-        $user->transfer_enable = Tools::autoBytesR($request->getParam('transfer_enable'));
-        $user->node_group = $request->getParam('node_group');
-        $user->class = $request->getParam('class');
-        $user->class_expire = $request->getParam('class_expire');
-        $user->auto_reset_day = $request->getParam('auto_reset_day');
-        $user->auto_reset_bandwidth = $request->getParam('auto_reset_bandwidth');
-        $user->node_speedlimit = $request->getParam('node_speedlimit');
-        $user->node_iplimit = $request->getParam('node_iplimit');
-        $user->locale = $request->getParam('locale');
-        $user->is_admin = $request->getParam('is_admin') === 'true' ? 1 : 0;
-        $user->ga_enable = $request->getParam('ga_enable') === 'true' ? 1 : 0;
-        $user->is_shadow_banned = $request->getParam('is_shadow_banned') === 'true' ? 1 : 0;
-        $user->is_banned = $request->getParam('is_banned') === 'true' ? 1 : 0;
-        $user->banned_reason = $request->getParam('banned_reason');
-        $user->remark = $request->getParam('remark');
+                if (Config::obtain('enable_forced_replacement')) {
+                    $user->removeLink();
+                }
+            }
 
-        if (! $user->save()) {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '修改失败',
-            ]);
-        }
+            $moneyChange = null;
+            if ($request->getParam('money') !== '' && $request->getParam('money') !== null) {
+                $moneyBefore = InvoiceAccountingService::money($user->money);
+                $moneyAfter = InvoiceAccountingService::money($request->getParam('money'));
 
-        return $response->withJson([
-            'ret' => 1,
-            'msg' => '修改成功',
-        ]);
+                if (bccomp($moneyBefore, $moneyAfter, 2) !== 0) {
+                    $diff = bcsub($moneyAfter, $moneyBefore, 2);
+                    $moneyChange = [$moneyBefore, $moneyAfter, $diff];
+                    $user->money = $moneyAfter;
+                }
+            }
+
+            $user->email = $request->getParam('email');
+            $user->user_name = $request->getParam('user_name');
+            $user->ref_by = $request->getParam('ref_by');
+            $user->port = $request->getParam('port');
+            $user->method = $request->getParam('method');
+            $user->transfer_enable = Tools::autoBytesR($request->getParam('transfer_enable'));
+            $user->node_group = $request->getParam('node_group');
+            $user->class = $request->getParam('class');
+            $user->class_expire = $request->getParam('class_expire');
+            $user->auto_reset_day = $request->getParam('auto_reset_day');
+            $user->auto_reset_bandwidth = $request->getParam('auto_reset_bandwidth');
+            $user->node_speedlimit = $request->getParam('node_speedlimit');
+            $user->node_iplimit = $request->getParam('node_iplimit');
+            $user->locale = $request->getParam('locale');
+            $user->is_admin = $request->getParam('is_admin') === 'true' ? 1 : 0;
+            $user->ga_enable = $request->getParam('ga_enable') === 'true' ? 1 : 0;
+            $user->is_shadow_banned = $request->getParam('is_shadow_banned') === 'true' ? 1 : 0;
+            $user->is_banned = $request->getParam('is_banned') === 'true' ? 1 : 0;
+            $user->banned_reason = $request->getParam('banned_reason');
+            $user->remark = $request->getParam('remark');
+
+            if (! $user->save()) {
+                throw new \RuntimeException('User update failed.');
+            }
+
+            if ($moneyChange !== null) {
+                [$moneyBefore, $moneyAfter, $diff] = $moneyChange;
+                (new UserMoneyLog())->add(
+                    $id,
+                    (float) $moneyBefore,
+                    (float) $moneyAfter,
+                    (float) $diff,
+                    bccomp($diff, '0.00', 2) > 0 ? '管理员添加余额' : '管理员扣除余额'
+                );
+            }
+
+            return ['ret' => 1, 'msg' => '修改成功'];
+        });
+
+        return $response->withJson($result);
     }
 
     public function delete(ServerRequest $request, Response $response, array $args): ResponseInterface
