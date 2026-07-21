@@ -48,7 +48,7 @@ class MonthlyShopProductsMigrationTest extends TestCase
         $migration->apply($this->pdo);
         $migration->apply($this->pdo);
 
-        $this->assertSame(13, (int) $this->pdo->query('SELECT COUNT(*) FROM product')->fetchColumn());
+        $this->assertSame(12, (int) $this->pdo->query('SELECT COUNT(*) FROM product')->fetchColumn());
         $this->assertSame(1, (int) $this->pdo->query(
             "SELECT COUNT(*) FROM product WHERE name = 'Existing custom product'"
         )->fetchColumn());
@@ -60,7 +60,6 @@ class MonthlyShopProductsMigrationTest extends TestCase
             'Standard / 标准套餐' => [1000, 900.0],
             'Pro / 专业套餐' => [1500, 1200.0],
             'Ultra / 超级套餐' => [2100, 1500.0],
-            'Unlimited / 无限套餐' => [MonthlyPlanService::UNLIMITED_BANDWIDTH_GB, 1800.0],
         ];
 
         foreach ($expectedPlans as $name => [$bandwidth, $price]) {
@@ -98,7 +97,7 @@ class MonthlyShopProductsMigrationTest extends TestCase
 
         $migration->revert($this->pdo);
 
-        $this->assertSame(12, (int) $this->pdo->query(
+        $this->assertSame(11, (int) $this->pdo->query(
             'SELECT COUNT(*) FROM product WHERE status = 0'
         )->fetchColumn());
         $this->assertSame(1, (int) $this->pdo->query(
