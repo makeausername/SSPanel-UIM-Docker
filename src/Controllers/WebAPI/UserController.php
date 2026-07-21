@@ -12,6 +12,7 @@ use App\Models\Node;
 use App\Models\OnlineLog;
 use App\Models\User;
 use App\Services\DynamicRate;
+use App\Services\UserAccessPolicy;
 use App\Utils\ResponseHelper;
 use App\Utils\Tools;
 use Psr\Http\Message\ResponseInterface;
@@ -47,27 +48,27 @@ final class UserController extends BaseController
             return ResponseHelper::error($response, 'Node out of bandwidth.');
         }
 
-        $users_raw = (new User())->where(
-            'is_banned',
-            0
-        )->where(
-            'class_expire',
-            '>',
-            date('Y-m-d H:i:s')
-        )->where(
-            static function ($query) use ($node): void {
-                $query->where('class', '>=', $node->node_class)
-                    ->where(static function ($query) use ($node): void {
-                        if ($node->node_group !== 0) {
-                            $query->where('node_group', $node->node_group);
-                        }
-                    });
-            }
-        )->orWhere(
-            'is_admin',
-            1
-        )->get([
+        $users_raw = (new User())->where(static function ($query) use ($node): void {
+            $query->where('is_admin', 1)
+                ->orWhere(static function ($query) use ($node): void {
+                    $query->where('is_banned', 0)
+                        ->whereNull('unpaid_delete_at')
+                        ->where('class', '>', 0)
+                        ->where('class', '>=', $node->node_class)
+                        ->where('class_expire', '>', date('Y-m-d H:i:s'))
+                        ->where(static function ($query) use ($node): void {
+                            if ($node->node_group !== 0) {
+                                $query->where('node_group', $node->node_group);
+                            }
+                        });
+                });
+        })->get([
             'id',
+            'is_admin',
+            'is_banned',
+            'class',
+            'class_expire',
+            'unpaid_delete_at',
             'u',
             'd',
             'transfer_enable',
@@ -89,6 +90,10 @@ final class UserController extends BaseController
         $users = [];
 
         foreach ($users_raw as $user_raw) {
+            if (! UserAccessPolicy::hasActivePlan($user_raw)) {
+                continue;
+            }
+
             if ($user_raw->transfer_enable <= $user_raw->u + $user_raw->d) {
                 if ($_ENV['keep_connect']) {
                     // 流量耗尽用户限速至 1Mbps
@@ -120,6 +125,10 @@ final class UserController extends BaseController
             }
 
             foreach ($keys_unset as $key) {
+                unset($user_raw->$key);
+            }
+
+            foreach (['is_admin', 'is_banned', 'class', 'class_expire', 'unpaid_delete_at'] as $key) {
                 unset($user_raw->$key);
             }
 

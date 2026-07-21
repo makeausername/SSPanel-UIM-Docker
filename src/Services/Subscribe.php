@@ -37,6 +37,10 @@ final class Subscribe
 
     public static function getUserNodes($user, bool $show_all_nodes = false): Collection
     {
+        if (! UserAccessPolicy::hasActivePlan($user)) {
+            return new Collection();
+        }
+
         $query = Node::query();
         $query->where('type', 1);
 

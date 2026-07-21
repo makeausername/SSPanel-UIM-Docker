@@ -63,6 +63,19 @@ final class ClientApiControllerTest extends TestCase
         $this->assertSame(0, $usage['remaining']);
     }
 
+    public function testAwaitingPlanPurchaseCannotConnectDespiteGrantedEntitlements(): void
+    {
+        $usage = $this->buildUsage([
+            'class' => 1,
+            'class_expire' => '2099-01-01 00:00:00',
+            'transfer_enable' => 1000,
+            'unpaid_delete_at' => '2099-01-04 00:00:00',
+        ]);
+
+        $this->assertFalse($usage['isExpired']);
+        $this->assertFalse($usage['canConnect']);
+    }
+
     public function testTodayUsageCannotExceedCurrentPeriodUsage(): void
     {
         $usage = $this->buildUsage([
@@ -85,6 +98,7 @@ final class ClientApiControllerTest extends TestCase
             'is_banned' => 0,
             'class' => 0,
             'class_expire' => '2099-01-01 00:00:00',
+            'unpaid_delete_at' => null,
             'u' => 0,
             'd' => 0,
             'transfer_today' => 0,

@@ -71,6 +71,26 @@ assert_function_excludes() {
     }
 }
 
+assert_function_order() {
+    local function_name="$1"
+    local file="$2"
+    local first="$3"
+    local second="$4"
+    local body
+    local first_line
+    local second_line
+
+    body="$(function_body "$function_name" "$file")"
+    first_line="$(printf '%s\n' "$body" | grep -nF -- "$first" | head -n 1 | cut -d: -f1)"
+    second_line="$(printf '%s\n' "$body" | grep -nF -- "$second" | head -n 1 | cut -d: -f1)"
+
+    [ -n "$first_line" ] && [ -n "$second_line" ] && [ "$first_line" -lt "$second_line" ] || {
+        printf 'ERROR: %s in %s does not place %s before %s.\n' \
+            "$function_name" "$file" "$first" "$second" >&2
+        return 1
+    }
+}
+
 assert_mode() {
     local expected="$1"
     local path="$2"
@@ -251,6 +271,11 @@ assert_read_tty_shape install.sh
 assert_read_tty_shape bootstrap.sh
 assert_file_contains docker-compose.yml '      - bash'
 assert_file_contains docker-compose.yml '      - /var/www/html/docker/cron/scheduler'
+assert_file_contains docker-compose.yml 'scheduler.last_success'
+assert_file_contains docker-compose.yml 'SCHEDULER_HEARTBEAT_MAX_AGE_SECONDS'
+assert_file_contains docker-compose.yml 'wget -q -O /dev/null http://127.0.0.1/index.php'
+assert_file_contains docker/cron/scheduler 'HEARTBEAT_FILE='
+assert_file_contains docker/cron/scheduler 'php xcat Cron'
 assert_file_contains Dockerfile 'bash -n docker/entrypoint.sh; \'
 assert_file_contains Dockerfile 'bash -n docker/cron/scheduler; \'
 assert_file_contains Dockerfile 'test -r docker/cron/scheduler; \'
@@ -260,6 +285,13 @@ assert_file_contains Dockerfile 'gosu www-data test -r /var/www/html/src/Utils/T
 assert_file_contains Dockerfile 'gosu www-data test ! -w /var/www/html/src/Utils/Tools.php; \'
 assert_function_contains clone_repository bootstrap.sh 'normalize_repository_permissions'
 assert_function_contains update_repository bootstrap.sh 'normalize_repository_permissions'
+assert_function_contains run_upgrade bootstrap.sh 'docker compose up -d mariadb redis app nginx caddy'
+assert_function_contains run_upgrade bootstrap.sh 'docker compose up -d scheduler'
+assert_function_contains run_upgrade bootstrap.sh 'docker compose restart nginx'
+assert_function_contains run_upgrade bootstrap.sh 'wait_for_service_ready nginx 180'
+assert_function_contains run_upgrade bootstrap.sh 'wait_for_service_ready scheduler 300'
+assert_function_order run_upgrade bootstrap.sh 'php xcat Migration latest' 'docker compose up -d scheduler'
+assert_function_order run_upgrade bootstrap.sh 'docker compose up -d scheduler' 'docker compose restart nginx'
 assert_function_contains build_images install.sh 'normalize_repository_permissions'
 assert_function_contains build_images install.sh 'verify_repository_permissions'
 assert_function_contains require_runtime install.sh 'require_command git'
@@ -268,6 +300,10 @@ assert_function_contains verify_containers install.sh 'sleep 3'
 assert_function_contains verify_containers install.sh 'docker compose logs --tail=100 "$service"'
 assert_function_contains verify_containers install.sh 'ExitCode=${exit_code:-unknown}'
 assert_function_contains resume_installation install.sh 'run_init_command Migration latest'
+assert_function_contains resume_installation install.sh 'docker_compose_up scheduler'
+assert_function_order resume_installation install.sh 'run_init_command Migration latest' 'docker_compose_up scheduler'
+assert_function_contains main install.sh 'docker_compose_up scheduler'
+assert_function_order main install.sh 'run_init_command Migration latest' 'docker_compose_up scheduler'
 assert_function_excludes resume_installation install.sh 'Migration new'
 assert_function_contains resume_installation install.sh 'ensure_admin_for_resume'
 assert_function_contains resume_installation install.sh 'verify_https'

@@ -11,8 +11,6 @@ use Throwable;
 use function in_array;
 use function is_string;
 use function strcasecmp;
-use function strtotime;
-use function time;
 use function trim;
 
 final class NodeProfileService
@@ -93,6 +91,7 @@ final class NodeProfileService
                 'class',
                 'class_expire',
                 'node_group',
+                'unpaid_delete_at',
                 'transfer_enable',
                 'u',
                 'd',
@@ -103,8 +102,11 @@ final class NodeProfileService
                 if (in_array(true, [
                     $uuid === '',
                     strcasecmp($uuid, self::MOCK_USER_UUID) === 0,
-                    (int) $user->is_banned !== 0,
                 ], true)) {
+                    return false;
+                }
+
+                if (! UserAccessPolicy::canUseNodes($user)) {
                     return false;
                 }
 
@@ -113,10 +115,7 @@ final class NodeProfileService
                 }
 
                 return ! in_array(false, [
-                    (int) $user->class > 0,
                     (int) $user->class >= $nodeClass,
-                    strtotime((string) $user->class_expire) > time(),
-                    (int) $user->transfer_enable > (int) $user->u + (int) $user->d,
                     in_array($nodeGroup, [0, (int) $user->node_group], true),
                 ], true);
             })
