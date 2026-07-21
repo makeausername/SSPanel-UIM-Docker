@@ -104,6 +104,13 @@ jobs:
                 \$smarty->setTemplateDir('resources/views/tabler/');
                 \$smarty->setCompileDir(sys_get_temp_dir());
                 \$smarty->muteUndefinedOrNullWarnings();
+                \$smarty->registerPlugin(
+                  \Smarty\Smarty::PLUGIN_FUNCTION,
+                  'trans',
+                  static function (array \$params): string {
+                    return (string) (\$params['key'] ?? '');
+                  }
+                );
                 
                 \$file = str_replace('resources/views/tabler/', '', '$file');
                 
