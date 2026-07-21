@@ -79,18 +79,13 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="form-group mb-3 row">
+                            <div class="form-group mb-4 row">
                                 <div class="col offset-3">
                                     <button id="apply-xnode-reality-template" class="btn btn-outline-primary btn-sm" type="button">
                                         <i class="icon ti ti-wand"></i>
                                         使用 XNode Reality 模板
                                     </button>
                                 </div>
-                            </div>
-                            <div id="xnode-managed-policy" class="alert alert-info {if $node->sort !== 15}d-none{/if}" role="alert">
-                                <strong>XNode 统一流量策略 / Uniform traffic policy</strong><br>
-                                上行和下行分别按固定 <strong>2×</strong> 计入用户套餐；关闭动态倍率，不限速、不限制节点流量，每月 1 日重置节点统计。
-                                / Upload and download are each billed at a fixed 2× rate, with no dynamic rate, speed limit, or node quota; node statistics reset on day 1.
                             </div>
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">自定义配置</label>
@@ -103,60 +98,13 @@
                                     修改节点自定义配置
                                 </label>
                             </div>
-                            <div class="form-group mb-3 row">
+                            <div class="form-group mb-0 row">
                                 <span class="col">显示此节点</span>
                                 <span class="col-auto">
                                     <label class="form-check form-check-single form-switch">
                                         <input id="type" class="form-check-input" type="checkbox" {if $node->type}checked="" {/if}>
                                     </label>
                                 </span>
-                            </div>
-                            <div class="hr-text">
-                                <span>动态倍率</span>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <span class="col">启用动态流量倍率</span>
-                                <span class="col-auto">
-                                    <label class="form-check form-check-single form-switch">
-                                        <input id="is_dynamic_rate" class="form-check-input" type="checkbox" {if $node->is_dynamic_rate}checked="" {/if}>
-                                    </label>
-                                </span>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">动态流量倍率计算方式</label>
-                                <div class="col">
-                                    <select id="dynamic_rate_type" class="col form-select" value="{$node->dynamic_rate_type}">
-                                        <option value="0" {if $node->dynamic_rate_type === 0}selected{/if}>Logistic</option>
-                                        <option value="1" {if $node->dynamic_rate_type === 1}selected{/if}>Linear</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">最大倍率</label>
-                                <div class="col">
-                                    <input id="max_rate" type="text" class="form-control" value="{$node->max_rate}">
-                                </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">最大倍率时间（时）</label>
-                                <div class="col">
-                                    <input id="max_rate_time" type="text" class="form-control" value="{$node->max_rate_time}">
-                                </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">最小倍率</label>
-                                <div class="col">
-                                    <input id="min_rate" type="text" class="form-control" value="{$node->min_rate}">
-                                </div>
-                            </div>
-                            <div class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label">最小倍率时间（时）</label>
-                                <div class="col">
-                                    <input id="min_rate_time" type="text" class="form-control" value="{$node->min_rate_time}">
-                                </div>
-                                <label class="form-label col-form-label">
-                                    最大倍率时间必须大于最小倍率时间，否则将不会生效
-                                </label>
                             </div>
                         </div>
                     </div>
@@ -409,10 +357,6 @@
         const trafficRate = '2';
         const values = {
             '#traffic_rate': trafficRate,
-            '#max_rate': trafficRate,
-            '#max_rate_time': '22',
-            '#min_rate': trafficRate,
-            '#min_rate_time': '3',
             '#node_class': '0',
             '#node_group': '0',
             '#node_speedlimit': '0',
@@ -422,13 +366,9 @@
 
         if (isXNode) {
             Object.entries(values).forEach(([selector, value]) => $(selector).val(value));
-            $('#is_dynamic_rate').prop('checked', false);
-            $('#dynamic_rate_type').val('0');
         }
 
         Object.keys(values).forEach(selector => $(selector).prop('readonly', isXNode));
-        $('#is_dynamic_rate, #dynamic_rate_type').prop('disabled', isXNode);
-        $('#xnode-managed-policy').toggleClass('d-none', !isXNode);
     }
 
     $("#apply-xnode-reality-template").click(function () {
@@ -569,7 +509,6 @@
                 {$key}: $('#{$key}').val(),
                 {/foreach}
                 type: $("#type").is(":checked"),
-                is_dynamic_rate: $("#is_dynamic_rate").is(":checked"),
                 custom_config: JSON.stringify(editor.get()),
             },
             success: function (data) {

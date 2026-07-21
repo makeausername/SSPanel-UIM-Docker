@@ -11,6 +11,7 @@ use App\Models\NodeReportReceipt;
 use App\Models\NodeRuntime;
 use App\Models\NodeToken;
 use App\Models\OnlineLog;
+use App\Services\FixedNodeTrafficRatePolicy;
 use App\Services\I18n;
 use App\Services\NodeEnrollmentService;
 use App\Services\NodeProbeService;
@@ -29,8 +30,6 @@ use function htmlspecialchars;
 use function implode;
 use function in_array;
 use function is_string;
-use function json_decode;
-use function json_encode;
 use function round;
 use function rtrim;
 use function strtolower;
@@ -61,8 +60,6 @@ final class NodeController extends BaseController
             'probe_status' => '可达性',
             'probe_checked_at' => '检测时间',
             'traffic_rate' => '倍率',
-            'is_dynamic_rate' => '动态倍率',
-            'dynamic_rate_type' => '动态倍率计算方式',
             'node_class' => '等级',
             'node_group' => '组别',
             'node_bandwidth_limit' => '流量限制/GB',
@@ -75,12 +72,6 @@ final class NodeController extends BaseController
         'name',
         'server',
         'traffic_rate',
-        'is_dynamic_rate',
-        'dynamic_rate_type',
-        'max_rate',
-        'max_rate_time',
-        'min_rate',
-        'min_rate_time',
         'node_group',
         'node_speedlimit',
         'sort',
@@ -128,14 +119,7 @@ final class NodeController extends BaseController
         $node->node_group = $request->getParam('node_group');
         $node->server = trim($request->getParam('server'));
         $node->traffic_rate = $request->getParam('traffic_rate') ?? 1;
-        $node->is_dynamic_rate = $request->getParam('is_dynamic_rate') === 'true' ? 1 : 0;
-        $node->dynamic_rate_type = $request->getParam('dynamic_rate_type') ?? 0;
-        $node->dynamic_rate_config = json_encode([
-            'max_rate' => $request->getParam('max_rate') ?? 1,
-            'max_rate_time' => $request->getParam('max_rate_time') ?? 22,
-            'min_rate' => $request->getParam('min_rate') ?? 1,
-            'min_rate_time' => $request->getParam('min_rate_time') ?? 3,
-        ]);
+        FixedNodeTrafficRatePolicy::apply($node);
 
         $custom_config = $request->getParam('custom_config') ?? '{}';
 
@@ -200,11 +184,6 @@ final class NodeController extends BaseController
         $runtime = (new NodeRuntime())->where('node_id', (int) $args['id'])->first();
         $nodeBandwidth = (int) $node->node_bandwidth;
 
-        $dynamic_rate_config = json_decode($node->dynamic_rate_config);
-        $node->max_rate = $dynamic_rate_config?->max_rate ?? 1;
-        $node->max_rate_time = $dynamic_rate_config?->max_rate_time ?? 22;
-        $node->min_rate = $dynamic_rate_config?->min_rate ?? 1;
-        $node->min_rate_time = $dynamic_rate_config?->min_rate_time ?? 3;
         $node->sort = (int) $node->sort;
 
         $node->node_bandwidth = Tools::autoBytes($node->node_bandwidth);
@@ -231,14 +210,7 @@ final class NodeController extends BaseController
         $node->node_group = $request->getParam('node_group') ?? 0;
         $node->server = trim($request->getParam('server'));
         $node->traffic_rate = $request->getParam('traffic_rate') ?? 1;
-        $node->is_dynamic_rate = $request->getParam('is_dynamic_rate') === 'true' ? 1 : 0;
-        $node->dynamic_rate_type = $request->getParam('dynamic_rate_type') ?? 0;
-        $node->dynamic_rate_config = json_encode([
-            'max_rate' => $request->getParam('max_rate') ?? 1,
-            'max_rate_time' => $request->getParam('max_rate_time') ?? 0,
-            'min_rate' => $request->getParam('min_rate') ?? 1,
-            'min_rate_time' => $request->getParam('min_rate_time') ?? 0,
-        ]);
+        FixedNodeTrafficRatePolicy::apply($node);
 
         $custom_config = $request->getParam('custom_config') ?? '{}';
 
@@ -672,8 +644,6 @@ final class NodeController extends BaseController
                 (string) $probeSummary['label']
             );
             $node->probe_checked_at = $this->formatXNodeTextValue($probeSummary['latest_checked_at'] ?? '-');
-            $node->is_dynamic_rate = $node->isDynamicRate();
-            $node->dynamic_rate_type = $node->dynamicRateType();
             $node->node_bandwidth = round(Tools::bToGB($node->node_bandwidth), 2);
             $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
         }
