@@ -180,8 +180,9 @@ final class NodeApiV1Controller extends BaseController
 
         $payload['node_id'] = $nodeId;
         $payload['target_port'] = $payload['target_port'] ?? 443;
+        $payload['probe_region'] = 'node-self';
 
-        foreach (['probe_region', 'probe_type', 'target_host', 'status'] as $field) {
+        foreach (['probe_type', 'target_host', 'status'] as $field) {
             if (! is_string($payload[$field] ?? null) || trim($payload[$field]) === '') {
                 return $this->validationError(
                     $request,
@@ -193,7 +194,7 @@ final class NodeApiV1Controller extends BaseController
         }
 
         try {
-            $summary = NodeProbeService::recordResult($payload, true);
+            $summary = NodeProbeService::recordResult($payload, true, false);
         } catch (InvalidArgumentException $e) {
             return $this->validationError($request, $response, $e->getMessage(), 'invalid_probe_payload');
         } catch (Throwable $e) {

@@ -303,7 +303,7 @@ docker compose exec -T app php xcat Tool generateXNodeEnrollToken 1 600
 通用安装命令：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/9f9cef203f0a37ed4c1301f6d96254824b40adc5/scripts/install.sh | bash -s -- \
   --panel-url "https://panel.example.com" \
   --node-id "1" \
   --node-domain "node1.example.com" \
@@ -314,7 +314,7 @@ curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scri
 低资源节点推荐命令：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/9f9cef203f0a37ed4c1301f6d96254824b40adc5/scripts/install.sh | bash -s -- \
   --panel-url "https://panel.example.com" \
   --node-id "1" \
   --node-domain "node1.example.com" \
@@ -422,10 +422,12 @@ cd /opt/SSPanel-UIM-Docker
 docker compose exec -T app php xcat Tool generateXNodeProbeToken
 ```
 
+Probe tokens expire after 30 days by default. Pass an explicit positive TTL in seconds when a shorter rotation period is required.
+
 在探针 VPS 安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scripts/install-probe.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/9f9cef203f0a37ed4c1301f6d96254824b40adc5/scripts/install-probe.sh | bash -s -- \
   --panel-url "https://panel.example.com" \
   --probe-token "xnp_xxx" \
   --probe-region "cn" \
@@ -538,7 +540,7 @@ sudo bash bootstrap.sh --upgrade
 使用后台节点编辑页生成的新安装命令，或手工运行 `install.sh` 并指定版本：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/9f9cef203f0a37ed4c1301f6d96254824b40adc5/scripts/install.sh | bash -s -- \
   --panel-url "https://panel.example.com" \
   --node-id "1" \
   --node-domain "node1.example.com" \

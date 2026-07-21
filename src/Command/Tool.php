@@ -456,7 +456,7 @@ EOL;
             return;
         }
 
-        $ttlSeconds = null;
+        $ttlSeconds = 2592000;
 
         if (isset($this->argv[3])) {
             $ttlArgument = trim((string) $this->argv[3]);
@@ -491,14 +491,10 @@ EOL;
         echo 'Token type: probe' . PHP_EOL;
         echo 'Node ID: 0' . PHP_EOL;
 
-        if ($ttlSeconds === null) {
-            echo 'Expires: never' . PHP_EOL;
-        } else {
-            $expiresAt = (int) $tokenRecord->expires_at;
+        $expiresAt = (int) $tokenRecord->expires_at;
 
-            echo 'Expires in: ' . $ttlSeconds . ' seconds' . PHP_EOL;
-            echo 'Expires at: ' . date('Y-m-d H:i:s T', $expiresAt) . ' (' . $expiresAt . ')' . PHP_EOL;
-        }
+        echo 'Expires in: ' . $ttlSeconds . ' seconds' . PHP_EOL;
+        echo 'Expires at: ' . date('Y-m-d H:i:s T', $expiresAt) . ' (' . $expiresAt . ')' . PHP_EOL;
 
         echo 'Token: ' . $token . PHP_EOL;
         echo 'Store this token only on the probe host.' . PHP_EOL . PHP_EOL;

@@ -1,7 +1,7 @@
 {include file='user/header.tpl'}
 
 <script src="//{$config['jsdelivr_url']}/npm/jquery/dist/jquery.min.js"></script>
-<script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+<script src="https://unpkg.com/@simplewebauthn/browser@13.3.0/dist/bundle/index.umd.min.js"></script>
 
 <div class="page-wrapper">
     <div class="container-xl">

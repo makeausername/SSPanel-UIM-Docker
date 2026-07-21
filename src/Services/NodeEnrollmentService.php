@@ -54,49 +54,62 @@ final class NodeEnrollmentService
         $domain = $this->parseDomain($payload['domain'] ?? null);
         $now = time();
 
-        $enrollTokenRecord = (new NodeToken())
-            ->where('token_hash', $this->hashToken($enrollToken))
-            ->where('token_type', 'enroll')
-            ->where('node_id', $nodeId)
-            ->whereNull('used_at')
-            ->whereNull('revoked_at')
-            ->where(static function ($query) use ($now): void {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', $now);
-            })
-            ->first();
+        return DB::connection()->transaction(function () use ($enrollToken, $nodeId, $domain, $now): array {
+            $enrollTokenRecord = (new NodeToken())
+                ->where('token_hash', $this->hashToken($enrollToken))
+                ->where('token_type', 'enroll')
+                ->where('node_id', $nodeId)
+                ->whereNull('used_at')
+                ->whereNull('revoked_at')
+                ->where(static function ($query) use ($now): void {
+                    $query->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+                })
+                ->lockForUpdate()
+                ->first();
 
-        if ($enrollTokenRecord === null) {
-            throw new RuntimeException('Invalid enroll token.');
-        }
+            if ($enrollTokenRecord === null) {
+                throw new RuntimeException('Invalid enroll token.');
+            }
 
-        $node = (new Node())->where('id', $nodeId)->first();
+            $node = (new Node())->where('id', $nodeId)->lockForUpdate()->first();
 
-        if ($node === null) {
-            throw new InvalidArgumentException('node_id does not exist.');
-        }
+            if ($node === null) {
+                throw new InvalidArgumentException('node_id does not exist.');
+            }
 
-        $this->assertDomainMatchesNode($node, $domain);
+            if ((int) $node->type === 0) {
+                throw new InvalidArgumentException('node is disabled.');
+            }
 
-        $nodeToken = $this->generateNodeToken();
-        $nodeTokenRecord = new NodeToken();
-        $nodeTokenRecord->node_id = $nodeId;
-        $nodeTokenRecord->token_hash = $this->hashToken($nodeToken);
-        $nodeTokenRecord->token_type = 'node';
-        $nodeTokenRecord->name = 'xnode-agent';
-        $nodeTokenRecord->created_at = $now;
-        $nodeTokenRecord->save();
+            $this->assertDomainMatchesNode($node, $domain);
 
-        $enrollTokenRecord->used_at = $now;
-        $enrollTokenRecord->save();
+            (new NodeToken())
+                ->where('node_id', $nodeId)
+                ->where('token_type', 'node')
+                ->whereNull('revoked_at')
+                ->update(['revoked_at' => $now]);
 
-        return [
-            'node_token' => $nodeToken,
-            'panel_url' => $this->getPanelUrl(),
-            'node_id' => $nodeId,
-            'domain' => $domain,
-            'report_interval_sec' => 60,
-            'config_interval_sec' => 60,
-        ];
+            $nodeToken = $this->generateNodeToken();
+            $nodeTokenRecord = new NodeToken();
+            $nodeTokenRecord->node_id = $nodeId;
+            $nodeTokenRecord->token_hash = $this->hashToken($nodeToken);
+            $nodeTokenRecord->token_type = 'node';
+            $nodeTokenRecord->name = 'xnode-agent';
+            $nodeTokenRecord->created_at = $now;
+            $nodeTokenRecord->save();
+
+            $enrollTokenRecord->used_at = $now;
+            $enrollTokenRecord->save();
+
+            return [
+                'node_token' => $nodeToken,
+                'panel_url' => $this->getPanelUrl(),
+                'node_id' => $nodeId,
+                'domain' => $domain,
+                'report_interval_sec' => 60,
+                'config_interval_sec' => 60,
+            ];
+        });
     }
 
     /**
@@ -128,7 +141,7 @@ final class NodeEnrollmentService
     /**
      * Show the returned token once to the operator, then discard it.
      */
-    public static function createProbeToken(?int $ttlSeconds = null): string
+    public static function createProbeToken(?int $ttlSeconds = 2592000): string
     {
         if ($ttlSeconds !== null && $ttlSeconds <= 0) {
             throw new InvalidArgumentException('ttl_seconds must be a positive integer.');

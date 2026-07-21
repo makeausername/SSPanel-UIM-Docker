@@ -42,7 +42,7 @@ use const ENT_SUBSTITUTE;
 final class NodeController extends BaseController
 {
     private const XNODE_INSTALLER_URL = 'https://raw.githubusercontent.com/makeausername/xnode-agent/'
-        . 'main/scripts/install.sh';
+        . '9f9cef203f0a37ed4c1301f6d96254824b40adc5/scripts/install.sh';
     private const XNODE_INSTALL_VERSION = 'v0.1.6';
 
     private static array $details = [
@@ -347,6 +347,18 @@ final class NodeController extends BaseController
     public function delete(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $node = (new Node())->find($args['id']);
+
+        if ($node === null) {
+            return $response->withStatus(404)->withJson([
+                'ret' => 0,
+                'msg' => 'Node not found',
+            ]);
+        }
+
+        (new NodeToken())
+            ->where('node_id', (int) $node->id)
+            ->whereNull('revoked_at')
+            ->update(['revoked_at' => time()]);
 
         if (! $node->delete()) {
             return $response->withJson([

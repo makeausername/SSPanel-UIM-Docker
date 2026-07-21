@@ -46,7 +46,7 @@
     </div>
 </div>
 
-<script src="//{$config['jsdelivr_url']}/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
+<script src="https://{$config['jsdelivr_url']}/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
 
 <script>
     let successDialog = new tabler.bootstrap.Modal(document.getElementById('success-dialog'));
@@ -76,7 +76,6 @@
 
 {include file='live_chat.tpl'}
 
-{include file='telemetry.tpl'}
 
 </body>
 

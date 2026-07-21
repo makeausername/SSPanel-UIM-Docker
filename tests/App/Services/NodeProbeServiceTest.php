@@ -29,6 +29,8 @@ final class NodeProbeServiceTest extends TestCase
         Capsule::table('node')->insert([
             'id' => 1,
             'name' => 'node-1',
+            'server' => 'node1.example.com',
+            'type' => 1,
             'gfw_block' => 0,
         ]);
     }
@@ -96,7 +98,7 @@ final class NodeProbeServiceTest extends TestCase
         ], false);
 
         $this->assertSame('unreachable', $summary['status']);
-        $this->assertSame(2, Capsule::table('node_probe_results')->count());
+        $this->assertSame(1, Capsule::table('node_probe_results')->count());
     }
 
     public function testFarFutureResultIsRejected(): void
@@ -109,11 +111,68 @@ final class NodeProbeServiceTest extends TestCase
         ], false);
     }
 
+    public function testMissingDisabledAndMismatchedTargetsAreRejected(): void
+    {
+        foreach ([
+            ['node_id' => 404, 'target_host' => 'node1.example.com'],
+            ['node_id' => 1, 'target_host' => 'other.example.com'],
+        ] as $payload) {
+            try {
+                NodeProbeService::recordResult($payload + [
+                    'probe_region' => 'cn',
+                    'probe_type' => 'external_tcp',
+                    'status' => 'ok',
+                ], false, true);
+                $this->fail('Invalid probe target should be rejected.');
+            } catch (\InvalidArgumentException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+
+        Capsule::table('node')->where('id', 1)->update(['type' => 0]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        NodeProbeService::recordResult([
+            'node_id' => 1,
+            'probe_region' => 'cn',
+            'probe_type' => 'external_tcp',
+            'target_host' => 'node1.example.com',
+            'status' => 'ok',
+        ], false, true);
+    }
+
+    public function testOnlyAuthoritativeExternalProbeCanChangeGfwFlag(): void
+    {
+        NodeProbeService::recordResult([
+            'node_id' => 1,
+            'probe_region' => 'node-self',
+            'probe_type' => 'node_tcp',
+            'target_host' => 'node1.example.com',
+            'status' => 'suspected_blocked',
+            'checked_at' => time() - 2,
+        ], false, false);
+
+        $this->assertSame(0, (int) Capsule::table('node')->where('id', 1)->value('gfw_block'));
+
+        NodeProbeService::recordResult([
+            'node_id' => 1,
+            'probe_region' => 'cn',
+            'probe_type' => 'external_tcp',
+            'target_host' => 'node1.example.com',
+            'status' => 'suspected_blocked',
+            'checked_at' => time() - 1,
+        ], false, true);
+
+        $this->assertSame(1, (int) Capsule::table('node')->where('id', 1)->value('gfw_block'));
+    }
+
     private function createSchema(): void
     {
         Capsule::schema()->create('node', static function (Blueprint $table): void {
             $table->integer('id')->primary();
             $table->string('name')->nullable();
+            $table->string('server')->nullable();
+            $table->integer('type')->default(1);
             $table->integer('gfw_block')->default(0);
         });
 

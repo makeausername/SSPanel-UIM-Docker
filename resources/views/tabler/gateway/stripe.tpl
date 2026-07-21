@@ -1,5 +1,5 @@
 <link rel="stylesheet"
-      href="//{$config['jsdelivr_url']}/npm/@tabler/core@latest/dist/css/tabler-payments.min.css">
+      href="https://{$config['jsdelivr_url']}/npm/@tabler/core@1.4.0/dist/css/tabler-payments.min.css">
 
 <div class="card-inner">
     <h4>

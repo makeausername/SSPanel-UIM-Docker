@@ -1,6 +1,6 @@
 {include file='header.tpl'}
 
-<script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+<script src="https://unpkg.com/@simplewebauthn/browser@13.3.0/dist/bundle/index.umd.min.js"></script>
 
 <body class="border-top-wide border-primary d-flex flex-column">
 <div class="page page-center">

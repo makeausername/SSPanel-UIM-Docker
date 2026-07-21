@@ -80,7 +80,7 @@
 </div>
 </div>
 <!-- js -->
-<script src="//{$config['jsdelivr_url']}/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
+<script src="https://{$config['jsdelivr_url']}/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
 <script>
     let successDialog = new tabler.bootstrap.Modal(document.getElementById('success-dialog'));
     let failDialog = new tabler.bootstrap.Modal(document.getElementById('fail-dialog'));
@@ -121,7 +121,6 @@
 </script>
 <script>console.table([['数据库查询', '执行时间'], ['{count($queryLog)} 次', '{$optTime} ms']])</script>
 
-{include file='telemetry.tpl'}
 
 </body>
 

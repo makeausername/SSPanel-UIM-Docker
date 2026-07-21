@@ -69,7 +69,7 @@
 </footer>
 </div>
 </div>
-<script src="//{$config['jsdelivr_url']}/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
+<script src="https://{$config['jsdelivr_url']}/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
 <script>
     function showToast(message, type = 'success') {
         const toast = document.createElement('div');
@@ -190,7 +190,6 @@
 
 {include file='live_chat.tpl'}
 
-{include file='telemetry.tpl'}
 
 </body>
 

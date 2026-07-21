@@ -25,8 +25,8 @@
         })()
     </script>
     <!-- CSS files -->
-    <link href="//{$config['jsdelivr_url']}/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
-    <link href="//{$config['jsdelivr_url']}/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet"/>
+    <link href="https://{$config['jsdelivr_url']}/npm/@tabler/core@1.4.0/dist/css/tabler.min.css" rel="stylesheet"/>
+    <link href="https://{$config['jsdelivr_url']}/npm/@tabler/icons-webfont@3.45.0/dist/tabler-icons.min.css" rel="stylesheet"/>
     <style>
         .frontend-locale-switcher {
             position: fixed;
@@ -43,7 +43,9 @@
     </style>
     <!-- JS files -->
     <script src="/assets/js/fuck.min.js"></script>
-    <script src="//{$config['jsdelivr_url']}/npm/htmx.org@v2/dist/htmx.min.js"></script>
+    <script src="https://{$config['jsdelivr_url']}/npm/htmx.org@2.0.10/dist/htmx.min.js"
+            integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+            crossorigin="anonymous"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             if (document.querySelector('.frontend-locale-switcher')) {

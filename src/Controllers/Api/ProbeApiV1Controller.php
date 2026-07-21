@@ -88,7 +88,7 @@ final class ProbeApiV1Controller extends BaseController
             }
 
             try {
-                NodeProbeService::recordResult($resultPayload, true);
+                NodeProbeService::recordResult($resultPayload, true, true);
                 $accepted++;
             } catch (InvalidArgumentException) {
                 $skipped++;
