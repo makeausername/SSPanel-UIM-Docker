@@ -100,6 +100,36 @@ class NodeRuntimeServiceTest extends TestCase
         $this->assertSame(579, (int) $nodeAfterDuplicate->node_bandwidth);
     }
 
+    public function testOneTimesRateBillsReportedUplinkAndDownlinkExactlyOnce(): void
+    {
+        $this->seedNode([
+            'id' => 3,
+            'traffic_rate' => 1,
+        ]);
+        $this->seedUser(['id' => 30]);
+
+        $result = (new NodeRuntimeService())->acceptTraffic([
+            'report_id' => 'bidirectional-one-times-report',
+            'period_start' => 100,
+            'period_end' => 200,
+            'data' => [
+                [
+                    'user_id' => 30,
+                    'u' => 100,
+                    'd' => 300,
+                ],
+            ],
+        ], 3);
+
+        $user = Capsule::table('user')->where('id', 30)->first();
+        $node = Capsule::table('node')->where('id', 3)->first();
+
+        $this->assertTrue($result['accepted']);
+        $this->assertSame(400, (int) $user->u + (int) $user->d);
+        $this->assertSame(400, (int) $user->transfer_total);
+        $this->assertSame(400, (int) $node->node_bandwidth);
+    }
+
     public function testOnlineReportConvertsIpv4ToIpv4MappedIpv6(): void
     {
         $this->seedNode(['id' => 1]);

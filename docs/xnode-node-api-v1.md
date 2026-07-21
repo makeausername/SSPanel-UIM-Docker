@@ -130,6 +130,18 @@ curl -sS https://panel.example.com/node/api/v1/users \
 
 The UUIDs in this response must match the UUIDs emitted in `/sub/{token}/v2ray` VLESS Reality links because xnode-agent uses them to render Xray `clients[].id`. The mock user UUID is retained only as a test/helper fallback and is no longer used for normal authenticated nodes.
 
+## Managed XNode access and accounting policy
+
+XNode nodes (`sort = 15`) use a panel-managed policy so operators only need to provide the node name, address, and connection profile:
+
+- `node_class = 0` and `node_group = 0`: available to every eligible paid user without node tiers.
+- `traffic_rate = 1`: Xray uplink and downlink are billed exactly once. The agent reports both directions separately, and the panel sums them.
+- Dynamic traffic rate is disabled: a byte always consumes the same quota regardless of time.
+- `node_speedlimit = 0` and `node_bandwidth_limit = 0`: no panel-side speed or node quota limit.
+- `bandwidthlimit_resetday = 1`: the displayed node traffic counter resets on day 1 while remaining unlimited.
+
+The migration normalizes existing XNode rows to the same policy without clearing their current `node_bandwidth` value. Non-XNode node types retain the original configurable SSPanel-UIM behavior.
+
 Fetch detect rules:
 
 ```bash
@@ -167,9 +179,9 @@ The Reality private key never leaves the node and is not included in panel subsc
 
 ## Current data behavior
 
-- `/users` reads real eligible users from the `user` table for the authenticated node and does not use the mock user for normal node-token requests.
-- `/users` does not enforce traffic quota during the first XNode rollout; the UUID returned here must match the UUID used in `/sub/{token}/v2ray`, and xnode-agent writes it to Xray `clients[].id`.
+- `/users` reads active, unexpired, non-banned users with remaining traffic from the `user` table for the authenticated node and does not use the mock user for normal node-token requests.
+- The UUID returned by `/users` matches the UUID used in `/sub/{token}/v2ray`, and xnode-agent writes it to Xray `clients[].id`.
 - `/runtime` stores `public_key`, normalized `short_ids`, and `reality_hash` together only after the panel recalculates and verifies the canonical hash.
 - `/heartbeat` updates safe runtime heartbeat metadata in `node_runtimes`.
-- `/traffic`, `/online`, and `/detect-log` are accepted-only for now.
-- This pass does not mutate user traffic, online logs, detect logs, hourly usage, billing data, subscriptions, or legacy `/mod_mu` behavior.
+- `/traffic` is idempotent by `report_id`, bills user upload and download with the node rate, and stores the raw bidirectional sum in `node_bandwidth`.
+- `/online` and `/detect-log` persist their reports through the same authenticated XNode API contract.
