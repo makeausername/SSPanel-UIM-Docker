@@ -33,9 +33,7 @@ return new class() implements MigrationInterface {
 
     private function normalizeNodes(\PDO $pdo): void
     {
-        $nodes = $pdo->prepare(
-            'SELECT `id`, `name`, `custom_config` FROM `node` WHERE `sort` = ?'
-        );
+        $nodes = $pdo->prepare('SELECT `id`, `custom_config` FROM `node` WHERE `sort` = ?');
         $nodes->execute([XNodeNodePolicy::SORT]);
         $update = $pdo->prepare('
             UPDATE `node`
@@ -54,11 +52,7 @@ return new class() implements MigrationInterface {
 
         while ($node = $nodes->fetch(\PDO::FETCH_ASSOC)) {
             $customConfig = (string) ($node['custom_config'] ?? '{}');
-            $profile = XNodeNodePolicy::resolveProfile(
-                XNodeNodePolicy::profileFromCustomConfig($customConfig),
-                (string) ($node['name'] ?? '')
-            );
-            $values = XNodeNodePolicy::databaseValues($profile);
+            $values = XNodeNodePolicy::databaseValues();
             $update->execute([
                 $values['traffic_rate'],
                 $values['is_dynamic_rate'],
@@ -69,7 +63,7 @@ return new class() implements MigrationInterface {
                 $values['node_speedlimit'],
                 $values['node_bandwidth_limit'],
                 $values['bandwidthlimit_resetday'],
-                XNodeNodePolicy::customConfigWithProfile($customConfig, $profile),
+                XNodeNodePolicy::withoutLegacyProfitMetadata($customConfig),
                 (int) $node['id'],
             ]);
         }

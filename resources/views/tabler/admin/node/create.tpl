@@ -67,20 +67,6 @@
                                     </select>
                                 </div>
                             </div>
-                            <div id="xnode-billing-profile-group" class="form-group mb-3 row">
-                                <label class="form-label col-3 col-form-label required">服务器成本档案</label>
-                                <div class="col">
-                                    <select id="xnode_billing_profile" class="col form-select">
-                                        {foreach $xnode_billing_profiles as $profile => $profile_config}
-                                            <option value="{$profile}" data-rate="{$profile_config['traffic_rate']}"
-                                                {if $profile === $xnode_default_billing_profile}selected{/if}>
-                                                {$profile_config['label']} — {$profile_config['traffic_rate']}× — 预计净利 {$profile_config['projected_net_margin']}%
-                                            </option>
-                                        {/foreach}
-                                    </select>
-                                    <small class="form-hint">根据服务器月租和双向流量额度自动选择盈利倍率。</small>
-                                </div>
-                            </div>
                             <div class="form-group mb-3 row">
                                 <div class="col offset-3">
                                     <button id="apply-xnode-reality-template" class="btn btn-outline-primary btn-sm" type="button">
@@ -90,10 +76,9 @@
                                 </div>
                             </div>
                             <div id="xnode-managed-policy" class="alert alert-info" role="alert">
-                                <strong>XNode 盈利策略 / Profit policy</strong><br>
-                                当前成本档案：<span id="xnode-managed-profile"></span>；自动倍率：<strong><span id="xnode-managed-rate"></span>×</strong>。
-                                关闭动态倍率，不限速、不限制节点流量，每月 1 日重置节点统计。
-                                / Cost-based rate with dynamic rate disabled, no speed or node quota limit, reset on day 1.
+                                <strong>XNode 统一流量策略 / Uniform traffic policy</strong><br>
+                                上行和下行分别按固定 <strong>2×</strong> 计入用户套餐；关闭动态倍率，不限速、不限制节点流量，每月 1 日重置节点统计。
+                                / Upload and download are each billed at a fixed 2× rate, with no dynamic rate, speed limit, or node quota; node statistics reset on day 1.
                             </div>
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">自定义配置</label>
@@ -230,15 +215,13 @@
             security: 'reality',
             flow: 'xtls-rprx-vision',
             sni: 'www.cloudflare.com',
-            fingerprint: 'chrome',
-            billing_profile: '{$xnode_default_billing_profile}'
+            fingerprint: 'chrome'
         }
     };
 
     function applyXNodeManagedPolicy() {
         const isXNode = $('#sort').val() === '15';
-        const selectedProfile = $('#xnode_billing_profile option:selected');
-        const trafficRate = String(selectedProfile.data('rate') || '36');
+        const trafficRate = '2';
         const values = {
             '#traffic_rate': trafficRate,
             '#max_rate': trafficRate,
@@ -260,20 +243,15 @@
 
         Object.keys(values).forEach(selector => $(selector).prop('readonly', isXNode));
         $('#is_dynamic_rate, #dynamic_rate_type').prop('disabled', isXNode);
-        $('#xnode-billing-profile-group').toggleClass('d-none', !isXNode);
         $('#xnode-managed-policy').toggleClass('d-none', !isXNode);
-        $('#xnode-managed-profile').text(selectedProfile.text().trim());
-        $('#xnode-managed-rate').text(trafficRate);
     }
 
     $("#apply-xnode-reality-template").click(function () {
         $('#sort').val('15').trigger('change');
-        xnodeRealityTemplate.xnode.billing_profile = $('#xnode_billing_profile').val();
         editor.set(xnodeRealityTemplate);
     });
 
     $('#sort').on('change', applyXNodeManagedPolicy);
-    $('#xnode_billing_profile').on('change', applyXNodeManagedPolicy);
     applyXNodeManagedPolicy();
     editor.set(xnodeRealityTemplate);
 
@@ -286,7 +264,6 @@
                 {foreach $update_field as $key}
                 {$key}: $('#{$key}').val(),
                 {/foreach}
-                xnode_billing_profile: $('#xnode_billing_profile').val(),
                 type: $("#type").is(":checked"),
                 custom_config: JSON.stringify(editor.get()),
             },
