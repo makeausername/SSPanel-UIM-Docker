@@ -9,13 +9,15 @@
     <meta name="referrer" content="never">
     <title>{$config['appName']}</title>
     <!-- CSS files -->
-    <link href="//{$config['jsdelivr_url']}/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
-    <link href="//{$config['jsdelivr_url']}/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet"/>
+    <link href="https://{$config['jsdelivr_url']}/npm/@tabler/core@1.4.0/dist/css/tabler.min.css" rel="stylesheet"/>
+    <link href="https://{$config['jsdelivr_url']}/npm/@tabler/icons-webfont@3.45.0/dist/tabler-icons.min.css" rel="stylesheet"/>
     <!-- JS files -->
     <script src="/assets/js/fuck.min.js"></script>
-    <script src="//{$config['jsdelivr_url']}/npm/qrcode_js@latest/qrcode.min.js"></script>
-    <script src="//{$config['jsdelivr_url']}/npm/clipboard@latest/dist/clipboard.min.js"></script>
-    <script src="//{$config['jsdelivr_url']}/npm/htmx.org@latest/dist/htmx.min.js"></script>
+    <script src="https://{$config['jsdelivr_url']}/npm/qrcode_js@1.0.0/qrcode.min.js"></script>
+    <script src="https://{$config['jsdelivr_url']}/npm/clipboard@2.0.11/dist/clipboard.min.js"></script>
+    <script src="https://{$config['jsdelivr_url']}/npm/htmx.org@2.0.10/dist/htmx.min.js"
+            integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+            crossorigin="anonymous"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.frontend-locale-redirect').forEach(function (input) {

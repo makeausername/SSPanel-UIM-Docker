@@ -150,6 +150,7 @@ return static function (Slim\App $app): void {
     $app->group('/password', static function (RouteCollectorProxy $group): void {
         $group->get('/reset', App\Controllers\PasswordController::class . ':reset');
         $group->post('/reset', App\Controllers\PasswordController::class . ':handleReset');
+        $group->get('/token', App\Controllers\PasswordController::class . ':tokenForm');
         $group->get('/token/{token}', App\Controllers\PasswordController::class . ':token');
         $group->post('/token', App\Controllers\PasswordController::class . ':handleToken');
     })->add(new SameOriginCsrf())->add(new Guest());

@@ -154,6 +154,7 @@ final class NodeRuntimeServiceTest extends TestCase
     public function testOnlineReportConvertsIpv4ToIpv4MappedIpv6(): void
     {
         $this->seedNode(['id' => 1]);
+        $this->seedUser(['id' => 10]);
 
         $result = (new NodeRuntimeService())->acceptOnline([
             'report_id' => 'online-report-1',
@@ -255,6 +256,7 @@ final class NodeRuntimeServiceTest extends TestCase
     public function testDetectLogReportStoresRuleIdAsLegacyListIdAndDuplicateDoesNotInsertTwice(): void
     {
         $this->seedNode(['id' => 1]);
+        $this->seedUser(['id' => 10]);
 
         $payload = [
             'report_id' => 'detect-report-1',
@@ -285,6 +287,79 @@ final class NodeRuntimeServiceTest extends TestCase
         $this->assertSame(7, (int) $logs[0]->list_id);
         $this->assertSame(1, (int) $logs[0]->node_id);
         $this->assertGreaterThan(0, (int) $logs[0]->datetime);
+    }
+
+    public function testSameReportIdIsIndependentAcrossNodesAndReportTypes(): void
+    {
+        $this->seedNode(['id' => 7]);
+        $this->seedNode(['id' => 8]);
+        $this->seedUser(['id' => 70]);
+        $this->seedUser(['id' => 80]);
+
+        $service = new NodeRuntimeService();
+        $first = $service->acceptTraffic([
+            'report_id' => 'shared-report-id',
+            'data' => [['user_id' => 70, 'u' => 10, 'd' => 20]],
+        ], 7);
+        $second = $service->acceptTraffic([
+            'report_id' => 'shared-report-id',
+            'data' => [['user_id' => 80, 'u' => 30, 'd' => 40]],
+        ], 8);
+        $online = $service->acceptOnline([
+            'report_id' => 'shared-report-id',
+            'data' => [['user_id' => 70, 'ip' => '1.2.3.4']],
+        ], 7);
+
+        $this->assertTrue($first['accepted']);
+        $this->assertFalse($first['duplicate']);
+        $this->assertTrue($second['accepted']);
+        $this->assertFalse($second['duplicate']);
+        $this->assertTrue($online['accepted']);
+        $this->assertFalse($online['duplicate']);
+        $this->assertSame(3, Capsule::table('node_report_receipts')
+            ->where('report_id', 'shared-report-id')->count());
+    }
+
+    public function testNodeCannotChargeUserOutsideItsClassOrGroup(): void
+    {
+        $this->seedNode(['id' => 9, 'node_class' => 2, 'node_group' => 3]);
+        $this->seedUser(['id' => 90, 'class' => 2, 'node_group' => 4]);
+
+        $result = (new NodeRuntimeService())->acceptTraffic([
+            'report_id' => 'wrong-node-user',
+            'data' => [['user_id' => 90, 'u' => 100, 'd' => 200]],
+        ], 9);
+
+        $user = Capsule::table('user')->where('id', 90)->first();
+        $node = Capsule::table('node')->where('id', 9)->first();
+
+        $this->assertTrue($result['accepted']);
+        $this->assertSame(0, $result['users']);
+        $this->assertSame(1, $result['skipped']);
+        $this->assertSame(0, (int) $user->u + (int) $user->d);
+        $this->assertSame(0, (int) $node->node_bandwidth);
+    }
+
+    public function testLateTrafficIsStillBilledForAssignedUserAfterQuotaIsReached(): void
+    {
+        $this->seedNode(['id' => 10]);
+        $this->seedUser([
+            'id' => 100,
+            'transfer_enable' => 100,
+            'u' => 100,
+        ]);
+
+        $result = (new NodeRuntimeService())->acceptTraffic([
+            'report_id' => 'late-quota-report',
+            'data' => [['user_id' => 100, 'u' => 5, 'd' => 10]],
+        ], 10);
+
+        $user = Capsule::table('user')->where('id', 100)->first();
+
+        $this->assertTrue($result['accepted']);
+        $this->assertSame(1, $result['users']);
+        $this->assertSame(105, (int) $user->u);
+        $this->assertSame(10, (int) $user->d);
     }
 
     public function testValidRealityMetadataIsNormalizedAndStoredAtomically(): void
@@ -399,6 +474,8 @@ final class NodeRuntimeServiceTest extends TestCase
         Capsule::schema()->create('node', static function (Blueprint $table): void {
             $table->integer('id')->primary();
             $table->integer('type')->default(1);
+            $table->integer('node_class')->default(0);
+            $table->integer('node_group')->default(0);
             $table->double('traffic_rate')->default(1);
             $table->integer('is_dynamic_rate')->default(0);
             $table->integer('dynamic_rate_type')->default(0);
@@ -409,6 +486,14 @@ final class NodeRuntimeServiceTest extends TestCase
 
         Capsule::schema()->create('user', static function (Blueprint $table): void {
             $table->integer('id')->primary();
+            $table->string('uuid')->nullable();
+            $table->integer('is_admin')->default(0);
+            $table->integer('is_banned')->default(0);
+            $table->integer('class')->default(0);
+            $table->string('class_expire')->nullable();
+            $table->integer('node_group')->default(0);
+            $table->string('unpaid_delete_at')->nullable();
+            $table->integer('transfer_enable')->default(0);
             $table->integer('u')->default(0);
             $table->integer('d')->default(0);
             $table->integer('transfer_total')->default(0);
@@ -419,12 +504,13 @@ final class NodeRuntimeServiceTest extends TestCase
         Capsule::schema()->create('node_report_receipts', static function (Blueprint $table): void {
             $table->increments('id');
             $table->integer('node_id');
-            $table->string('report_id', 128)->unique();
+            $table->string('report_id', 128);
             $table->string('report_type', 32);
             $table->integer('period_start')->nullable();
             $table->integer('period_end')->nullable();
             $table->integer('created_at');
             $table->index(['node_id', 'report_type', 'created_at'], 'node_type_created');
+            $table->unique(['node_id', 'report_type', 'report_id'], 'node_type_report_unique');
         });
 
         Capsule::schema()->create('online_log', static function (Blueprint $table): void {
@@ -494,6 +580,14 @@ final class NodeRuntimeServiceTest extends TestCase
     {
         Capsule::table('user')->insert(array_merge([
             'id' => 1,
+            'uuid' => '00000000-0000-0000-0000-000000000001',
+            'is_admin' => 0,
+            'is_banned' => 0,
+            'class' => 1,
+            'class_expire' => '2099-01-01 00:00:00',
+            'node_group' => 0,
+            'unpaid_delete_at' => null,
+            'transfer_enable' => 1099511627776,
             'u' => 0,
             'd' => 0,
             'transfer_total' => 0,

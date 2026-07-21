@@ -8,15 +8,22 @@ use App\Models\Config;
 use App\Models\DetectBanLog;
 use App\Models\DetectLog;
 use App\Models\Node;
+use App\Models\NodeProbeState;
 use App\Models\User;
 use App\Utils\Tools;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\Http\Client\ClientExceptionInterface;
 use Telegram\Bot\Exceptions\TelegramSDKException;
+use function array_key_exists;
 use function file_get_contents;
 use function in_array;
+use function is_array;
+use function is_bool;
 use function json_decode;
+use function stream_context_create;
+use function strtolower;
 use function str_replace;
+use function trim;
 use function strtotime;
 use function time;
 use const PHP_EOL;
@@ -32,14 +39,28 @@ final class Detect
             ->where('ipv4', '!=', '127.0.0.1')->where('online', 1)->get();
 
         foreach ($nodes as $node) {
+            $probeState = (new NodeProbeState())->where('node_id', (int) $node->id)->first();
+
+            if (
+                $probeState !== null
+                && NodeProbeService::isMainlandProbeRegion((string) $probeState->probe_region)
+                && (int) $probeState->last_checked_at > time() - 3600
+            ) {
+                continue;
+            }
+
             $api_url = str_replace(
                 ['{ip}', '{port}'],
                 [$node->ipv4, $_ENV['detect_gfw_port']],
                 $_ENV['detect_gfw_url']
             );
 
-            $json_tcping = json_decode(file_get_contents($api_url), true);
-            $result_tcping = $json_tcping['status'] === 'true';
+            $result_tcping = self::fetchGfwStatus($api_url);
+
+            if ($result_tcping === null) {
+                echo 'Skip legacy GFW result for node #' . $node->id . ': invalid or unavailable response' . PHP_EOL;
+                continue;
+            }
 
             if ($result_tcping && ! $node->gfw_block) {
                 continue;
@@ -110,6 +131,42 @@ final class Detect
                 $node->save();
             }
         }
+    }
+
+    private static function fetchGfwStatus(string $url): ?bool
+    {
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 5,
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+        $body = @file_get_contents($url, false, $context);
+
+        if ($body === false) {
+            return null;
+        }
+
+        $payload = json_decode($body, true);
+
+        if (! is_array($payload) || ! array_key_exists('status', $payload)) {
+            return null;
+        }
+
+        if (is_bool($payload['status'])) {
+            return $payload['status'];
+        }
+
+        $status = strtolower(trim((string) $payload['status']));
+
+        return match ($status) {
+            'true' => true,
+            'false' => false,
+            default => null,
+        };
     }
 
     public static function ban(): void

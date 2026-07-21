@@ -59,10 +59,6 @@ final class NodeRuntimeService
             return $this->rejected('missing_report_id', $this->trafficResult());
         }
 
-        if ($this->receiptExists($reportId)) {
-            return $this->accepted($this->trafficResult(['duplicate' => true]));
-        }
-
         if (! is_array($payload['data'] ?? null)) {
             return $this->rejected('invalid_data', $this->trafficResult());
         }
@@ -77,9 +73,13 @@ final class NodeRuntimeService
             return $this->rejected('node_disabled', $this->trafficResult());
         }
 
+        if ($this->receiptExists((int) $node->id, 'traffic', $reportId)) {
+            return $this->accepted($this->trafficResult(['duplicate' => true]));
+        }
+
         try {
             return DB::connection()->transaction(function () use ($payload, $node, $reportId): array {
-                if ($this->receiptExists($reportId)) {
+                if ($this->receiptExists((int) $node->id, 'traffic', $reportId)) {
                     return $this->accepted($this->trafficResult(['duplicate' => true]));
                 }
 
@@ -137,6 +137,11 @@ final class NodeRuntimeService
                         continue;
                     }
 
+                    if (! NodeProfileService::canUserUseNode($user, $lockedNode, false)) {
+                        $result['skipped']++;
+                        continue;
+                    }
+
                     $u = $traffic['u'];
                     $d = $traffic['d'];
                     $billedU = $u * $rate;
@@ -166,7 +171,7 @@ final class NodeRuntimeService
                 return $this->accepted($result);
             });
         } catch (QueryException $e) {
-            if ($this->receiptExists($reportId)) {
+            if ($this->receiptExists((int) $node->id, 'traffic', $reportId)) {
                 return $this->accepted($this->trafficResult(['duplicate' => true]));
             }
 
@@ -180,10 +185,6 @@ final class NodeRuntimeService
 
         if ($reportId === null) {
             return $this->rejected('missing_report_id', $this->onlineResult());
-        }
-
-        if ($this->receiptExists($reportId)) {
-            return $this->accepted($this->onlineResult(['duplicate' => true]));
         }
 
         if (! is_array($payload['data'] ?? null)) {
@@ -200,9 +201,13 @@ final class NodeRuntimeService
             return $this->rejected('node_disabled', $this->onlineResult());
         }
 
+        if ($this->receiptExists((int) $node->id, 'online', $reportId)) {
+            return $this->accepted($this->onlineResult(['duplicate' => true]));
+        }
+
         try {
             return DB::connection()->transaction(function () use ($payload, $node, $reportId): array {
-                if ($this->receiptExists($reportId)) {
+                if ($this->receiptExists((int) $node->id, 'online', $reportId)) {
                     return $this->accepted($this->onlineResult(['duplicate' => true]));
                 }
 
@@ -225,6 +230,13 @@ final class NodeRuntimeService
                         continue;
                     }
 
+                    $user = (new User())->where('id', $userId)->first();
+
+                    if ($user === null || ! NodeProfileService::canUserUseNode($user, $node, false)) {
+                        $result['skipped_count']++;
+                        continue;
+                    }
+
                     (new OnlineLog())->upsert(
                         [
                             'user_id' => $userId,
@@ -243,7 +255,7 @@ final class NodeRuntimeService
                 return $this->accepted($result);
             });
         } catch (QueryException $e) {
-            if ($this->receiptExists($reportId)) {
+            if ($this->receiptExists((int) $node->id, 'online', $reportId)) {
                 return $this->accepted($this->onlineResult(['duplicate' => true]));
             }
 
@@ -257,10 +269,6 @@ final class NodeRuntimeService
 
         if ($reportId === null) {
             return $this->rejected('missing_report_id', $this->detectLogResult());
-        }
-
-        if ($this->receiptExists($reportId)) {
-            return $this->accepted($this->detectLogResult(['duplicate' => true]));
         }
 
         if (! is_array($payload['data'] ?? null)) {
@@ -277,9 +285,13 @@ final class NodeRuntimeService
             return $this->rejected('node_disabled', $this->detectLogResult());
         }
 
+        if ($this->receiptExists((int) $node->id, 'detect-log', $reportId)) {
+            return $this->accepted($this->detectLogResult(['duplicate' => true]));
+        }
+
         try {
             return DB::connection()->transaction(function () use ($payload, $node, $reportId): array {
-                if ($this->receiptExists($reportId)) {
+                if ($this->receiptExists((int) $node->id, 'detect-log', $reportId)) {
                     return $this->accepted($this->detectLogResult(['duplicate' => true]));
                 }
 
@@ -300,6 +312,12 @@ final class NodeRuntimeService
                         continue;
                     }
 
+                    $user = (new User())->where('id', $userId)->first();
+
+                    if ($user === null || ! NodeProfileService::canUserUseNode($user, $node, false)) {
+                        continue;
+                    }
+
                     (new DetectLog())->insert([
                         'user_id' => $userId,
                         'list_id' => $listId,
@@ -313,7 +331,7 @@ final class NodeRuntimeService
                 return $this->accepted($result);
             });
         } catch (QueryException $e) {
-            if ($this->receiptExists($reportId)) {
+            if ($this->receiptExists((int) $node->id, 'detect-log', $reportId)) {
                 return $this->accepted($this->detectLogResult(['duplicate' => true]));
             }
 
@@ -517,9 +535,13 @@ final class NodeRuntimeService
         return $reportId;
     }
 
-    private function receiptExists(string $reportId): bool
+    private function receiptExists(int $nodeId, string $reportType, string $reportId): bool
     {
-        return (new NodeReportReceipt())->where('report_id', $reportId)->exists();
+        return (new NodeReportReceipt())
+            ->where('node_id', $nodeId)
+            ->where('report_type', $reportType)
+            ->where('report_id', $reportId)
+            ->exists();
     }
 
     private function createReceipt(string $reportId, string $reportType, int $nodeId, array $payload): void

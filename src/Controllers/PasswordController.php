@@ -96,14 +96,69 @@ final class PasswordController extends BaseController
             return $response->withStatus(302)->withHeader('Location', '/password/reset');
         }
 
-        return $response->write(
-            $this->view()->fetch('password/token.tpl')
-        );
+        return $response
+            ->withStatus(302)
+            ->withHeader('Location', '/password/token')
+            ->withHeader('Cache-Control', 'no-store')
+            ->withHeader('Referrer-Policy', 'no-referrer')
+            ->withAddedHeader('Set-Cookie', self::resetTokenCookie($token));
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function tokenForm(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        $token = $this->antiXss->xss_clean($request->getCookieParam('password_reset_token', ''));
+        $redis = (new Cache())->initRedis();
+
+        try {
+            $email = $token === '' ? false : $redis->get('password_reset:' . $token);
+        } catch (RedisException) {
+            $email = false;
+        }
+
+        if (! $email) {
+            return $response
+                ->withStatus(302)
+                ->withHeader('Location', '/password/reset')
+                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
+        }
+
+        return $response
+            ->withHeader('Cache-Control', 'no-store')
+            ->withHeader('Referrer-Policy', 'no-referrer')
+            ->write($this->view()->fetch('password/token.tpl'));
+    }
+
+    private static function resetTokenCookie(string $token): string
+    {
+        $ttl = max(1, min((int) Config::obtain('email_password_reset_ttl'), 900));
+        $cookie = 'password_reset_token=' . rawurlencode($token)
+            . '; Max-Age=' . $ttl
+            . '; Path=/password/token; HttpOnly; SameSite=Lax';
+
+        if (str_starts_with((string) $_ENV['baseUrl'], 'https://')) {
+            $cookie .= '; Secure';
+        }
+
+        return $cookie;
+    }
+
+    private static function clearResetTokenCookie(): string
+    {
+        $cookie = 'password_reset_token=; Max-Age=0; Path=/password/token; HttpOnly; SameSite=Lax';
+
+        if (str_starts_with((string) $_ENV['baseUrl'], 'https://')) {
+            $cookie .= '; Secure';
+        }
+
+        return $cookie;
     }
 
     public function handleToken(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $token = $this->antiXss->xss_clean($request->getParam('token'));
+        $token = $this->antiXss->xss_clean($request->getCookieParam('password_reset_token', ''));
         $password = $request->getParam('password');
         $confirm_password = $request->getParam('confirm_password');
 
@@ -120,30 +175,35 @@ final class PasswordController extends BaseController
         try {
             $email = OneTimeTokenService::consume($redis, 'password_reset:' . $token);
         } catch (RedisException) {
-            return ResponseHelper::error($response, '链接无效');
+            return ResponseHelper::error($response, '链接无效')
+                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
         }
 
         if (! $email) {
-            return ResponseHelper::error($response, '链接无效');
+            return ResponseHelper::error($response, '链接无效')
+                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
         }
 
         $user = (new User())->where('email', $email)->first();
 
         if ($user === null) {
-            return ResponseHelper::error($response, '链接无效');
+            return ResponseHelper::error($response, '链接无效')
+                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
         }
         // reset password
         $hashPassword = Hash::passwordHash($password);
         $user->pass = $hashPassword;
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '重置失败，请重试');
+            return ResponseHelper::error($response, '重置失败，请重试')
+                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
         }
 
         if (Config::obtain('enable_forced_replacement')) {
             $user->removeLink();
         }
 
-        return ResponseHelper::success($response, '重置成功');
+        return ResponseHelper::success($response, '重置成功')
+            ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
     }
 }

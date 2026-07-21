@@ -55,7 +55,11 @@ final class NodeProbeService
         self::STATUS_ERROR => 'bg-yellow text-yellow-fg',
     ];
 
-    public static function recordResult(array $payload, bool $notify = true): array
+    public static function recordResult(
+        array $payload,
+        bool $notify = true,
+        bool $authoritativeGfw = false
+    ): array
     {
         $nodeId = (int) ($payload['node_id'] ?? 0);
 
@@ -74,6 +78,11 @@ final class NodeProbeService
         $status = self::normalizeStatus((string) ($payload['status'] ?? self::STATUS_ERROR));
         $latencyMs = self::nullableUnsignedInt($payload['latency_ms'] ?? null);
         $targetPort = self::unsignedInt($payload['target_port'] ?? 443, 443);
+
+        if ($targetPort <= 0 || $targetPort > 65535) {
+            throw new InvalidArgumentException('target_port must be between 1 and 65535');
+        }
+
         $resultData = [
             'probe_region' => self::cleanString($payload['probe_region'] ?? '', 64),
             'probe_provider' => self::nullableString($payload['probe_provider'] ?? null, 64),
@@ -93,15 +102,20 @@ final class NodeProbeService
             $checkedAt,
             $status,
             $resultData,
-            $notify
+            $notify,
+            $authoritativeGfw
         ): array {
-            $result = new NodeProbeResult();
-            foreach ($resultData as $key => $value) {
-                $result->{$key} = $value;
+            $node = (new Node())->where('id', $nodeId)->lockForUpdate()->first();
+
+            if ($node === null) {
+                throw new InvalidArgumentException('node_id does not exist');
             }
-            $result->node_id = $nodeId;
-            $result->created_at = $now;
-            $result->save();
+
+            if ((int) $node->type === 0) {
+                throw new InvalidArgumentException('node is disabled');
+            }
+
+            self::assertTargetMatchesNode($node, (string) $resultData['target_host']);
 
             (new NodeProbeState())->newQuery()->insertOrIgnore([
                 'node_id' => $nodeId,
@@ -126,10 +140,18 @@ final class NodeProbeService
             if (
                 $oldStatus === self::STATUS_SUSPECTED_BLOCKED
                 && $status === self::STATUS_OK
-                && ! self::isMainlandProbeRegion((string) $result->probe_region)
+                && ! self::isMainlandProbeRegion((string) $resultData['probe_region'])
             ) {
                 return ['summary' => self::summaryFromState($state), 'notification' => null];
             }
+
+            $result = new NodeProbeResult();
+            foreach ($resultData as $key => $value) {
+                $result->{$key} = $value;
+            }
+            $result->node_id = $nodeId;
+            $result->created_at = $now;
+            $result->save();
 
             $statusChanged = $oldStatus !== $status;
             foreach ($resultData as $key => $value) {
@@ -146,13 +168,11 @@ final class NodeProbeService
             }
 
             $state->save();
-            $node = (new Node())->where('id', $nodeId)->lockForUpdate()->first();
-            if ($node !== null) {
+            if ($authoritativeGfw) {
                 self::updateNodeGfwBlock($node, $oldStatus, $status);
             }
 
             $shouldNotify = $notify
-                && $node !== null
                 && $statusChanged
                 && NodeProbeNotificationService::shouldNotifyTransition($oldStatus, $status);
 
@@ -226,6 +246,24 @@ final class NodeProbeService
     public static function isAllowedStatus(string $status): bool
     {
         return in_array(trim($status), self::ALLOWED_STATUSES, true);
+    }
+
+    private static function assertTargetMatchesNode(Node $node, string $targetHost): void
+    {
+        $targetHost = strtolower(trim($targetHost));
+        $allowedHosts = [];
+
+        foreach (['server', 'domain'] as $field) {
+            $host = strtolower(trim((string) ($node->getAttribute($field) ?? '')));
+
+            if ($host !== '') {
+                $allowedHosts[] = $host;
+            }
+        }
+
+        if ($targetHost === '' || $allowedHosts === [] || ! in_array($targetHost, $allowedHosts, true)) {
+            throw new InvalidArgumentException('target_host does not match node');
+        }
     }
 
     public static function summarizeNode(int $nodeId): array

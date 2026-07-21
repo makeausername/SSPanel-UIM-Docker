@@ -1,7 +1,7 @@
 {include file='admin/header.tpl'}
 
-<script src="//{$config['jsdelivr_url']}/npm/jsoneditor@latest/dist/jsoneditor.min.js"></script>
-<link href="//{$config['jsdelivr_url']}/npm/jsoneditor@latest/dist/jsoneditor.min.css" rel="stylesheet" type="text/css">
+<script src="https://{$config['jsdelivr_url']}/npm/jsoneditor@10.4.3/dist/jsoneditor.min.js"></script>
+<link href="https://{$config['jsdelivr_url']}/npm/jsoneditor@10.4.3/dist/jsoneditor.min.css" rel="stylesheet" type="text/css">
 
 <div class="page-wrapper">
     <div class="container-xl">

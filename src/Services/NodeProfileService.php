@@ -78,9 +78,6 @@ final class NodeProfileService
             return [];
         }
 
-        $nodeClass = (int) $node->node_class;
-        $nodeGroup = (int) $node->node_group;
-
         return (new User())
             ->orderBy('id')
             ->get([
@@ -96,29 +93,7 @@ final class NodeProfileService
                 'u',
                 'd',
             ])
-            ->filter(static function (User $user) use ($nodeClass, $nodeGroup): bool {
-                $uuid = trim((string) $user->uuid);
-
-                if (in_array(true, [
-                    $uuid === '',
-                    strcasecmp($uuid, self::MOCK_USER_UUID) === 0,
-                ], true)) {
-                    return false;
-                }
-
-                if (! UserAccessPolicy::canUseNodes($user)) {
-                    return false;
-                }
-
-                if ((int) $user->is_admin === 1) {
-                    return true;
-                }
-
-                return ! in_array(false, [
-                    (int) $user->class >= $nodeClass,
-                    in_array($nodeGroup, [0, (int) $user->node_group], true),
-                ], true);
-            })
+            ->filter(static fn (User $user): bool => self::canUserUseNode($user, $node))
             ->map(static fn (User $user): array => [
                 'id' => (int) $user->id,
                 'uuid' => trim((string) $user->uuid),
@@ -130,6 +105,41 @@ final class NodeProfileService
             ])
             ->values()
             ->toArray();
+    }
+
+    public static function canUserUseNode(
+        User $user,
+        Node $node,
+        bool $requireRemainingTraffic = true
+    ): bool
+    {
+        $uuid = trim((string) $user->uuid);
+
+        if (in_array(true, [
+            $uuid === '',
+            strcasecmp($uuid, self::MOCK_USER_UUID) === 0,
+        ], true)) {
+            return false;
+        }
+
+        $hasAccess = $requireRemainingTraffic
+            ? UserAccessPolicy::canUseNodes($user)
+            : UserAccessPolicy::hasActivePlan($user);
+
+        if (! $hasAccess) {
+            return false;
+        }
+
+        if ((int) $user->is_admin === 1) {
+            return true;
+        }
+
+        $nodeGroup = (int) $node->node_group;
+
+        return ! in_array(false, [
+            (int) $user->class >= (int) $node->node_class,
+            in_array($nodeGroup, [0, (int) $user->node_group], true),
+        ], true);
     }
 
     public function buildMockDetectRules(): array

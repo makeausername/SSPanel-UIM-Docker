@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Models\Node;
 use App\Models\NodeToken;
 use App\Services\NodeEnrollmentService;
 use App\Services\RateLimit;
@@ -51,6 +52,16 @@ final class NodeApiToken implements MiddlewareInterface
 
         if ($tokenRecord === null) {
             return $this->error($request, 'Invalid node token', 'AUTH_INVALID_TOKEN');
+        }
+
+        $node = (new Node())->where('id', (int) $tokenRecord->node_id)->first();
+
+        if ($node === null) {
+            return $this->error($request, 'Invalid node token', 'AUTH_INVALID_TOKEN');
+        }
+
+        if ((int) $node->type === 0) {
+            return $this->error($request, 'Node is disabled', 'NODE_DISABLED', 403);
         }
 
         $tokenRecord->last_used_at = $now;
