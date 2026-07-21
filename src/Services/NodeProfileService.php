@@ -8,6 +8,7 @@ use App\Models\DetectRule;
 use App\Models\Node;
 use App\Models\User;
 use Throwable;
+use function in_array;
 use function is_string;
 use function strcasecmp;
 use function strtotime;
@@ -99,11 +100,11 @@ final class NodeProfileService
             ->filter(static function (User $user) use ($nodeClass, $nodeGroup): bool {
                 $uuid = trim((string) $user->uuid);
 
-                if ($uuid === '' || strcasecmp($uuid, self::MOCK_USER_UUID) === 0) {
-                    return false;
-                }
-
-                if ((int) $user->is_banned !== 0) {
+                if (in_array(true, [
+                    $uuid === '',
+                    strcasecmp($uuid, self::MOCK_USER_UUID) === 0,
+                    (int) $user->is_banned !== 0,
+                ], true)) {
                     return false;
                 }
 
@@ -111,19 +112,13 @@ final class NodeProfileService
                     return true;
                 }
 
-                if ((int) $user->class <= 0 || (int) $user->class < $nodeClass) {
-                    return false;
-                }
-
-                if (strtotime((string) $user->class_expire) <= time()) {
-                    return false;
-                }
-
-                if ((int) $user->transfer_enable <= (int) $user->u + (int) $user->d) {
-                    return false;
-                }
-
-                return $nodeGroup === 0 || (int) $user->node_group === $nodeGroup;
+                return ! in_array(false, [
+                    (int) $user->class > 0,
+                    (int) $user->class >= $nodeClass,
+                    strtotime((string) $user->class_expire) > time(),
+                    (int) $user->transfer_enable > (int) $user->u + (int) $user->d,
+                    in_array($nodeGroup, [0, (int) $user->node_group], true),
+                ], true);
             })
             ->map(static fn (User $user): array => [
                 'id' => (int) $user->id,
@@ -151,7 +146,13 @@ final class NodeProfileService
                 ])->toArray();
             }
         } catch (Throwable) {
-            // Keep the endpoint available during early XNode rollout even if detect_list is not migrated.
+            return [
+                [
+                    'id' => 1,
+                    'type' => 'protocol',
+                    'pattern' => 'bittorrent',
+                ],
+            ];
         }
 
         return [
@@ -180,7 +181,7 @@ final class NodeProfileService
                 return trim($server);
             }
         } catch (Throwable) {
-            // Fallback keeps the skeleton config endpoint usable without widening data dependencies.
+            return 'node1.example.com';
         }
 
         return 'node1.example.com';
