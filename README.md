@@ -2,7 +2,7 @@
 
 这是一个基于 SSPanel-UIM 的 Docker 化面板仓库，面向 EzIPLC 的生产部署和日常运维做了定制。
 
-本仓库包含 XNode 集成，用于接入 VLESS Reality Vision 节点。当前推荐的 XNode Agent 版本为 `v0.1.5`。
+本仓库包含 XNode 集成，用于接入 VLESS Reality Vision 节点。当前推荐的 XNode Agent 版本为 `v0.1.6`。
 
 XNode 集成支持节点注册、配置同步、用户同步、流量上报、在线上报、心跳、运行状态、自检探针，以及外部大陆探针上报。
 
@@ -16,7 +16,7 @@ git status --short --branch
 
 ## 1. 当前状态
 
-面板侧 XNode 集成已经合并到默认分支 `master`。当前生产推荐的节点端版本是 `xnode-agent v0.1.5 stable`。
+面板侧 XNode 集成已经合并到默认分支 `master`。当前生产推荐的节点端版本是 `xnode-agent v0.1.6 stable`。
 
 在完成真实节点测试、大陆探针测试、前台节点状态验证、订阅输出验证之后，本项目适合小规模生产使用。
 
@@ -279,7 +279,7 @@ https://panel.example.com/admin/node/1/edit
 - 节点 ID。
 - 节点域名。
 - 一次性 enroll token，格式为 `xne_...`。
-- Agent 版本 `v0.1.5`。
+- Agent 版本 `v0.1.6`。
 
 也可以在面板服务器用 CLI 生成 enroll token：
 
@@ -308,7 +308,7 @@ curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scri
   --node-id "1" \
   --node-domain "node1.example.com" \
   --enroll-token "xne_xxx" \
-  --version "v0.1.5"
+  --version "v0.1.6"
 ```
 
 低资源节点推荐命令：
@@ -319,7 +319,7 @@ curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scri
   --node-id "1" \
   --node-domain "node1.example.com" \
   --enroll-token "xne_xxx" \
-  --version "v0.1.5" \
+  --version "v0.1.6" \
   --online-interval-sec 120 \
   --access-log-tail-bytes 1048576 \
   --access-log-max-lines 5000 \
@@ -434,7 +434,7 @@ curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scri
   --target "1:node1.example.com:443" \
   --target "2:node2.example.com:443" \
   --interval-sec 300 \
-  --version "v0.1.5"
+  --version "v0.1.6"
 ```
 
 一次性验证：
@@ -543,7 +543,7 @@ curl -fsSL https://raw.githubusercontent.com/makeausername/xnode-agent/main/scri
   --node-id "1" \
   --node-domain "node1.example.com" \
   --enroll-token "xne_xxx" \
-  --version "v0.1.5"
+  --version "v0.1.6"
 ```
 
 升级后重新执行节点状态和订阅验证。
@@ -655,7 +655,7 @@ docker compose logs --since=10m app nginx caddy 2>/dev/null || true
 - 面板容器健康。
 - `Migration latest` 已完成。
 - 管理员可以登录。
-- 节点编辑页可以生成 `v0.1.5` 安装命令。
+- 节点编辑页可以生成 `v0.1.6` 安装命令。
 - `xnode-agent` 注册成功。
 - `xnode-xray` 处于 active 状态。
 - `node_runtimes.last_seen` 持续更新。

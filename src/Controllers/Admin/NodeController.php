@@ -43,7 +43,7 @@ final class NodeController extends BaseController
 {
     private const XNODE_INSTALLER_URL = 'https://raw.githubusercontent.com/makeausername/xnode-agent/'
         . 'main/scripts/install.sh';
-    private const XNODE_INSTALL_VERSION = 'v0.1.5';
+    private const XNODE_INSTALL_VERSION = 'v0.1.6';
 
     private static array $details = [
         'field' => [
