@@ -55,15 +55,28 @@
                                                              class="display-6 my-3">
                                                             <p class="fw-bold">{$tabp->price}</p>
                                                             <i class="ti ti-currency-yuan"></i>
+                                                            {if $tabp->content->monthly_plan}
+                                                                <small class="fs-5">/ {trans key='shop.product.year'}</small>
+                                                            {/if}
                                                         </div>
                                                         <div class="list-group list-group-flush">
                                                             <div class="list-group-item">
                                                                 <div class="row align-items-center">
                                                                     <div class="col text-truncate">
-                                                                        <div class="text-reset d-block">
-                                                                            Lv. {$tabp->content->class}</div>
+                                                                        {if $tabp->content->monthly_plan}
+                                                                            <div class="text-reset d-block">
+                                                                                {trans key='shop.product.all_nodes'}
+                                                                            </div>
+                                                                        {else}
+                                                                            <div class="text-reset d-block">
+                                                                                Lv. {$tabp->content->class}</div>
+                                                                        {/if}
                                                                         <div class="d-block text-secondary text-truncate mt-n1">
-                                                                            {trans key='shop.product.level'}
+                                                                            {if $tabp->content->monthly_plan}
+                                                                                {trans key='shop.product.node_access'}
+                                                                            {else}
+                                                                                {trans key='shop.product.level'}
+                                                                            {/if}
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -71,11 +84,21 @@
                                                             <div class="list-group-item">
                                                                 <div class="row align-items-center">
                                                                     <div class="col text-truncate">
-                                                                        <div class="text-reset d-block">{$tabp->content->class_time}
-                                                                            {trans key='common.days'}
-                                                                        </div>
+                                                                        {if $tabp->content->monthly_plan}
+                                                                            <div class="text-reset d-block">
+                                                                                {trans key='shop.product.one_year'}
+                                                                            </div>
+                                                                        {else}
+                                                                            <div class="text-reset d-block">{$tabp->content->class_time}
+                                                                                {trans key='common.days'}
+                                                                            </div>
+                                                                        {/if}
                                                                         <div class="d-block text-secondary text-truncate mt-n1">
-                                                                            {trans key='shop.product.level_duration'}
+                                                                            {if $tabp->content->monthly_plan}
+                                                                                {trans key='shop.product.subscription_period'}
+                                                                            {else}
+                                                                                {trans key='shop.product.level_duration'}
+                                                                            {/if}
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -83,11 +106,19 @@
                                                             <div class="list-group-item">
                                                                 <div class="row align-items-center">
                                                                     <div class="col text-truncate">
-                                                                        <div class="text-reset d-block">{$tabp->content->bandwidth}
-                                                                            GB
-                                                                        </div>
+                                                                        {if $tabp->content->unlimited_bandwidth}
+                                                                            <div class="text-reset d-block">{trans key='common.unlimited'}</div>
+                                                                        {else}
+                                                                            <div class="text-reset d-block">{$tabp->content->bandwidth}
+                                                                                GB
+                                                                            </div>
+                                                                        {/if}
                                                                         <div class="d-block text-secondary text-truncate mt-n1">
-                                                                            {trans key='shop.product.available_traffic'}
+                                                                            {if $tabp->content->monthly_plan}
+                                                                                {trans key='shop.product.monthly_traffic'}
+                                                                            {else}
+                                                                                {trans key='shop.product.available_traffic'}
+                                                                            {/if}
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -164,7 +195,11 @@
                                                                             GB
                                                                         </div>
                                                                         <div class="d-block text-secondary text-truncate mt-n1">
-                                                                            {trans key='shop.product.available_traffic'}
+                                                                            {if $bandwidth->content->current_month_only}
+                                                                                {trans key='shop.product.current_month_traffic'}
+                                                                            {else}
+                                                                                {trans key='shop.product.available_traffic'}
+                                                                            {/if}
                                                                         </div>
                                                                     </div>
                                                                 </div>

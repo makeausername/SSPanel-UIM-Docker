@@ -6,11 +6,13 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\Product;
+use App\Services\MonthlyPlanService;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function is_array;
 use function json_decode;
 use function json_encode;
 use function time;
@@ -231,6 +233,7 @@ final class ProductController extends BaseController
         $new_user_required = $request->getParam('new_user_required') === 'true' ? 1 : 0;
 
         $product = (new Product())->find($product_id);
+        $existing_content = json_decode($product->content, true);
 
         if ($price < 0) {
             return $response->withJson([
@@ -288,6 +291,31 @@ final class ProductController extends BaseController
                 'ret' => 0,
                 'msg' => self::$invalid_data_msg,
             ]);
+        }
+
+        if (is_array($existing_content)
+            && $type === 'tabp'
+            && ($existing_content['monthly_plan'] ?? false) === true
+        ) {
+            $content['monthly_plan'] = true;
+            $content['billing_cycle'] = 'annual';
+            $content['auto_reset_day'] = MonthlyPlanService::RESET_DAY;
+            $content['unlimited_bandwidth'] = ($existing_content['unlimited_bandwidth'] ?? false) === true;
+
+            if ($content['unlimited_bandwidth']) {
+                $content['bandwidth'] = MonthlyPlanService::UNLIMITED_BANDWIDTH_GB;
+            }
+
+            $content['auto_reset_bandwidth'] = $content['bandwidth'];
+            $content['managed_by'] = $existing_content['managed_by'] ?? '';
+            $content['sku'] = $existing_content['sku'] ?? '';
+        } elseif (is_array($existing_content)
+            && $type === 'bandwidth'
+            && ($existing_content['current_month_only'] ?? false) === true
+        ) {
+            $content['current_month_only'] = true;
+            $content['managed_by'] = $existing_content['managed_by'] ?? '';
+            $content['sku'] = $existing_content['sku'] ?? '';
         }
 
         $limit = [

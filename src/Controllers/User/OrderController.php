@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\UserCoupon;
+use App\Services\MonthlyPlanService;
 use App\Utils\Cookie;
 use App\Utils\Tools;
 use Exception;
@@ -70,6 +71,9 @@ final class OrderController extends BaseController
         $product = (new Product())->where('id', $product_id)->first();
         $product->type_text = $product->type();
         $product->content = json_decode($product->content);
+        $product->content->monthly_plan = $product->content->monthly_plan ?? false;
+        $product->content->unlimited_bandwidth = $product->content->unlimited_bandwidth ?? false;
+        $product->content->current_month_only = $product->content->current_month_only ?? false;
 
         return $response->write(
             $this->view()
@@ -131,7 +135,7 @@ final class OrderController extends BaseController
 
         $product = (new Product())->find($product_id);
 
-        if ($product === null || $product->stock === 0) {
+        if ($product === null || (int) $product->status !== 1 || $product->stock === 0) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '商品不存在或库存不足',
@@ -145,6 +149,18 @@ final class OrderController extends BaseController
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '商品不存在或库存不足',
+            ]);
+        }
+
+        $product_content = json_decode($product->content);
+        if (property_exists($product_content, 'current_month_only')
+            && $product_content->current_month_only === true
+            && ! MonthlyPlanService::canBuyCurrentMonthAddon($user)
+        ) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '当月流量加油包仅限有效年付套餐用户购买 / '
+                    . 'Current-month traffic add-ons require an active annual plan',
             ]);
         }
 

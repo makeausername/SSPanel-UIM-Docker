@@ -38,23 +38,46 @@
                                     <td class="text-end">{$product->type_text}</td>
                                 </tr>
                                 {if $product->type === 'tabp' || $product->type === 'time'}
-                                    <tr>
-                                        <td>{trans key='shop.product.duration'}</td>
-                                        <td class="text-end">{$product->content->time} {trans key='common.days'}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>{trans key='shop.product.level_duration'}</td>
-                                        <td class="text-end">{$product->content->class_time} {trans key='common.days'}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>{trans key='shop.product.level'}</td>
-                                        <td class="text-end">Lv. {$product->content->class}</td>
-                                    </tr>
+                                    {if $product->content->monthly_plan}
+                                        <tr>
+                                            <td>{trans key='shop.product.subscription_period'}</td>
+                                            <td class="text-end">{trans key='shop.product.one_year'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{trans key='shop.product.node_access'}</td>
+                                            <td class="text-end">{trans key='shop.product.all_nodes'}</td>
+                                        </tr>
+                                    {else}
+                                        <tr>
+                                            <td>{trans key='shop.product.duration'}</td>
+                                            <td class="text-end">{$product->content->time} {trans key='common.days'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{trans key='shop.product.level_duration'}</td>
+                                            <td class="text-end">{$product->content->class_time} {trans key='common.days'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>{trans key='shop.product.level'}</td>
+                                            <td class="text-end">Lv. {$product->content->class}</td>
+                                        </tr>
+                                    {/if}
                                 {/if}
                                 {if $product->type === 'tabp' || $product->type === 'bandwidth'}
                                     <tr>
-                                        <td>{trans key='shop.product.available_traffic'}</td>
-                                        <td class="text-end">{$product->content->bandwidth} GB</td>
+                                        <td>
+                                            {if $product->content->monthly_plan}
+                                                {trans key='shop.product.monthly_traffic'}
+                                            {elseif $product->content->current_month_only}
+                                                {trans key='shop.product.current_month_traffic'}
+                                            {else}
+                                                {trans key='shop.product.available_traffic'}
+                                            {/if}
+                                        </td>
+                                        {if $product->content->unlimited_bandwidth}
+                                            <td class="text-end">{trans key='common.unlimited'}</td>
+                                        {else}
+                                            <td class="text-end">{$product->content->bandwidth} GB</td>
+                                        {/if}
                                     </tr>
                                 {/if}
                                 {if $product->type === 'tabp' || $product->type === 'time'}

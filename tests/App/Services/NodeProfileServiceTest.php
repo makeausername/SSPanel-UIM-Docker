@@ -70,8 +70,6 @@ class NodeProfileServiceTest extends TestCase
     public function testBuildUsersForNodeReturnsEligibleRealUsersForRollout(): void
     {
         $subscriptionUserUuid = '01b60f94-488b-4dc2-ab9b-73aafc48317a';
-        $zeroTransferUserUuid = '33333333-3333-3333-3333-333333333333';
-
         $this->seedNode([
             'id' => 1,
             'node_class' => 2,
@@ -96,7 +94,7 @@ class NodeProfileServiceTest extends TestCase
         ]);
         $this->seedUser([
             'id' => 3,
-            'uuid' => $zeroTransferUserUuid,
+            'uuid' => '33333333-3333-3333-3333-333333333333',
             'class' => 2,
             'node_group' => 3,
             'transfer_enable' => 0,
@@ -131,6 +129,21 @@ class NodeProfileServiceTest extends TestCase
             'node_group' => 3,
             'transfer_enable' => 1000,
         ]);
+        $this->seedUser([
+            'id' => 7,
+            'uuid' => '77777777-7777-7777-7777-777777777777',
+            'class' => 2,
+            'class_expire' => '2000-01-01 00:00:00',
+            'node_group' => 3,
+            'transfer_enable' => 1000,
+        ]);
+        $this->seedUser([
+            'id' => 8,
+            'uuid' => '88888888-8888-8888-8888-888888888888',
+            'class' => 0,
+            'node_group' => 3,
+            'transfer_enable' => 1000,
+        ]);
 
         Capsule::connection()->enableQueryLog();
 
@@ -146,15 +159,6 @@ class NodeProfileServiceTest extends TestCase
                 'enabled' => true,
                 'updated_at' => 0,
             ],
-            [
-                'id' => 3,
-                'uuid' => $zeroTransferUserUuid,
-                'email' => 'user-3@panel.local',
-                'speed_limit_mbps' => 0,
-                'ip_limit' => 0,
-                'enabled' => true,
-                'updated_at' => 0,
-            ],
         ], $users);
         $this->assertSame($subscriptionUserUuid, $users[0]['uuid']);
         $this->assertSame('user-1@panel.local', $users[0]['email']);
@@ -162,7 +166,8 @@ class NodeProfileServiceTest extends TestCase
 
         $executedSql = implode("\n", array_column(Capsule::connection()->getQueryLog(), 'query'));
         $this->assertSame(0, preg_match('/["`]uuid["`]\s*(?:<>|!=)\s*\?/', $executedSql), $executedSql);
-        $this->assertStringNotContainsString('transfer_enable', $executedSql);
+        $this->assertStringContainsString('transfer_enable', $executedSql);
+        $this->assertStringContainsString('class_expire', $executedSql);
     }
 
     public function testBuildUsersForNodeAllowsAnyUserGroupForGroupZeroNode(): void
@@ -292,6 +297,7 @@ class NodeProfileServiceTest extends TestCase
             $table->integer('is_admin')->default(0);
             $table->integer('is_banned')->default(0);
             $table->integer('class')->default(0);
+            $table->string('class_expire')->nullable();
             $table->integer('node_group')->default(0);
             $table->integer('transfer_enable')->default(0);
             $table->integer('u')->default(0);
@@ -315,9 +321,10 @@ class NodeProfileServiceTest extends TestCase
             'uuid' => '00000000-0000-0000-0000-000000000000',
             'is_admin' => 0,
             'is_banned' => 0,
-            'class' => 0,
+            'class' => 1,
+            'class_expire' => '2099-01-01 00:00:00',
             'node_group' => 0,
-            'transfer_enable' => 0,
+            'transfer_enable' => 1000,
             'u' => 0,
             'd' => 0,
         ], $overrides));
