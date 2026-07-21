@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Subscribe;
 
+use App\Models\User;
 use App\Services\NodeProfileService;
 use App\Services\XNodeRealityMetadataService;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -312,14 +313,20 @@ class V2RayTest extends TestCase
         Capsule::table('node_runtimes')->insert($runtime);
     }
 
-    private function user(array $overrides = []): stdClass
+    private function user(array $overrides = []): User
     {
-        return $this->makeObject(array_merge([
+        $user = new User();
+        $user->forceFill(array_merge([
             'uuid' => '11111111-2222-3333-4444-555555555555',
             'class' => 1,
+            'class_expire' => '2099-01-01 00:00:00',
             'node_group' => 0,
-            'is_admin' => false,
+            'is_admin' => 0,
+            'is_banned' => 0,
+            'unpaid_delete_at' => null,
         ], $overrides));
+
+        return $user;
     }
 
     /**
