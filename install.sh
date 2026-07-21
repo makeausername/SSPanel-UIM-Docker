@@ -1101,7 +1101,7 @@ resume_installation() {
     docker_compose_up mariadb redis
     wait_for_health mariadb 240
     wait_for_health redis 120
-    docker_compose_up app nginx caddy scheduler
+    docker_compose_up app nginx caddy
     ensure_app_autoload
 
     show_step 5 "更新数据库结构"
@@ -1109,6 +1109,7 @@ resume_installation() {
 
     show_step 6 "确认管理员账号"
     ensure_admin_for_resume
+    docker_compose_up scheduler
 
     show_step 7 "验证 Docker 服务"
     verify_containers
@@ -1165,12 +1166,13 @@ main() {
     docker_compose_up mariadb redis
     wait_for_health mariadb 240
     wait_for_health redis 120
-    docker_compose_up app nginx caddy scheduler
+    docker_compose_up app nginx caddy
     ensure_app_autoload
     run_init_command Migration new
     run_init_command Migration latest
     run_init_command Tool importSetting
     ensure_user_ga_enable_column
+    docker_compose_up scheduler
 
     show_step 7 "创建管理员"
     create_admin

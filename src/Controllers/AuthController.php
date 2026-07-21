@@ -19,6 +19,7 @@ use App\Services\MFA\TOTP;
 use App\Services\MFA\WebAuthn;
 use App\Services\RateLimit;
 use App\Services\Reward;
+use App\Services\UserAccessPolicy;
 use App\Utils\Cookie;
 use App\Utils\Hash;
 use App\Utils\ResponseHelper;
@@ -272,6 +273,7 @@ final class AuthController extends BaseController
         $user->node_iplimit = $configs['reg_ip_limit'];
         $user->node_speedlimit = $configs['reg_speed_limit'];
         $user->reg_date = date('Y-m-d H:i:s');
+        UserAccessPolicy::applyRegistrationPolicy($user, (bool) $is_admin_reg);
         $user->reg_ip = $_SERVER['REMOTE_ADDR'];
         $user->theme = $_ENV['theme'];
         $user->locale = $_ENV['locale'];

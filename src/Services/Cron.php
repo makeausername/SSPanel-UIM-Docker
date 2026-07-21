@@ -22,7 +22,9 @@ use DateTime;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\Http\Client\ClientExceptionInterface;
+use RuntimeException;
 use Telegram\Bot\Exceptions\TelegramSDKException;
+use Throwable;
 use function array_map;
 use function date;
 use function in_array;
@@ -51,6 +53,82 @@ final class Cron
         (new OnlineLog())->where('last_time', '<', time() - 86400)->delete();
 
         echo Tools::toDateTime(time()) . ' 数据库清理完成' . PHP_EOL;
+    }
+
+    public static function deleteUnpaidRegistrations(): void
+    {
+        $dueUsers = (new User())
+            ->where('is_admin', 0)
+            ->whereNotNull('unpaid_delete_at')
+            ->where('unpaid_delete_at', '<=', date('Y-m-d H:i:s'))
+            ->get(['id']);
+        $deleted = 0;
+        $protected = 0;
+        $failed = 0;
+
+        foreach ($dueUsers as $dueUser) {
+            try {
+                $result = DB::connection()->transaction(static function () use ($dueUser): string {
+                    $user = (new User())->where('id', (int) $dueUser->id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($user === null || ! UserAccessPolicy::isAwaitingPlanPurchase($user)) {
+                        return 'skipped';
+                    }
+
+                    if ((int) $user->is_admin === 1 || self::hasQualifyingPlanPurchase((int) $user->id)) {
+                        UserAccessPolicy::markPlanPurchased($user);
+                        $user->save();
+
+                        return 'protected';
+                    }
+
+                    if (! $user->kill()) {
+                        throw new RuntimeException('Unable to delete overdue unpaid account.');
+                    }
+
+                    return 'deleted';
+                });
+
+                if ($result === 'deleted') {
+                    $deleted++;
+                } elseif ($result === 'protected') {
+                    $protected++;
+                }
+            } catch (Throwable $exception) {
+                $failed++;
+                echo 'Failed to process overdue unpaid account #' . (int) $dueUser->id
+                    . ': ' . $exception->getMessage() . PHP_EOL;
+            }
+        }
+
+        echo Tools::toDateTime(time())
+            . " Unpaid registration cleanup completed: deleted={$deleted}, protected={$protected}, failed={$failed}"
+            . PHP_EOL;
+    }
+
+    private static function hasQualifyingPlanPurchase(int $userId): bool
+    {
+        $orders = (new Order())->where('user_id', $userId)
+            ->where('product_type', 'tabp')
+            ->get(['id', 'status']);
+
+        if ($orders->isEmpty()) {
+            return false;
+        }
+
+        foreach ($orders as $order) {
+            if (in_array($order->status, ['pending_activation', 'activated', 'expired'], true)) {
+                return true;
+            }
+        }
+
+        return (new Invoice())->where('user_id', $userId)
+            ->where('type', 'product')
+            ->whereIn('order_id', $orders->pluck('id')->all())
+            ->whereIn('status', ['paid_gateway', 'paid_balance', 'paid_admin'])
+            ->exists();
     }
 
     public static function detectInactiveUser(): void
@@ -283,6 +361,7 @@ final class Cron
                 $user->node_speedlimit = $content->speed_limit;
                 $user->node_iplimit = $content->ip_limit;
                 MonthlyPlanService::applyProductToUser($user, $content);
+                UserAccessPolicy::markPlanPurchased($user);
                 $user->save();
                 $order->status = 'activated';
                 $order->update_time = time();

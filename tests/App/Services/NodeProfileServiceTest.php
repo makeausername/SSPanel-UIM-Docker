@@ -144,6 +144,14 @@ class NodeProfileServiceTest extends TestCase
             'node_group' => 3,
             'transfer_enable' => 1000,
         ]);
+        $this->seedUser([
+            'id' => 9,
+            'uuid' => '99999999-9999-9999-9999-999999999999',
+            'class' => 2,
+            'node_group' => 3,
+            'transfer_enable' => 1000,
+            'unpaid_delete_at' => '2099-01-04 00:00:00',
+        ]);
 
         Capsule::connection()->enableQueryLog();
 
@@ -299,6 +307,7 @@ class NodeProfileServiceTest extends TestCase
             $table->integer('class')->default(0);
             $table->string('class_expire')->nullable();
             $table->integer('node_group')->default(0);
+            $table->string('unpaid_delete_at')->nullable();
             $table->integer('transfer_enable')->default(0);
             $table->integer('u')->default(0);
             $table->integer('d')->default(0);
@@ -324,6 +333,7 @@ class NodeProfileServiceTest extends TestCase
             'class' => 1,
             'class_expire' => '2099-01-01 00:00:00',
             'node_group' => 0,
+            'unpaid_delete_at' => null,
             'transfer_enable' => 1000,
             'u' => 0,
             'd' => 0,

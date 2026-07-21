@@ -48,6 +48,7 @@ EOL;
         $jobs->processTopupOrderActivation();
 
         // Run user related jobs
+        $jobs->deleteUnpaidRegistrations();
         $jobs->expirePaidUserAccount();
         $jobs->sendPaidUserUsageLimitNotification();
 

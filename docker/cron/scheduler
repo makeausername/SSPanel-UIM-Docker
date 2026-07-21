@@ -5,6 +5,7 @@ APP_DIR="${APP_DIR:-/var/www/html}"
 INTERVAL_SECONDS="${CRON_INTERVAL_SECONDS:-300}"
 LOCK_DIR="${CRON_LOCK_DIR:-${APP_DIR}/storage/framework/sspanel-cron.lock}"
 STALE_AFTER_SECONDS="${CRON_STALE_AFTER_SECONDS:-900}"
+HEARTBEAT_FILE="${SCHEDULER_HEARTBEAT_FILE:-${APP_DIR}/storage/framework/scheduler.last_success}"
 
 cd "${APP_DIR}"
 
@@ -24,6 +25,7 @@ while true; do
         echo "[scheduler] $(date -Iseconds) running php xcat Cron"
 
         if php xcat Cron; then
+            printf '%s\n' "$(date +%s)" > "${HEARTBEAT_FILE}"
             echo "[scheduler] $(date -Iseconds) cron completed"
         else
             status="$?"

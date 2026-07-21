@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Models\User;
 use App\Services\Subscribe;
+use App\Services\UserAccessPolicy;
 use App\Utils\Hash;
 use App\Utils\ResponseHelper;
 use Psr\Http\Message\ResponseInterface;
@@ -126,8 +127,7 @@ final class ClientApiController extends BaseController
 
         $isAdmin = (int) $user->is_admin === 1;
         $isExpired = ! $isAdmin && $expireTimestamp !== false && $expireTimestamp > 0 && $expireTimestamp < time();
-        $hasTraffic = $isAdmin || $remaining > 0;
-        $canConnect = (int) $user->is_banned === 0 && ! $isExpired && $hasTraffic;
+        $canConnect = UserAccessPolicy::canUseNodes($user);
 
         return [
             'upload' => $upload,

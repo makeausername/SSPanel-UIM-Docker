@@ -34,6 +34,7 @@ use const PHP_EOL;
  * @property int    $last_check_in_time 最后签到时间
  * @property int    $last_login_time 最后登录时间
  * @property string $reg_date 注册时间
+ * @property string|null $unpaid_delete_at 未购买套餐账户自动删除时间
  * @property float  $money 账户余额
  * @property int    $ref_by 邀请人ID
  * @property string $method Shadowsocks加密方式

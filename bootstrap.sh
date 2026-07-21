@@ -494,6 +494,44 @@ has_existing_installation() {
         || has_mariadb_volume
 }
 
+wait_for_service_ready() {
+    local service="$1"
+    local timeout_seconds="$2"
+    local started_at
+    local container_id
+    local status
+    local health
+    local effective_status
+
+    started_at="$(date +%s)"
+    while true; do
+        container_id="$(docker compose ps -q "$service" | sed -n '1p')"
+        if [ -n "$container_id" ]; then
+            status="$(docker inspect --format '{{.State.Status}}' "$container_id" 2>/dev/null || true)"
+            health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container_id" 2>/dev/null || true)"
+            effective_status="${health:-${status:-unknown}}"
+
+            case "$effective_status" in
+                running|healthy)
+                    success "${service} is ready."
+                    return 0
+                    ;;
+                unhealthy|exited|dead)
+                    docker compose logs --tail=100 "$service" >&2 || true
+                    die "${service} entered ${effective_status} state."
+                    ;;
+            esac
+        fi
+
+        if [ $(( "$(date +%s)" - started_at )) -ge "$timeout_seconds" ]; then
+            docker compose logs --tail=100 "$service" >&2 || true
+            die "Timed out waiting for ${service} readiness."
+        fi
+
+        sleep 3
+    done
+}
+
 guard_default_install() {
     if has_existing_installation; then
         if [ -f "${INSTALL_DIR}/.env" ] \
@@ -546,9 +584,15 @@ run_upgrade() {
     docker compose config >/dev/null
     info "构建并启动现有服务；不会重新生成任何凭据。"
     docker compose build
-    docker compose up -d
+    docker compose up -d mariadb redis app nginx caddy
+    wait_for_service_ready app 180
     docker compose exec -T app test -f vendor/autoload.php
     docker compose exec -T app php xcat Migration latest
+    docker compose up -d scheduler
+    info "Restarting nginx after the app image and database migration are ready."
+    docker compose restart nginx
+    wait_for_service_ready nginx 180
+    wait_for_service_ready scheduler 300
     docker compose ps
     success "升级完成。所有配置文件和 Docker volume 均已保留。"
 }
