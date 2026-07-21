@@ -54,7 +54,8 @@ final class BalancePaymentService
             }
 
             $moneyBefore = self::money($user->money);
-            $invoiceDue = self::money($invoice->price);
+            InvoiceAccountingService::initialize($invoice);
+            $invoiceDue = InvoiceAccountingService::remaining($invoice);
 
             if (bccomp($invoiceDue, '0.00', 2) <= 0) {
                 return ['status' => 'error', 'message' => '账单金额无效'];
@@ -66,6 +67,7 @@ final class BalancePaymentService
 
             $fullyPaid = bccomp($moneyBefore, $invoiceDue, 2) >= 0;
             $paid = $fullyPaid ? $invoiceDue : $moneyBefore;
+            InvoiceAccountingService::recordPayment($invoice, $paid);
             $moneyAfter = bcsub($moneyBefore, $paid, 2);
             $user->money = $moneyAfter;
             $user->save();

@@ -15,6 +15,7 @@ use RuntimeException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Throwable;
+use function count;
 use function is_array;
 use function is_numeric;
 use function is_string;
@@ -24,6 +25,8 @@ use function uniqid;
 
 final class NodeApiV1Controller extends BaseController
 {
+    private const MAX_BATCH_ITEMS = 1000;
+
     /**
      * POST /node/api/v1/enroll
      */
@@ -111,6 +114,9 @@ final class NodeApiV1Controller extends BaseController
     public function traffic(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $payload = $this->readJsonBody($request) ?? [];
+        if ($this->batchTooLarge($payload)) {
+            return $this->validationError($request, $response, 'Traffic batch is too large.', 'batch_too_large');
+        }
         $data = (new NodeRuntimeService())->acceptTraffic($payload, $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
@@ -122,6 +128,9 @@ final class NodeApiV1Controller extends BaseController
     public function online(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $payload = $this->readJsonBody($request) ?? [];
+        if ($this->batchTooLarge($payload)) {
+            return $this->validationError($request, $response, 'Online batch is too large.', 'batch_too_large');
+        }
         $data = (new NodeRuntimeService())->acceptOnline($payload, $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
@@ -133,6 +142,9 @@ final class NodeApiV1Controller extends BaseController
     public function detectLog(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $payload = $this->readJsonBody($request) ?? [];
+        if ($this->batchTooLarge($payload)) {
+            return $this->validationError($request, $response, 'Detect-log batch is too large.', 'batch_too_large');
+        }
         $data = (new NodeRuntimeService())->acceptDetectLog($payload, $this->authenticatedNodeId($request));
 
         return $this->success($request, $response, $data);
@@ -279,5 +291,11 @@ final class NodeApiV1Controller extends BaseController
         $payload = json_decode($body, true);
 
         return is_array($payload) ? $payload : null;
+    }
+
+    private function batchTooLarge(array $payload): bool
+    {
+        return is_array($payload['data'] ?? null)
+            && count($payload['data']) > self::MAX_BATCH_ITEMS;
     }
 }

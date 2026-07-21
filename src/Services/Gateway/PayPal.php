@@ -98,12 +98,15 @@ final class PayPal extends Base
             ]);
         }
 
+        $paypalCurrency = (string) Config::obtain('paypal_currency');
+        $this->setExpectedProviderSettlement($paylist, $exchange_amount, $paypalCurrency);
+
         $order_data = [
             'intent' => 'CAPTURE',
             'purchase_units' => [
                 [
                     'amount' => [
-                        'currency_code' => Config::obtain('paypal_currency'),
+                        'currency_code' => $paypalCurrency,
                         'value' => $exchange_amount,
                     ],
                     'invoice_id' => $paylist->tradeno,
@@ -144,7 +147,13 @@ final class PayPal extends Base
             $webhook_data['event_type'] === 'PAYMENT.CAPTURE.COMPLETED' &&
             $webhook_data['resource']['status'] === 'COMPLETED'
         ) {
-            $this->postPayment($webhook_data['resource']['invoice_id']);
+            $resource = $webhook_data['resource'];
+            $this->postPayment(
+                (string) $resource['invoice_id'],
+                $resource['amount']['value'] ?? null,
+                isset($resource['amount']['currency_code']) ? (string) $resource['amount']['currency_code'] : null,
+                isset($resource['id']) ? (string) $resource['id'] : null
+            );
 
             return $response->withStatus(204);
         }

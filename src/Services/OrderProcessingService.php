@@ -1,0 +1,226 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Models\Invoice;
+use App\Models\Order;
+use App\Models\User;
+use App\Models\UserMoneyLog;
+use App\Utils\Tools;
+use DateTime;
+use function bcadd;
+use function in_array;
+use function json_decode;
+use function time;
+
+final class OrderProcessingService
+{
+    public function processTabp(): void
+    {
+        $userIds = (new Order())->where('product_type', 'tabp')
+            ->whereIn('status', ['activated', 'pending_activation'])
+            ->distinct()
+            ->orderBy('user_id')
+            ->pluck('user_id');
+
+        foreach ($userIds as $userId) {
+            DB::connection()->transaction(static function () use ($userId): void {
+                $user = (new User())->where('id', $userId)->lockForUpdate()->first();
+                if ($user === null) {
+                    return;
+                }
+
+                $activated = (new Order())->where('user_id', $userId)
+                    ->where('status', 'activated')
+                    ->where('product_type', 'tabp')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($activated !== null) {
+                    $content = json_decode((string) $activated->product_content);
+                    if ($content !== null && $activated->update_time + $content->time * 86400 < time()) {
+                        $activated->status = 'expired';
+                        $activated->update_time = time();
+                        $activated->save();
+                        $activated = null;
+                    }
+                }
+
+                if ($activated !== null) {
+                    return;
+                }
+
+                $order = (new Order())->where('user_id', $userId)
+                    ->where('status', 'pending_activation')
+                    ->where('product_type', 'tabp')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
+                if ($order === null) {
+                    return;
+                }
+
+                $content = json_decode((string) $order->product_content);
+                if ($content === null) {
+                    return;
+                }
+
+                $user->u = 0;
+                $user->d = 0;
+                $user->transfer_today = 0;
+                $user->transfer_enable = Tools::gbToB($content->bandwidth);
+                $user->class = $content->class;
+                $user->class_expire = (new DateTime())
+                    ->modify('+' . $content->class_time . ' days')->format('Y-m-d H:i:s');
+                $user->node_group = $content->node_group;
+                $user->node_speedlimit = $content->speed_limit;
+                $user->node_iplimit = $content->ip_limit;
+                MonthlyPlanService::applyProductToUser($user, $content);
+                UserAccessPolicy::markPlanPurchased($user);
+                $user->save();
+
+                $order->status = 'activated';
+                $order->update_time = time();
+                $order->save();
+            });
+        }
+    }
+
+    public function processBandwidth(): void
+    {
+        $this->processFirstPerUser('bandwidth', static function (User $user, object $content): void {
+            $user->transfer_enable += Tools::gbToB($content->bandwidth);
+        });
+    }
+
+    public function processTime(): void
+    {
+        $this->processFirstPerUser('time', static function (User $user, object $content): bool {
+            if ($user->class !== (int) $content->class && $user->class > 0) {
+                return false;
+            }
+
+            $user->class = $content->class;
+            $user->class_expire = (new DateTime((string) $user->class_expire))
+                ->modify('+' . $content->class_time . ' days')->format('Y-m-d H:i:s');
+            $user->node_group = $content->node_group;
+            $user->node_speedlimit = $content->speed_limit;
+            $user->node_iplimit = $content->ip_limit;
+
+            return true;
+        });
+    }
+
+    public function processTopups(): void
+    {
+        $ids = (new Order())->where('status', 'pending_activation')
+            ->where('product_type', 'topup')->orderBy('id')->pluck('id');
+
+        foreach ($ids as $orderId) {
+            DB::connection()->transaction(static function () use ($orderId): void {
+                $order = (new Order())->where('id', $orderId)->lockForUpdate()->first();
+                if ($order === null || $order->status !== 'pending_activation') {
+                    return;
+                }
+
+                $user = (new User())->where('id', $order->user_id)->lockForUpdate()->first();
+                $content = json_decode((string) $order->product_content);
+                if ($user === null || $content === null) {
+                    return;
+                }
+
+                $amount = InvoiceAccountingService::money($content->amount ?? 0);
+                $before = InvoiceAccountingService::money($user->money);
+                $after = bcadd($before, $amount, 2);
+                $user->money = $after;
+                $user->save();
+
+                $order->status = 'activated';
+                $order->update_time = time();
+                $order->save();
+
+                (new UserMoneyLog())->add(
+                    (int) $user->id,
+                    (float) $before,
+                    (float) $after,
+                    (float) $amount,
+                    "充值订单 #{$order->id}"
+                );
+            });
+        }
+    }
+
+    public function processPending(): void
+    {
+        $ids = (new Order())->where('status', 'pending_payment')->orderBy('id')->pluck('id');
+
+        foreach ($ids as $orderId) {
+            DB::connection()->transaction(static function () use ($orderId): void {
+                $invoice = (new Invoice())->where('order_id', $orderId)->lockForUpdate()->first();
+                if ($invoice === null) {
+                    return;
+                }
+
+                $order = (new Order())->where('id', $orderId)->lockForUpdate()->first();
+                if ($order === null || $order->status !== 'pending_payment') {
+                    return;
+                }
+
+                if (in_array($invoice->status, ['paid_gateway', 'paid_balance', 'paid_admin'], true)) {
+                    $order->status = 'pending_activation';
+                    $order->update_time = time();
+                    $order->save();
+
+                    return;
+                }
+
+                if ($order->create_time + 86400 < time() && $invoice->status !== 'partially_paid') {
+                    $order->status = 'cancelled';
+                    $order->update_time = time();
+                    $order->save();
+                    $invoice->status = 'cancelled';
+                    $invoice->update_time = time();
+                    $invoice->save();
+                }
+            });
+        }
+    }
+
+    private function processFirstPerUser(string $type, callable $apply): void
+    {
+        $userIds = (new Order())->where('status', 'pending_activation')
+            ->where('product_type', $type)
+            ->distinct()
+            ->orderBy('user_id')
+            ->pluck('user_id');
+
+        foreach ($userIds as $userId) {
+            DB::connection()->transaction(static function () use ($userId, $type, $apply): void {
+                $user = (new User())->where('id', $userId)->lockForUpdate()->first();
+                $order = (new Order())->where('user_id', $userId)
+                    ->where('status', 'pending_activation')
+                    ->where('product_type', $type)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($user === null || $order === null) {
+                    return;
+                }
+
+                $content = json_decode((string) $order->product_content);
+                if ($content === null || $apply($user, $content) === false) {
+                    return;
+                }
+
+                $user->save();
+                $order->status = 'activated';
+                $order->update_time = time();
+                $order->save();
+            });
+        }
+    }
+}

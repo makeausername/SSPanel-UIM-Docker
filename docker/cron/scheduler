@@ -6,17 +6,50 @@ INTERVAL_SECONDS="${CRON_INTERVAL_SECONDS:-300}"
 LOCK_DIR="${CRON_LOCK_DIR:-${APP_DIR}/storage/framework/sspanel-cron.lock}"
 STALE_AFTER_SECONDS="${CRON_STALE_AFTER_SECONDS:-900}"
 HEARTBEAT_FILE="${SCHEDULER_HEARTBEAT_FILE:-${APP_DIR}/storage/framework/scheduler.last_success}"
+LOCK_HEARTBEAT_PID=""
 
 if ! [[ "${INTERVAL_SECONDS}" =~ ^[1-9][0-9]*$ ]]; then
     echo "[scheduler] CRON_INTERVAL_SECONDS must be a positive integer" >&2
     exit 64
 fi
 
+case "${LOCK_DIR}" in
+    "${APP_DIR}"/storage/framework/*) ;;
+    *)
+        echo "[scheduler] CRON_LOCK_DIR must stay under ${APP_DIR}/storage/framework" >&2
+        exit 64
+        ;;
+esac
+
 cd "${APP_DIR}"
 
 cleanup_lock() {
+    if [ -n "${LOCK_HEARTBEAT_PID}" ]; then
+        kill "${LOCK_HEARTBEAT_PID}" 2>/dev/null || true
+        wait "${LOCK_HEARTBEAT_PID}" 2>/dev/null || true
+        LOCK_HEARTBEAT_PID=""
+    fi
     if [ -d "${LOCK_DIR}" ] && [ "$(cat "${LOCK_DIR}/owner" 2>/dev/null || true)" = "$$" ]; then
         rm -rf "${LOCK_DIR}"
+    fi
+}
+
+start_lock_heartbeat() {
+    (
+        while [ -d "${LOCK_DIR}" ] \
+            && [ "$(cat "${LOCK_DIR}/owner" 2>/dev/null || true)" = "$$" ]; do
+            touch "${LOCK_DIR}"
+            sleep 30
+        done
+    ) &
+    LOCK_HEARTBEAT_PID="$!"
+}
+
+stop_lock_heartbeat() {
+    if [ -n "${LOCK_HEARTBEAT_PID}" ]; then
+        kill "${LOCK_HEARTBEAT_PID}" 2>/dev/null || true
+        wait "${LOCK_HEARTBEAT_PID}" 2>/dev/null || true
+        LOCK_HEARTBEAT_PID=""
     fi
 }
 
@@ -25,6 +58,7 @@ trap cleanup_lock EXIT INT TERM
 while true; do
     if mkdir "${LOCK_DIR}" 2>/dev/null; then
         echo "$$" > "${LOCK_DIR}/owner"
+        start_lock_heartbeat
         echo "[scheduler] $(date -Iseconds) running php xcat Cron"
 
         if php xcat Cron; then
@@ -35,6 +69,7 @@ while true; do
             echo "[scheduler] $(date -Iseconds) cron failed with exit code ${status}" >&2
         fi
 
+        stop_lock_heartbeat
         rm -rf "${LOCK_DIR}"
     else
         lock_mtime="$(stat -c %Y "${LOCK_DIR}" 2>/dev/null || echo 0)"

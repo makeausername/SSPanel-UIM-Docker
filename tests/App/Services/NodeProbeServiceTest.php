@@ -75,6 +75,40 @@ class NodeProbeServiceTest extends TestCase
         $this->assertSame('node1.example.com', $state->target_host);
     }
 
+    public function testOlderResultCannotOverwriteNewerState(): void
+    {
+        NodeProbeService::recordResult([
+            'node_id' => 1,
+            'probe_region' => 'cn',
+            'probe_type' => 'external_tcp',
+            'target_host' => 'node1.example.com',
+            'status' => 'unreachable',
+            'checked_at' => time() - 10,
+        ], false);
+
+        $summary = NodeProbeService::recordResult([
+            'node_id' => 1,
+            'probe_region' => 'cn',
+            'probe_type' => 'external_tcp',
+            'target_host' => 'node1.example.com',
+            'status' => 'ok',
+            'checked_at' => time() - 20,
+        ], false);
+
+        $this->assertSame('unreachable', $summary['status']);
+        $this->assertSame(2, Capsule::table('node_probe_results')->count());
+    }
+
+    public function testFarFutureResultIsRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        NodeProbeService::recordResult([
+            'node_id' => 1,
+            'status' => 'ok',
+            'checked_at' => time() + 301,
+        ], false);
+    }
+
     private function createSchema(): void
     {
         Capsule::schema()->create('node', static function (Blueprint $table): void {

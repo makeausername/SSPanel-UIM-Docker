@@ -87,6 +87,7 @@ final class Smogate extends Base
             'total_amount' => (int) round((float) $paylist->total * 100),
             'notify_url' => self::getCallbackUrl(),
         ];
+        $this->setExpectedProviderSettlement($paylist, $data['total_amount'], 'CNY');
         $params = $this->prepareSign($data);
         $data['sign'] = $this->sign($params);
         $rawResult = $this->post($data);
@@ -123,10 +124,23 @@ final class Smogate extends Base
 
     public function notify(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        if (! $this->verify($request->getParams(), $request->getParam('sign'))) {
+        $params = $request->getParams();
+
+        if (! $this->verify($params, $request->getParam('sign'))) {
             return $response->withStatus(400)->write('FAIL');
         }
-        $this->postPayment((string) $request->getParam('out_trade_no'));
+
+        $status = (string) ($params['trade_status'] ?? $params['status'] ?? '');
+        if ($status !== '' && ! in_array(strtoupper($status), ['SUCCESS', 'PAID', 'TRADE_SUCCESS'], true)) {
+            return $response->withStatus(400)->write('FAIL');
+        }
+
+        $this->postPayment(
+            (string) $request->getParam('out_trade_no'),
+            $params['total_amount'] ?? null,
+            'CNY',
+            isset($params['trade_no']) ? (string) $params['trade_no'] : null
+        );
 
         return $response->write('SUCCESS');
     }

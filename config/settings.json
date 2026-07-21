@@ -1641,7 +1641,7 @@
         "item": "cryptomus_api_key",
         "value": "",
         "class": "billing",
-        "is_public": 1,
+        "is_public": 0,
         "type": "string",
         "default": "",
         "mark": "cryptomus_api_key"
@@ -1861,5 +1861,32 @@
         "type": "string",
         "default": "meta.llama3-8b-instruct-v1:0",
         "mark": "AWS Bedrock Model ID"
+    },
+    {
+        "item": "node_report_retention_days",
+        "value": "14",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "14",
+        "mark": "Node report receipt retention in days"
+    },
+    {
+        "item": "node_probe_retention_days",
+        "value": "30",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "30",
+        "mark": "Node probe result retention in days"
+    },
+    {
+        "item": "email_dead_retention_days",
+        "value": "30",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "30",
+        "mark": "Failed email retention in days"
     }
 ]

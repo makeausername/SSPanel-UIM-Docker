@@ -8,6 +8,7 @@ use App\Models\Config;
 use App\Models\User;
 use App\Services\Cache;
 use App\Services\Captcha;
+use App\Services\OneTimeTokenService;
 use App\Services\Password;
 use App\Services\RateLimit;
 use App\Utils\Hash;
@@ -117,8 +118,7 @@ final class PasswordController extends BaseController
         $redis = (new Cache())->initRedis();
 
         try {
-            $email = $redis->get('password_reset:' . $token);
-            $redis->del('password_reset:' . $token);
+            $email = OneTimeTokenService::consume($redis, 'password_reset:' . $token);
         } catch (RedisException) {
             return ResponseHelper::error($response, '链接无效');
         }

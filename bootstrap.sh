@@ -552,6 +552,35 @@ guard_resume_installation() {
         || die "检测到 storage/.install_lock；该安装已经完成，请使用 --upgrade。"
 }
 
+create_upgrade_backup() {
+    local backup_dir="${INSTALL_DIR}/storage/backups"
+    local timestamp
+    local backup_file
+    local temporary_file
+
+    timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    backup_file="${backup_dir}/sspanel-before-upgrade-${timestamp}.sql"
+    temporary_file="${backup_file}.tmp"
+    install -d -m 700 "$backup_dir"
+
+    info "Creating a database backup before migrations."
+    if ! docker compose exec -T mariadb sh -c \
+        'exec mariadb-dump --single-transaction --quick --routines --events -u root --password="$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"' \
+        > "$temporary_file"; then
+        rm -f -- "$temporary_file"
+        die "Database backup failed; upgrade stopped before migration."
+    fi
+
+    if [ ! -s "$temporary_file" ]; then
+        rm -f -- "$temporary_file"
+        die "Database backup is empty; upgrade stopped before migration."
+    fi
+
+    mv -- "$temporary_file" "$backup_file"
+    sha256sum "$backup_file" > "${backup_file}.sha256"
+    success "Database backup created: ${backup_file}"
+}
+
 confirm_reinstall() {
     local confirmation
 
@@ -582,12 +611,17 @@ run_upgrade() {
 
     info "校验 Compose 配置。"
     docker compose config >/dev/null
+    docker compose stop scheduler >/dev/null 2>&1 || true
+    docker compose up -d mariadb redis
+    wait_for_service_ready mariadb 180
+    wait_for_service_ready redis 180
+    create_upgrade_backup
     info "构建并启动现有服务；不会重新生成任何凭据。"
     docker compose build
-    docker compose up -d mariadb redis app nginx caddy
+    docker compose run --rm -T app php xcat Migration latest
+    docker compose up -d app nginx caddy
     wait_for_service_ready app 180
     docker compose exec -T app test -f vendor/autoload.php
-    docker compose exec -T app php xcat Migration latest
     docker compose up -d scheduler
     info "Restarting nginx after the app image and database migration are ready."
     docker compose restart nginx

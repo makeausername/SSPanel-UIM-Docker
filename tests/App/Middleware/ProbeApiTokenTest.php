@@ -77,7 +77,7 @@ class ProbeApiTokenTest extends TestCase
             }
         };
 
-        $response = (new ProbeApiToken())->process($request, $handler);
+        $response = (new ProbeApiToken(static fn (): bool => true))->process($request, $handler);
         $record = Capsule::table('node_tokens')->where('token_type', 'probe')->first();
 
         $this->assertSame(204, $response->getStatusCode());
@@ -102,7 +102,7 @@ class ProbeApiTokenTest extends TestCase
             }
         };
 
-        $response = (new ProbeApiToken())->process($request, $handler);
+        $response = (new ProbeApiToken(static fn (): bool => true))->process($request, $handler);
         $payload = json_decode((string) $response->getBody(), true);
         $record = Capsule::table('node_tokens')->where('token_type', 'node')->first();
 

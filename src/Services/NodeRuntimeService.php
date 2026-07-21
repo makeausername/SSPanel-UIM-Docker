@@ -333,37 +333,39 @@ final class NodeRuntimeService
     private function upsertRuntime(int $nodeId, array $payload, bool $includeRuntimeFields): void
     {
         $now = time();
-        $runtime = (new NodeRuntime())
-            ->where('node_id', $nodeId)
-            ->orderByDesc('updated_at')
-            ->orderByDesc('id')
-            ->first();
+        DB::connection()->transaction(function () use ($nodeId, $payload, $includeRuntimeFields, $now): void {
+            (new NodeRuntime())->newQuery()->insertOrIgnore([
+                'node_id' => $nodeId,
+                'created_at' => $now,
+                'updated_at' => $now,
+                'last_seen' => $now,
+            ]);
+            $runtime = (new NodeRuntime())->where('node_id', $nodeId)->lockForUpdate()->first();
 
-        if ($runtime === null) {
-            $runtime = new NodeRuntime();
-            $runtime->node_id = $nodeId;
-            $runtime->created_at = $now;
-        }
+            if ($runtime === null) {
+                return;
+            }
 
-        $this->assignString($runtime, $payload, 'agent_version', 64);
-        $this->assignString($runtime, $payload, 'core_version', 64);
-        $this->assignNormalizedState($runtime, $payload);
-        $this->assignString($runtime, $payload, 'config_hash', 128);
-        $this->assignRuntimeLastError($runtime, $payload, $includeRuntimeFields);
+            $this->assignString($runtime, $payload, 'agent_version', 64);
+            $this->assignString($runtime, $payload, 'core_version', 64);
+            $this->assignNormalizedState($runtime, $payload);
+            $this->assignString($runtime, $payload, 'config_hash', 128);
+            $this->assignRuntimeLastError($runtime, $payload, $includeRuntimeFields);
 
-        if ($includeRuntimeFields) {
-            $this->assignJson($runtime, $payload, 'capabilities', 'capabilities_json');
-            $this->assignRealityMetadata($runtime, $payload);
-        }
+            if ($includeRuntimeFields) {
+                $this->assignJson($runtime, $payload, 'capabilities', 'capabilities_json');
+                $this->assignRealityMetadata($runtime, $payload);
+            }
 
-        $runtime->last_seen = $now;
-        $runtime->updated_at = $now;
-        $runtime->save();
-        $node = (new Node())->where('id', $nodeId)->first();
-        if ($node !== null) {
-            $node->node_heartbeat = $now;
-            $node->save();
-        }
+            $runtime->last_seen = $now;
+            $runtime->updated_at = $now;
+            $runtime->save();
+            $node = (new Node())->where('id', $nodeId)->lockForUpdate()->first();
+            if ($node !== null) {
+                $node->node_heartbeat = $now;
+                $node->save();
+            }
+        });
     }
 
     private function assignNormalizedState(NodeRuntime $runtime, array $payload): void

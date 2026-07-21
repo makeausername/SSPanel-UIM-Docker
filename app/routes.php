@@ -5,8 +5,11 @@ declare(strict_types=1);
 use App\Middleware\Admin;
 use App\Middleware\Guest;
 use App\Middleware\NodeApiToken;
+use App\Middleware\NodeEnrollRateLimit;
 use App\Middleware\NodeToken;
 use App\Middleware\ProbeApiToken;
+use App\Middleware\RequestBodyLimit;
+use App\Middleware\SameOriginCsrf;
 use App\Middleware\User;
 use Slim\Routing\RouteCollectorProxy;
 
@@ -24,7 +27,7 @@ return static function (Slim\App $app): void {
     // Bot Callback
     $app->post('/callback/{type}', App\Controllers\CallbackController::class . ':index');
     // OAuth
-    $app->post('/oauth/{type}', App\Controllers\OAuthController::class . ':index');
+    $app->post('/oauth/{type}', App\Controllers\OAuthController::class . ':index')->add(new SameOriginCsrf());
     $app->get('/oauth/{type}', App\Controllers\OAuthController::class . ':index');
     // 通用订阅
     $app->get('/sub/{token}/{subtype}', App\Controllers\SubController::class . ':index');
@@ -34,7 +37,7 @@ return static function (Slim\App $app): void {
         $group->get('/me', App\Controllers\ClientApiController::class . ':me');
         $group->get('/subscription', App\Controllers\ClientApiController::class . ':subscription');
         $group->post('/logout', App\Controllers\ClientApiController::class . ':logout');
-    });
+    })->add(new RequestBodyLimit(64 * 1024));
 
     // User
     $app->group('/user', static function (RouteCollectorProxy $group): void {
@@ -122,7 +125,7 @@ return static function (Slim\App $app): void {
         $group->get('/clients/{name}', App\Controllers\User\ClientController::class . ':getClients');
         // 登出
         $group->get('/logout', App\Controllers\UserController::class . ':logout');
-    })->add(new User());
+    })->add(new SameOriginCsrf())->add(new User());
 
     $app->group('/payment', static function (RouteCollectorProxy $group): void {
         $group->get('/notify/{type}', App\Services\Payment::class . ':notify');
@@ -142,14 +145,14 @@ return static function (Slim\App $app): void {
         $group->post('/totp', App\Controllers\AuthController::class . ':totpHandle');
         $group->get('/fido', App\Controllers\AuthController::class . ':fidoRequest');
         $group->post('/fido', App\Controllers\AuthController::class . ':fidoHandle');
-    })->add(new Guest());
+    })->add(new SameOriginCsrf())->add(new Guest());
     // Password
     $app->group('/password', static function (RouteCollectorProxy $group): void {
         $group->get('/reset', App\Controllers\PasswordController::class . ':reset');
         $group->post('/reset', App\Controllers\PasswordController::class . ':handleReset');
         $group->get('/token/{token}', App\Controllers\PasswordController::class . ':token');
         $group->post('/token', App\Controllers\PasswordController::class . ':handleToken');
-    })->add(new Guest());
+    })->add(new SameOriginCsrf())->add(new Guest());
     // Admin
     $app->group('/admin', static function (RouteCollectorProxy $group): void {
         $group->get('', App\Controllers\AdminController::class . ':index');
@@ -333,7 +336,7 @@ return static function (Slim\App $app): void {
         $group->get('/invoice/{id:[0-9]+}/view', App\Controllers\Admin\InvoiceController::class . ':detail');
         $group->post('/invoice/{id:[0-9]+}/mark_paid', App\Controllers\Admin\InvoiceController::class . ':markPaid');
         $group->post('/invoice/ajax', App\Controllers\Admin\InvoiceController::class . ':ajax');
-    })->add(new Admin());
+    })->add(new SameOriginCsrf())->add(new Admin());
     // WebAPI
     $app->group('/mod_mu', static function (RouteCollectorProxy $group): void {
         // 节点
@@ -362,7 +365,8 @@ return static function (Slim\App $app): void {
     $app->group('/node/api/v1', static function (RouteCollectorProxy $group): void {
         $nodeApiToken = new NodeApiToken();
 
-        $group->post('/enroll', App\Controllers\Api\NodeApiV1Controller::class . ':enroll');
+        $group->post('/enroll', App\Controllers\Api\NodeApiV1Controller::class . ':enroll')
+            ->add(new NodeEnrollRateLimit());
         $group->get('/config', App\Controllers\Api\NodeApiV1Controller::class . ':config')->add($nodeApiToken);
         $group->get('/users', App\Controllers\Api\NodeApiV1Controller::class . ':users')->add($nodeApiToken);
         $group->get('/detect-rules', App\Controllers\Api\NodeApiV1Controller::class . ':detectRules')->add($nodeApiToken);
@@ -372,10 +376,10 @@ return static function (Slim\App $app): void {
         $group->post('/detect-log', App\Controllers\Api\NodeApiV1Controller::class . ':detectLog')->add($nodeApiToken);
         $group->post('/probe', App\Controllers\Api\NodeApiV1Controller::class . ':probe')->add($nodeApiToken);
         $group->post('/heartbeat', App\Controllers\Api\NodeApiV1Controller::class . ':heartbeat')->add($nodeApiToken);
-    });
+    })->add(new RequestBodyLimit(2 * 1024 * 1024));
 
     // XNode external probe API V1
     $app->group('/probe/api/v1', static function (RouteCollectorProxy $group): void {
         $group->post('/report', App\Controllers\Api\ProbeApiV1Controller::class . ':report')->add(new ProbeApiToken());
-    });
+    })->add(new RequestBodyLimit(2 * 1024 * 1024));
 };

@@ -25,6 +25,8 @@ use const JSON_ERROR_NONE;
 
 final class ProbeApiV1Controller extends BaseController
 {
+    private const MAX_BATCH_ITEMS = 500;
+
     /**
      * POST /probe/api/v1/report
      */
@@ -42,6 +44,15 @@ final class ProbeApiV1Controller extends BaseController
                 $response,
                 'Invalid probe report payload.',
                 'invalid_probe_report_payload'
+            );
+        }
+
+        if (count($payload['results']) > self::MAX_BATCH_ITEMS) {
+            return $this->validationError(
+                $request,
+                $response,
+                'Probe report batch is too large.',
+                'batch_too_large'
             );
         }
 

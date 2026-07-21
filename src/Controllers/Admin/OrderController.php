@@ -8,6 +8,9 @@ use App\Controllers\BaseController;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Paylist;
+use App\Models\User;
+use App\Services\DB;
+use App\Services\InvoiceRefundService;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -102,87 +105,75 @@ final class OrderController extends BaseController
 
     public function cancel(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $order_id = $args['id'];
-        $order = (new Order())->find($order_id);
+        $orderId = (int) $args['id'];
+        $result = DB::connection()->transaction(static function () use ($orderId): array {
+            $invoice = (new Invoice())->where('order_id', $orderId)->lockForUpdate()->first();
 
-        if ($order === null) {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '订单不存在',
-            ]);
-        }
+            if ($invoice === null) {
+                return ['ret' => 0, 'msg' => '关联账单不存在'];
+            }
 
-        if (in_array($order->status, ['activated', 'expired', 'cancelled'])) {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '无法取消 ' . $order->status() . ' 状态的产品',
-            ]);
-        }
+            $order = (new Order())->where('id', $orderId)->lockForUpdate()->first();
 
-        $invoice = (new Invoice())->where('order_id', $order_id)->first();
+            if ($order === null) {
+                return ['ret' => 0, 'msg' => '订单不存在'];
+            }
 
-        if ($invoice === null) {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '关联账单不存在',
-            ]);
-        }
+            if (in_array($order->status, ['activated', 'expired', 'cancelled'], true)) {
+                return ['ret' => 0, 'msg' => '无法取消 ' . $order->status() . ' 状态的产品'];
+            }
 
-        if ($invoice->status === 'partially_paid') {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '无法取消账单已部分支付的订单',
-            ]);
-        }
+            if ($invoice->status === 'partially_paid') {
+                return ['ret' => 0, 'msg' => '无法取消账单已部分支付的订单'];
+            }
 
-        $order->update_time = time();
-        $order->status = 'cancelled';
-        $order->save();
+            $order->update_time = time();
+            $order->status = 'cancelled';
+            $order->save();
 
-        if (in_array($invoice->status, ['paid_gateway', 'paid_balance', 'paid_admin'])) {
-            $invoice->refundToBalance();
+            if (in_array($invoice->status, ['paid_gateway', 'paid_balance', 'paid_admin'], true)) {
+                $user = (new User())->where('id', $invoice->user_id)->lockForUpdate()->first();
 
-            return $response->withJson([
-                'ret' => 1,
-                'msg' => '订单取消成功，关联账单已退款至余额',
-            ]);
-        }
+                if ($user === null || ! (new InvoiceRefundService())->refundLocked($invoice, $user)) {
+                    throw new \RuntimeException('Invoice refund failed.');
+                }
 
-        $invoice->update_time = time();
-        $invoice->status = 'cancelled';
-        $invoice->save();
+                return ['ret' => 1, 'msg' => '订单取消成功，关联账单已退款至余额'];
+            }
 
-        return $response->withJson([
-            'ret' => 1,
-            'msg' => '订单取消成功',
-        ]);
+            $invoice->update_time = time();
+            $invoice->status = 'cancelled';
+            $invoice->save();
+
+            return ['ret' => 1, 'msg' => '订单取消成功'];
+        });
+
+        return $response->withJson($result);
     }
 
     public function delete(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $order_id = $args['id'];
-        $order = (new Order())->find($order_id);
+        $orderId = (int) $args['id'];
+        $result = DB::connection()->transaction(static function () use ($orderId): array {
+            $invoice = (new Invoice())->where('order_id', $orderId)->lockForUpdate()->first();
+            $order = (new Order())->where('id', $orderId)->lockForUpdate()->first();
 
-        if ($order === null) {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '订单不存在',
-            ]);
-        }
+            if ($order === null || $invoice === null) {
+                return ['ret' => 0, 'msg' => '订单或关联账单不存在'];
+            }
 
-        $invoice = (new Invoice())->where('order_id', $order_id)->first();
+            if ($order->status !== 'cancelled' || ! in_array($invoice->status, ['unpaid', 'cancelled'], true)) {
+                return ['ret' => 0, 'msg' => '仅允许删除已取消且未支付的订单'];
+            }
 
-        if ($order->delete() && $invoice->delete()) {
-            return $response->withJson([
-                'ret' => 1,
-                'msg' => '删除成功',
-            ]);
-        }
+            if (! $invoice->delete() || ! $order->delete()) {
+                throw new \RuntimeException('Order deletion failed.');
+            }
 
-        return $response->withJson([
-            'ret' => 1,
-            'msg' => '删除失败',
-        ]);
+            return ['ret' => 1, 'msg' => '删除成功'];
+        });
+
+        return $response->withJson($result);
     }
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
