@@ -173,7 +173,7 @@ final class XNodeAuditService
 
     public function normalizePatterns(mixed $input, string $matchType): array
     {
-        $raw = is_array($input) ? $input : preg_split('/[\r\n,]+/', (string) $input) ?: [];
+        $raw = is_array($input) ? $input : (preg_split('/[\r\n,]+/', (string) $input) ?: []);
         $patterns = [];
 
         foreach ($raw as $candidate) {

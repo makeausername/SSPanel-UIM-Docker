@@ -70,9 +70,18 @@
 
     {include file='datatable.tpl'}
     <script>
-        tableConfig.ajax = {url: '/admin/detect/ajax', type: 'POST', dataSrc: 'rules'};
+        tableConfig.ajax = {
+            url: '/admin/detect/ajax',
+            type: 'POST',
+            dataSrc: 'rules'
+        };
         tableConfig.order = [[1, 'asc']];
-        tableConfig.columnDefs = [{targets: [0, 3, 4], orderable: false}];
+        tableConfig.columnDefs = [
+            {
+                targets: [0, 3, 4],
+                orderable: false
+            }
+        ];
         let table = new DataTable('#data-table', tableConfig);
 
         $('#add-detect-button').click(function () {
@@ -101,14 +110,24 @@
         }
 
         function toggleRule(ruleId) {
-            $.ajax({url: '/admin/detect/' + ruleId + '/toggle', type: 'PUT', dataType: 'json', success: showResult});
+            $.ajax({
+                url: '/admin/detect/' + ruleId + '/toggle',
+                type: 'PUT',
+                dataType: 'json',
+                success: showResult
+            });
         }
 
         function deleteRule(ruleId) {
             $('#notice-message').text('确定删除这条审计规则？');
             $('#notice-dialog').modal('show');
             $('#notice-confirm').off('click').on('click', function () {
-                $.ajax({url: '/admin/detect/' + ruleId, type: 'DELETE', dataType: 'json', success: showResult});
+                $.ajax({
+                    url: '/admin/detect/' + ruleId,
+                    type: 'DELETE',
+                    dataType: 'json',
+                    success: showResult
+                });
             });
         }
     </script>

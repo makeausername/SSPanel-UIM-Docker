@@ -18,9 +18,18 @@
     {include file='datatable.tpl'}
     <script>
         tableConfig.serverSide = true;
-        tableConfig.ajax = {url: '/admin/detect/log/ajax', type: 'POST', dataSrc: 'logs.data'};
+        tableConfig.ajax = {
+            url: '/admin/detect/log/ajax',
+            type: 'POST',
+            dataSrc: 'logs.data'
+        };
         tableConfig.order = [[0, 'desc']];
-        tableConfig.columnDefs = [{orderable: false, targets: [3, 4, 5, 6, 7, 8, 9]}];
+        tableConfig.columnDefs = [
+            {
+                orderable: false,
+                targets: [3, 4, 5, 6, 7, 8, 9]
+            }
+        ];
         new DataTable('#data-table', tableConfig);
     </script>
 
