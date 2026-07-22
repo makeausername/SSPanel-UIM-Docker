@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 return [
     'preset' => 'default',
+    'threads' => 1,
     'remove' => [
         NunoMaduro\PhpInsights\Domain\Sniffs\ForbiddenSetterSniff::class,
         NunoMaduro\PhpInsights\Domain\Insights\ForbiddenDefineFunctions::class,
