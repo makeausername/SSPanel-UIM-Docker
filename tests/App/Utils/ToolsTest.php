@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Utils;
 
+use App\Services\GeoIP2;
 use PHPUnit\Framework\TestCase;
 use function date_default_timezone_set;
 use function strlen;
+use const BASE_PATH;
 
 class ToolsTest extends TestCase
 {
@@ -19,6 +21,28 @@ class ToolsTest extends TestCase
         $msg = Tools::getIpLocation('8.8.8.8');
         $this->assertIsString($msg);
         $this->assertEquals('GeoIP2 服务未配置', $msg);
+    }
+
+    public function testGetIpLocationFromBundledDatabase(): void
+    {
+        $_ENV['maxmind_license_key'] = 'configured-for-local-database-test';
+        $_ENV['geoip_locale'] = 'zh-CN';
+
+        $msg = Tools::getIpLocation('8.8.8.8');
+
+        $this->assertIsString($msg);
+        $this->assertNotSame('GeoIP2 服务未配置', $msg);
+    }
+
+    public function testCountryLookupWorksWithoutCityDatabase(): void
+    {
+        $geoip = new GeoIP2(
+            BASE_PATH . '/storage/GeoLite2-City/missing.mmdb',
+            BASE_PATH . '/storage/GeoLite2-Country/GeoLite2-Country.mmdb'
+        );
+
+        $this->assertNull($geoip->getCity('8.8.8.8'));
+        $this->assertNotEmpty($geoip->getCountry('8.8.8.8'));
     }
 
     /**

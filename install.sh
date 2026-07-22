@@ -774,6 +774,24 @@ run_init_command() {
     docker compose exec -T app php xcat "$@"
 }
 
+sync_geoip_defaults() {
+    bash docker/geoip/sync-config.sh "$APP_CONFIG_EXAMPLE" "$APP_CONFIG_FILE" >/dev/null \
+        || die "补齐 GeoIP 默认配置失败。"
+    success "GeoIP 默认配置已就绪。"
+}
+
+update_geoip_database() {
+    local output
+
+    info "下载并校验 GeoLite2 City/Country 数据库。"
+    if ! output="$(docker compose exec -T app php xcat Tool updateGeoIP2 2>&1)"; then
+        die "GeoLite2 数据库下载失败，安装不会被标记为成功。"
+    fi
+    printf '%s\n' "$output" | grep -Fq 'Successfully updated GeoIP2 database.' \
+        || die "GeoLite2 数据库未通过更新校验，安装不会被标记为成功。"
+    success "GeoLite2 数据库已更新并启用中文归属地。"
+}
+
 run_mariadb_root_sql() {
     local sql="$1"
     docker compose exec -T mariadb sh -c \
@@ -1088,6 +1106,7 @@ resume_installation() {
 
     show_step 2 "读取现有配置和恢复凭据"
     load_existing_credentials
+    sync_geoip_defaults
     [ -f "$APP_PROFILE_FILE" ] || write_appprofile_file
     [ -f "$COMPOSE_OVERRIDE_FILE" ] || write_compose_override
     write_recovery_credentials_file
@@ -1106,6 +1125,7 @@ resume_installation() {
 
     show_step 5 "更新数据库结构"
     run_init_command Migration latest
+    update_geoip_database
 
     show_step 6 "确认管理员账号"
     ensure_admin_for_resume
@@ -1172,6 +1192,7 @@ main() {
     run_init_command Migration latest
     run_init_command Tool importSetting
     ensure_user_ga_enable_column
+    update_geoip_database
     docker_compose_up scheduler
 
     show_step 7 "创建管理员"

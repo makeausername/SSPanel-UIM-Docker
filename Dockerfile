@@ -94,6 +94,8 @@ RUN set -eux; \
         storage/framework/smarty/cache \
         storage/framework/smarty/compile \
         storage/framework/twig/cache \
+        storage/GeoLite2-City \
+        storage/GeoLite2-Country \
         public/clients \
         config; \
     chown -R www-data:www-data \
@@ -101,12 +103,16 @@ RUN set -eux; \
         storage/framework/smarty/cache \
         storage/framework/smarty/compile \
         storage/framework/twig/cache \
+        storage/GeoLite2-City \
+        storage/GeoLite2-Country \
         public/clients; \
     chmod -R ug+rwX \
         storage/framework \
         storage/framework/smarty/cache \
         storage/framework/smarty/compile \
         storage/framework/twig/cache \
+        storage/GeoLite2-City \
+        storage/GeoLite2-Country \
         public/clients
 
 ENTRYPOINT ["docker/entrypoint.sh"]

@@ -120,11 +120,13 @@ Timezone [Asia/Shanghai]: Asia/Shanghai
 6. 构建 Docker 镜像。
 7. 启动 MariaDB 和 Redis。
 8. 等待 MariaDB 和 Redis 就绪。
-9. 启动 app、nginx、caddy、scheduler 服务。
+9. 启动 app、nginx、caddy 服务。
 10. 检查容器内 `vendor/autoload.php` 是否存在，确认 Composer 依赖已安装完成。
 11. 执行数据库迁移和配置导入。
-12. 创建管理员账号。
-13. 打印最终访问地址和常用命令。
+12. 下载并校验 GeoLite2 City/Country 数据库；如果所在地区不允许下载 City，自动降级使用 Country 数据。
+13. 启动 scheduler；GeoLite2 数据库此后每周自动更新。
+14. 创建管理员账号。
+15. 打印最终访问地址和常用命令。
 
 初始化命令顺序为：
 
@@ -132,6 +134,7 @@ Timezone [Asia/Shanghai]: Asia/Shanghai
 docker compose exec app php xcat Migration new
 docker compose exec app php xcat Migration latest
 docker compose exec app php xcat Tool importSetting
+docker compose exec app php xcat Tool updateGeoIP2
 docker compose exec app php xcat Tool createAdmin "admin@example.com" "your_admin_password"
 ```
 

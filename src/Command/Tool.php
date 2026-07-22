@@ -9,6 +9,7 @@ use App\Models\Link;
 use App\Models\Node;
 use App\Models\NodeToken;
 use App\Models\User as ModelsUser;
+use App\Services\GeoIP2;
 use App\Services\NodeEnrollmentService;
 use App\Utils\Hash;
 use App\Utils\Tools;
@@ -20,12 +21,15 @@ use function ctype_digit;
 use function date;
 use function fgets;
 use function file_get_contents;
+use function file_put_contents;
 use function fwrite;
 use function in_array;
+use function is_file;
 use function json_decode;
 use function method_exists;
 use function rtrim;
 use function strtolower;
+use function time;
 use function trim;
 use const BASE_PATH;
 use const PHP_EOL;
@@ -521,10 +525,22 @@ EOL;
 
             try {
                 $client->run();
+                $country = (new GeoIP2())->getCountry('8.8.8.8');
+                if ($country === null || $country === '') {
+                    throw new Exception('GeoIP2 verification lookup returned no country.');
+                }
+                if (file_put_contents(
+                    BASE_PATH . '/storage/framework/geoip.last_success',
+                    (string) time() . PHP_EOL
+                ) === false) {
+                    throw new Exception('Unable to persist GeoIP2 update checkpoint.');
+                }
+                if (!is_file(BASE_PATH . '/storage/GeoLite2-City/GeoLite2-City.mmdb')) {
+                    echo 'GeoLite2 City database unavailable; using Country database.' . PHP_EOL;
+                }
                 echo 'Successfully updated GeoIP2 database.' . PHP_EOL;
-            } catch (Exception $e) {
+            } catch (Exception) {
                 echo 'Update GeoIP2 database failed.' . PHP_EOL;
-                echo $e->getMessage() . PHP_EOL;
             }
         } else {
             echo 'Please configure maxmind_account_id & maxmind_license_key in config/.config.php' . PHP_EOL;

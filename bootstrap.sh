@@ -581,6 +581,24 @@ create_upgrade_backup() {
     success "Database backup created: ${backup_file}"
 }
 
+sync_geoip_defaults() {
+    bash docker/geoip/sync-config.sh config/.config.example.php config/.config.php >/dev/null \
+        || die "补齐 GeoIP 默认配置失败。"
+    success "GeoIP 默认配置已就绪。"
+}
+
+update_geoip_database() {
+    local output
+
+    info "下载并校验 GeoLite2 City/Country 数据库。"
+    if ! output="$(docker compose exec -T app php xcat Tool updateGeoIP2 2>&1)"; then
+        die "GeoLite2 数据库下载失败，升级未完成。"
+    fi
+    printf '%s\n' "$output" | grep -Fq 'Successfully updated GeoIP2 database.' \
+        || die "GeoLite2 数据库未通过更新校验，升级未完成。"
+    success "GeoLite2 数据库已更新并启用中文归属地。"
+}
+
 confirm_reinstall() {
     local confirmation
 
@@ -608,6 +626,7 @@ run_upgrade() {
 
     update_repository
     cd "$INSTALL_DIR"
+    sync_geoip_defaults
 
     info "校验 Compose 配置。"
     docker compose config >/dev/null
@@ -622,6 +641,7 @@ run_upgrade() {
     docker compose up -d app nginx caddy
     wait_for_service_ready app 180
     docker compose exec -T app test -f vendor/autoload.php
+    update_geoip_database
     docker compose up -d scheduler
     info "Restarting nginx after the app image and database migration are ready."
     docker compose restart nginx

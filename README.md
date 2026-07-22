@@ -132,6 +132,8 @@ Token 必须使用 Fine-grained Personal Access Token，并且：
 
 HTTPS、80/443 端口和 `Asia/Shanghai` 时区使用固定生产默认值。数据库名、数据库用户、数据库密码、数据库 root 密码、Redis 密码、App Key 和 muKey 均由 OpenSSL 自动生成。
 
+GeoLite2 City/Country 已随私有部署配置启用。安装器会在完成前下载最新数据库，以 `zh-CN` 显示 IP 归属地，并把数据库保存在独立 Docker volume 中；scheduler 每周自动更新，失败时按六小时退避重试，更新过程不会输出下载凭据。如果服务器所在地区被 MaxMind 限制下载 City 数据库，面板会自动降级使用 Country 数据，不会因此中断安装。
+
 安全凭据写入 `.env` 和 `config/.config.php` 后，安装器会立即在 `/root` 创建权限为 `0600` 的恢复凭据文件。安装成功后，它会更新为正式凭据文件：
 
 ```text
@@ -149,11 +151,11 @@ cd /opt/SSPanel-UIM-Docker
 sudo bash bootstrap.sh --resume
 ```
 
-恢复模式保留现有数据库、Redis、App Key、muKey 和所有 Docker volume；它不会再次执行 `Migration new`，只会重建服务、执行 `Migration latest`、跳过已经存在的管理员，然后验证容器与 HTTPS。验证成功后才写入安装锁。
+恢复模式保留现有数据库、Redis、App Key、muKey 和所有 Docker volume；它不会再次执行 `Migration new`，只会补齐空缺的 GeoIP 默认配置、重建服务、执行 `Migration latest`、更新 GeoLite2 数据库、跳过已经存在的管理员，然后验证容器与 HTTPS。验证成功后才写入安装锁。
 
 ### 升级现有安装
 
-升级会保留 `.env`、`config/.config.php`、`config/appprofile.php` 和全部 Docker volume，不会重新生成任何密码或密钥：
+升级会保留 `.env`、`config/.config.php`、`config/appprofile.php` 和全部 Docker volume，不会重新生成数据库、Redis、App Key 或 muKey。若现有 GeoIP 配置仍为空，升级器会从私有仓库默认值补齐，并在启动 scheduler 前下载最新数据库：
 
 ```bash
 cd /opt/SSPanel-UIM-Docker

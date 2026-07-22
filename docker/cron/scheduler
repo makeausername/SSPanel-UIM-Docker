@@ -6,12 +6,24 @@ INTERVAL_SECONDS="${CRON_INTERVAL_SECONDS:-300}"
 LOCK_DIR="${CRON_LOCK_DIR:-${APP_DIR}/storage/framework/sspanel-cron.lock}"
 STALE_AFTER_SECONDS="${CRON_STALE_AFTER_SECONDS:-900}"
 HEARTBEAT_FILE="${SCHEDULER_HEARTBEAT_FILE:-${APP_DIR}/storage/framework/scheduler.last_success}"
+GEOIP_SUCCESS_FILE="${GEOIP_SUCCESS_FILE:-${APP_DIR}/storage/framework/geoip.last_success}"
+GEOIP_ATTEMPT_FILE="${GEOIP_ATTEMPT_FILE:-${APP_DIR}/storage/framework/geoip.last_attempt}"
+GEOIP_UPDATE_INTERVAL_SECONDS="${GEOIP_UPDATE_INTERVAL_SECONDS:-604800}"
+GEOIP_RETRY_INTERVAL_SECONDS="${GEOIP_RETRY_INTERVAL_SECONDS:-21600}"
 LOCK_HEARTBEAT_PID=""
 
 if ! [[ "${INTERVAL_SECONDS}" =~ ^[1-9][0-9]*$ ]]; then
     echo "[scheduler] CRON_INTERVAL_SECONDS must be a positive integer" >&2
     exit 64
 fi
+
+for setting in GEOIP_UPDATE_INTERVAL_SECONDS GEOIP_RETRY_INTERVAL_SECONDS; do
+    value="${!setting}"
+    if ! [[ "${value}" =~ ^[1-9][0-9]*$ ]]; then
+        echo "[scheduler] ${setting} must be a positive integer" >&2
+        exit 64
+    fi
+done
 
 case "${LOCK_DIR}" in
     "${APP_DIR}"/storage/framework/*) ;;
@@ -53,12 +65,53 @@ stop_lock_heartbeat() {
     fi
 }
 
+read_timestamp() {
+    local file="$1"
+    local value
+
+    value="$(cat "$file" 2>/dev/null || echo 0)"
+    if [[ "$value" =~ ^[0-9]+$ ]]; then
+        printf '%s' "$value"
+    else
+        printf '0'
+    fi
+}
+
+update_geoip_if_due() {
+    local now
+    local last_success
+    local last_attempt
+    local output
+
+    now="$(date +%s)"
+    last_success="$(read_timestamp "$GEOIP_SUCCESS_FILE")"
+    last_attempt="$(read_timestamp "$GEOIP_ATTEMPT_FILE")"
+
+    if [ $((now - last_success)) -lt "$GEOIP_UPDATE_INTERVAL_SECONDS" ]; then
+        return 0
+    fi
+    if [ $((now - last_attempt)) -lt "$GEOIP_RETRY_INTERVAL_SECONDS" ]; then
+        return 0
+    fi
+
+    printf '%s\n' "$now" > "$GEOIP_ATTEMPT_FILE"
+    echo "[scheduler] $(date -Iseconds) updating GeoLite2 databases"
+
+    if output="$(php xcat Tool updateGeoIP2 2>&1)" \
+        && printf '%s\n' "$output" | grep -Fq 'Successfully updated GeoIP2 database.'; then
+        echo "[scheduler] $(date -Iseconds) GeoLite2 update completed"
+    else
+        echo "[scheduler] $(date -Iseconds) GeoLite2 update failed; retry scheduled" >&2
+    fi
+}
+
 trap cleanup_lock EXIT INT TERM
 
 while true; do
     if mkdir "${LOCK_DIR}" 2>/dev/null; then
         echo "$$" > "${LOCK_DIR}/owner"
         start_lock_heartbeat
+        update_geoip_if_due
         echo "[scheduler] $(date -Iseconds) running php xcat Cron"
 
         if php xcat Cron; then

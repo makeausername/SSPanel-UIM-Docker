@@ -75,6 +75,8 @@ REQUIRED_DIRS=(
     "${APP_DIR}/storage/framework/smarty/cache"
     "${APP_DIR}/storage/framework/smarty/compile"
     "${APP_DIR}/storage/framework/twig/cache"
+    "${APP_DIR}/storage/GeoLite2-City"
+    "${APP_DIR}/storage/GeoLite2-Country"
     "${APP_DIR}/public/clients"
     "${APP_DIR}/config"
 )
@@ -84,6 +86,8 @@ WRITABLE_DIRS=(
     "${APP_DIR}/storage/framework/smarty/cache"
     "${APP_DIR}/storage/framework/smarty/compile"
     "${APP_DIR}/storage/framework/twig/cache"
+    "${APP_DIR}/storage/GeoLite2-City"
+    "${APP_DIR}/storage/GeoLite2-Country"
     "${APP_DIR}/public/clients"
 )
 
