@@ -288,10 +288,13 @@ return new class() implements MigrationInterface {
             return $statement->fetchColumn() !== false;
         }
 
-        $statement = $pdo->prepare('SHOW TABLES LIKE ?');
+        $statement = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
+        );
         $statement->execute([$table]);
 
-        return $statement->fetchColumn() !== false;
+        return (int) $statement->fetchColumn() > 0;
     }
 
     private function columnExists(\PDO $pdo, string $driver, string $table, string $column): bool
@@ -306,10 +309,13 @@ return new class() implements MigrationInterface {
             return false;
         }
 
-        $statement = $pdo->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
-        $statement->execute([$column]);
+        $statement = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+        );
+        $statement->execute([$table, $column]);
 
-        return $statement->fetchColumn() !== false;
+        return (int) $statement->fetchColumn() > 0;
     }
 
     private function indexExists(\PDO $pdo, string $driver, string $table, string $index): bool
@@ -324,9 +330,12 @@ return new class() implements MigrationInterface {
             return false;
         }
 
-        $statement = $pdo->prepare("SHOW INDEX FROM `{$table}` WHERE `Key_name` = ?");
-        $statement->execute([$index]);
+        $statement = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?'
+        );
+        $statement->execute([$table, $index]);
 
-        return $statement->fetchColumn() !== false;
+        return (int) $statement->fetchColumn() > 0;
     }
 };
