@@ -27,6 +27,12 @@ final class InviteSubscriptionReward extends Model
 {
     protected $connection = 'default';
     protected $table = 'invite_subscription_reward';
+    protected $appends = ['inviter_name', 'user_name', 'product_name'];
+
+    public function getInviterNameAttribute(): string
+    {
+        return (new User())->where('id', $this->inviter_user_id)->value('user_name') ?? 'Deleted user';
+    }
 
     public function getUserNameAttribute(): string
     {

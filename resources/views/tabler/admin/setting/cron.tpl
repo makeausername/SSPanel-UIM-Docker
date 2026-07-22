@@ -62,6 +62,30 @@
                                                        value="{$settings['daily_job_minute']}">
                                             </div>
                                         </div>
+                                        <div class="form-group mb-3 row">
+                                            <label class="form-label col-3 col-form-label">节点上报记录保留天数</label>
+                                            <div class="col">
+                                                <input id="node_report_retention_days" type="number" min="1" max="3650"
+                                                       class="form-control"
+                                                       value="{$settings['node_report_retention_days']}">
+                                            </div>
+                                        </div>
+                                        <div class="form-group mb-3 row">
+                                            <label class="form-label col-3 col-form-label">节点探测记录保留天数</label>
+                                            <div class="col">
+                                                <input id="node_probe_retention_days" type="number" min="1" max="3650"
+                                                       class="form-control"
+                                                       value="{$settings['node_probe_retention_days']}">
+                                            </div>
+                                        </div>
+                                        <div class="form-group mb-3 row">
+                                            <label class="form-label col-3 col-form-label">失败邮件记录保留天数</label>
+                                            <div class="col">
+                                                <input id="email_dead_retention_days" type="number" min="1" max="3650"
+                                                       class="form-control"
+                                                       value="{$settings['email_dead_retention_days']}">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="tab-pane show" id="finance_mail">

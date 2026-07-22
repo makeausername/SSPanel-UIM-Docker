@@ -118,8 +118,16 @@ EOL;
                 continue;
             }
 
-            if ($query->class !== $item['class']) {
-                $query->class = $item['class'];
+            $metadataChanged = false;
+
+            foreach (['class', 'is_public', 'type', 'default', 'mark'] as $field) {
+                if ((string) $query->$field !== (string) $item[$field]) {
+                    $query->$field = $item[$field];
+                    $metadataChanged = true;
+                }
+            }
+
+            if ($metadataChanged) {
                 $query->save();
                 echo '更新数据库设置：' . $item_name . PHP_EOL;
                 $update_counter += 1;
@@ -535,7 +543,7 @@ EOL;
                 ) === false) {
                     throw new Exception('Unable to persist GeoIP2 update checkpoint.');
                 }
-                if (!is_file(BASE_PATH . '/storage/GeoLite2-City/GeoLite2-City.mmdb')) {
+                if (! is_file(BASE_PATH . '/storage/GeoLite2-City/GeoLite2-City.mmdb')) {
                     echo 'GeoLite2 City database unavailable; using Country database.' . PHP_EOL;
                 }
                 echo 'Successfully updated GeoIP2 database.' . PHP_EOL;

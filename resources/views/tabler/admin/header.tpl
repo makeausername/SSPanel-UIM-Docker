@@ -188,7 +188,7 @@
                                 </a>
                                 <a class="dropdown-item" href="/admin/payback">
                                     <i class="ti ti-friends"></i>&nbsp;
-                                    返利
+                                    邀请奖励
                                 </a>
                                 <a class="dropdown-item" href="/admin/money">
                                     <i class="ti ti-coin"></i>&nbsp;

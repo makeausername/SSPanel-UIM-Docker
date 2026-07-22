@@ -6,16 +6,19 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\UserCoupon;
+use App\Services\InvoiceAccountingService;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use function in_array;
+use function is_numeric;
 use function json_decode;
 use function json_encode;
 use function property_exists;
 use function time;
+use function trim;
 
 final class CouponController extends BaseController
 {
@@ -116,24 +119,32 @@ final class CouponController extends BaseController
      */
     public function add(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $code = $request->getParam('code');
-        $type = $request->getParam('type');
-        $value = $request->getParam('value');
-        $product_id = $request->getParam('product_id');
-        $use_time = $request->getParam('use_time');
-        $total_use_time = $request->getParam('total_use_time');
-        $new_user = $request->getParam('new_user');
-        $generate_method = $request->getParam('generate_method');
-        $expire_time = $request->getParam('expire_time');
+        $code = trim((string) $request->getParam('code'));
+        $type = (string) $request->getParam('type');
+        $value = (string) $request->getParam('value');
+        $product_id = trim((string) $request->getParam('product_id'));
+        $use_time_raw = (string) $request->getParam('use_time');
+        $total_use_time_raw = (string) $request->getParam('total_use_time');
+        $use_time = $use_time_raw === '' ? -1 : (int) $use_time_raw;
+        $total_use_time = $total_use_time_raw === '' ? -1 : (int) $total_use_time_raw;
+        $new_user = (int) $request->getParam('new_user') === 1 ? 1 : 0;
+        $generate_method = (string) $request->getParam('generate_method');
+        $expire_time = (string) $request->getParam('expire_time');
 
-        if ($code === '' && in_array($generate_method, ['char', 'char_ramdom'])) {
+        if ($code === '' && in_array($generate_method, ['char', 'char_random'], true)) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '优惠码不能为空',
             ]);
         }
 
-        if ($type === '' || $value === '' || ($expire_time !== '' && $expire_time < time())) {
+        if (! in_array($type, ['percentage', 'fixed'], true)
+            || ! is_numeric($value)
+            || (float) $value <= 0
+            || ($type === 'percentage' && (float) $value > 100)
+            || ! in_array($generate_method, ['char', 'random', 'char_random'], true)
+            || ($expire_time !== '' && (! is_numeric($expire_time) || (int) $expire_time < time()))
+        ) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '无效的优惠码参数',
@@ -171,7 +182,7 @@ final class CouponController extends BaseController
 
         $content = [
             'type' => $type,
-            'value' => $value,
+            'value' => InvoiceAccountingService::money($value),
         ];
 
         $limit = [
@@ -189,7 +200,7 @@ final class CouponController extends BaseController
         $coupon->create_time = time();
 
         if ($expire_time !== '') {
-            $coupon->expire_time = $expire_time;
+            $coupon->expire_time = (int) $expire_time;
         } else {
             $coupon->expire_time = 0;
         }
@@ -205,7 +216,16 @@ final class CouponController extends BaseController
     public function delete(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $coupon_id = $args['id'];
-        (new UserCoupon())->find($coupon_id)->delete();
+        $coupon = (new UserCoupon())->find($coupon_id);
+
+        if ($coupon === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '优惠码不存在',
+            ]);
+        }
+
+        $coupon->delete();
 
         return $response->withJson([
             'ret' => 1,
@@ -216,8 +236,24 @@ final class CouponController extends BaseController
     public function disable(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $coupon_id = $args['id'];
-        $coupon = (new UserCoupon())->find($coupon_id)->first();
+        $coupon = (new UserCoupon())->find($coupon_id);
+
+        if ($coupon === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '优惠码不存在',
+            ]);
+        }
+
         $limit = json_decode($coupon->limit);
+
+        if (! is_object($limit)) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '优惠码配置无效',
+            ]);
+        }
+
         $limit->disabled = 1;
         $coupon->limit = json_encode($limit);
         $coupon->save();
@@ -241,7 +277,7 @@ final class CouponController extends BaseController
 
             $coupon->op = '<button class="btn btn-red" id="delete-coupon-' . $coupon->id . '"
                 onclick="deleteCoupon(' . $coupon->id . ')">删除</button>' .
-                ($limit->disabled !== 1 ? '
+                ((int) ($limit->disabled ?? 0) !== 1 ? '
                 <button class="btn btn-orange" id="disable-coupon-' .
                     $coupon->id . '" onclick="disableCoupon(' . $coupon->id . ')">禁用</button>' : '');
 
@@ -251,8 +287,8 @@ final class CouponController extends BaseController
             $coupon->use_time = (int) $limit->use_time < 0 ? '不限次数' : $limit->use_time;
             $coupon->total_use_time = ! property_exists($limit, 'total_use_time') ||
             (int) $limit->total_use_time < 0 ? '不限次数' : $limit->total_use_time;
-            $coupon->new_user = $limit->new_user === 1 ? '是' : '否';
-            $coupon->disabled = $limit->disabled === 1 ? '是' : '否';
+            $coupon->new_user = (int) ($limit->new_user ?? 0) === 1 ? '是' : '否';
+            $coupon->disabled = (int) ($limit->disabled ?? 0) === 1 ? '是' : '否';
             $coupon->create_time = Tools::toDateTime((int) $coupon->create_time);
             $coupon->expire_time = $coupon->expire_time === 0 ? '永久有效' : Tools::toDateTime((int) $coupon->expire_time);
         }

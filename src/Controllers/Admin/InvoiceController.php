@@ -56,6 +56,10 @@ final class InvoiceController extends BaseController
         $invoice = (new Invoice())->find($id);
         $paylist = [];
 
+        if ($invoice === null) {
+            return $response->withStatus(301)->withHeader('Location', '/admin/invoice');
+        }
+
         if ($invoice->status === 'paid_gateway') {
             $paylist = (new Paylist())->where('invoice_id', $invoice->id)->where('status', 1)->first();
         }

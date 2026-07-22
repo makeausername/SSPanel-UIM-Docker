@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PHPUnit\Framework\TestCase;
+use function is_array;
+use function sort;
+use const BASE_PATH;
 
 final class FrontendI18nTest extends TestCase
 {
@@ -31,10 +34,47 @@ final class FrontendI18nTest extends TestCase
             '订阅奖励记录',
             FrontendI18n::trans('user.invite.reward_records', [], 'zh-CN')
         );
+        $this->assertSame('Loading...', FrontendI18n::trans('common.loading', [], 'en-US'));
+        $this->assertSame('加载中...', FrontendI18n::trans('common.loading', [], 'zh-CN'));
+        $this->assertSame(
+            'Invite link reset successfully',
+            FrontendI18n::trans('response.invite_reset_success', [], 'en-US')
+        );
     }
 
     public function testMissingTranslationReturnsKey(): void
     {
         $this->assertSame('missing.key', FrontendI18n::trans('missing.key', [], 'en-US'));
+    }
+
+    public function testFrontendLocalesHaveMatchingKeys(): void
+    {
+        $english = require BASE_PATH . '/resources/locale/frontend/en_US.php';
+        $chinese = require BASE_PATH . '/resources/locale/frontend/zh_CN.php';
+        $englishKeys = self::flattenKeys($english);
+        $chineseKeys = self::flattenKeys($chinese);
+        sort($englishKeys);
+        sort($chineseKeys);
+
+        $this->assertSame($englishKeys, $chineseKeys);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     *
+     * @return list<string>
+     */
+    private static function flattenKeys(array $values, string $prefix = ''): array
+    {
+        $keys = [];
+        foreach ($values as $key => $value) {
+            $path = $prefix === '' ? (string) $key : $prefix . '.' . $key;
+            $keys[] = $path;
+            if (is_array($value)) {
+                $keys = [...$keys, ...self::flattenKeys($value, $path)];
+            }
+        }
+
+        return $keys;
     }
 }

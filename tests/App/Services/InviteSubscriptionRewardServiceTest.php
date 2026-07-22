@@ -132,6 +132,35 @@ final class InviteSubscriptionRewardServiceTest extends TestCase
         $this->assertLessThanOrEqual(time() + 395 * 86400 + 2, $expiry);
     }
 
+    public function testRewardDoesNotReviveAnExpiredManagedPlan(): void
+    {
+        $expiredAt = $this->now - 10 * 86400;
+        $this->seedUser(8, date('Y-m-d H:i:s', $expiredAt));
+        $this->seedOrder(80, 8, 'mini', 'activated', '300.00', $this->now - 375 * 86400);
+        $this->seedInvoice(800, 9, 90, 'paid_gateway', '300.00');
+        Capsule::table('invite_subscription_reward')->insert([
+            'inviter_user_id' => 8,
+            'invited_user_id' => 9,
+            'qualifying_order_id' => 90,
+            'invoice_id' => 800,
+            'applied_order_id' => 0,
+            'product_sku' => 'mini',
+            'reward_days' => 30,
+            'status' => 'pending',
+            'create_time' => $this->now,
+            'apply_time' => 0,
+        ]);
+
+        InviteSubscriptionRewardService::applyPendingForInviter(8);
+
+        $this->assertSame('expired', (string) Capsule::table('order')->find(80)->status);
+        $this->assertSame('pending', (string) Capsule::table('invite_subscription_reward')->first()->status);
+        $this->assertSame(
+            date('Y-m-d H:i:s', $expiredAt),
+            (string) Capsule::table('user')->find(8)->class_expire
+        );
+    }
+
     private function createSchema(): void
     {
         Capsule::schema()->create('user', static function (Blueprint $table): void {

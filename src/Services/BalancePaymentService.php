@@ -11,8 +11,8 @@ use function bcadd;
 use function bccomp;
 use function bcsub;
 use function count;
-use function is_array;
 use function in_array;
+use function is_array;
 use function json_decode;
 use function json_encode;
 use function time;
@@ -20,7 +20,7 @@ use function time;
 final class BalancePaymentService
 {
     /**
-     * @return array{status: 'error'|'paid'|'partial', message?: string}
+     * @return array{status: 'error'|'paid'|'partial', message_key?: string}
      */
     public function pay(int $userId, int $invoiceId): array
     {
@@ -32,25 +32,25 @@ final class BalancePaymentService
                 ->first();
 
             if ($invoice === null) {
-                return ['status' => 'error', 'message' => '账单不存在'];
+                return ['status' => 'error', 'message_key' => 'response.payment.invoice_not_found'];
             }
 
             if (! in_array($invoice->status, ['unpaid', 'partially_paid'], true)) {
-                return ['status' => 'error', 'message' => '账单已处理，请刷新页面'];
+                return ['status' => 'error', 'message_key' => 'response.payment.invoice_processed'];
             }
 
             if ($invoice->type === 'topup') {
-                return ['status' => 'error', 'message' => '该账单不支持使用余额支付'];
+                return ['status' => 'error', 'message_key' => 'response.payment.balance_not_supported'];
             }
 
             $user = (new User())->where('id', $userId)->lockForUpdate()->first();
 
             if ($user === null) {
-                return ['status' => 'error', 'message' => '用户不存在'];
+                return ['status' => 'error', 'message_key' => 'response.payment.user_not_found'];
             }
 
             if ($user->is_shadow_banned) {
-                return ['status' => 'error', 'message' => '支付失败，请稍后再试'];
+                return ['status' => 'error', 'message_key' => 'response.payment.failed'];
             }
 
             $moneyBefore = self::money($user->money);
@@ -58,11 +58,11 @@ final class BalancePaymentService
             $invoiceDue = InvoiceAccountingService::remaining($invoice);
 
             if (bccomp($invoiceDue, '0.00', 2) <= 0) {
-                return ['status' => 'error', 'message' => '账单金额无效'];
+                return ['status' => 'error', 'message_key' => 'response.payment.invoice_amount_invalid'];
             }
 
             if (bccomp($moneyBefore, '0.00', 2) <= 0) {
-                return ['status' => 'error', 'message' => '余额不足'];
+                return ['status' => 'error', 'message_key' => 'response.payment.insufficient_balance'];
             }
 
             $fullyPaid = bccomp($moneyBefore, $invoiceDue, 2) >= 0;
@@ -77,7 +77,7 @@ final class BalancePaymentService
                 (float) $moneyBefore,
                 (float) $moneyAfter,
                 -(float) $paid,
-                '支付账单 #' . $invoice->id
+                '支付账单 / Invoice payment #' . $invoice->id
             );
 
             if ($fullyPaid) {
@@ -89,7 +89,7 @@ final class BalancePaymentService
                 $content = is_array($content) ? $content : [];
                 $content[] = [
                     'content_id' => count($content),
-                    'name' => '余额部分支付',
+                    'name' => '余额部分支付 / Partial balance payment',
                     'price' => '-' . $paid,
                 ];
                 $invoice->content = json_encode($content);

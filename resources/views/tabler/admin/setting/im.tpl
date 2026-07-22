@@ -477,12 +477,12 @@
                                         </div>
                                         <div class="form-group mb-3 row">
                                             <label class="form-label col-3 col-form-label">Discord User ID/Channel ID</label>
-                                            <input type="text" class="form-control" id="discord_channel_id" value="">
+                                            <input type="text" class="form-control" id="discord_test_channel_id" value="">
                                             <div class="row my-3">
                                                 <div class="col">
                                                     <button class="btn btn-primary"
                                                         hx-post="/admin/setting/test/discord" hx-swap="none"
-                                                        hx-vals='js:{ discord_channel_id: document.getElementById("discord_channel_id").value }'>
+                                                        hx-vals='js:{ discord_channel_id: document.getElementById("discord_test_channel_id").value }'>
                                                         Send Test Message
                                                     </button>
                                                 </div>
@@ -545,12 +545,12 @@
                                         </div>
                                         <div class="form-group mb-3 row">
                                             <label class="form-label col-3 col-form-label">Slack User ID/Channel ID</label>
-                                            <input type="text" class="form-control" id="slack_channel_id" value="">
+                                            <input type="text" class="form-control" id="slack_test_channel_id" value="">
                                             <div class="row my-3">
                                                 <div class="col">
                                                     <button class="btn btn-primary"
                                                         hx-post="/admin/setting/test/slack" hx-swap="none"
-                                                        hx-vals='js:{ slack_channel_id: document.getElementById("slack_channel_id").value }'>
+                                                        hx-vals='js:{ slack_channel_id: document.getElementById("slack_test_channel_id").value }'>
                                                         Send Test Message
                                                     </button>
                                                 </div>

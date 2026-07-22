@@ -8,26 +8,28 @@ use App\Controllers\BaseController;
 use App\Models\Invoice;
 use App\Models\Paylist;
 use App\Services\BalancePaymentService;
+use App\Services\FrontendI18n;
 use App\Services\Payment;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function in_array;
 use function json_decode;
 
 final class InvoiceController extends BaseController
 {
     private static array $details = [
         'field' => [
-            'op' => '操作',
-            'id' => '账单ID',
-            'order_id' => '订单ID',
-            'price' => '账单金额',
-            'status' => '账单状态',
-            'create_time' => '创建时间',
-            'update_time' => '更新时间',
-            'pay_time' => '支付时间',
+            'op' => 'common.operation',
+            'id' => 'invoice.id',
+            'order_id' => 'order.id',
+            'price' => 'invoice.amount',
+            'status' => 'invoice.status',
+            'create_time' => 'common.created_at',
+            'update_time' => 'common.updated_at',
+            'pay_time' => 'payment.paid_at',
         ],
     ];
 
@@ -36,9 +38,14 @@ final class InvoiceController extends BaseController
      */
     public function index(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
+        $details = self::$details;
+        foreach ($details['field'] as $field => $translationKey) {
+            $details['field'][$field] = FrontendI18n::trans($translationKey);
+        }
+
         return $response->write(
             $this->view()
-                ->assign('details', self::$details)
+                ->assign('details', $details)
                 ->fetch('user/invoice/index.tpl')
         );
     }
@@ -62,7 +69,7 @@ final class InvoiceController extends BaseController
             $paylist = (new Paylist())->where('invoice_id', $invoice->id)->where('status', 1)->first();
         }
 
-        $invoice->status_text = $invoice->status();
+        $invoice->status_text = self::invoiceStatus((string) $invoice->status);
         $invoice->create_time = Tools::toDateTime($invoice->create_time);
         $invoice->update_time = Tools::toDateTime($invoice->update_time);
         $invoice->pay_time = Tools::toDateTime($invoice->pay_time);
@@ -86,7 +93,7 @@ final class InvoiceController extends BaseController
         if ($result['status'] === 'error') {
             return $response->withJson([
                 'ret' => 0,
-                'msg' => $result['message'],
+                'msg' => FrontendI18n::trans($result['message_key']),
             ]);
         }
 
@@ -102,8 +109,9 @@ final class InvoiceController extends BaseController
         $invoices = (new Invoice())->orderBy('id', 'desc')->where('user_id', $this->user->id)->get();
 
         foreach ($invoices as $invoice) {
-            $invoice->op = '<a class="btn btn-primary" href="/user/invoice/' . $invoice->id . '/view">查看</a>';
-            $invoice->status = $invoice->status();
+            $invoice->op = '<a class="btn btn-primary" href="/user/invoice/' . $invoice->id . '/view">'
+                . FrontendI18n::trans('docs.view') . '</a>';
+            $invoice->status = self::invoiceStatus((string) $invoice->status);
             $invoice->create_time = Tools::toDateTime($invoice->create_time);
             $invoice->update_time = Tools::toDateTime($invoice->update_time);
             $invoice->pay_time = Tools::toDateTime($invoice->pay_time);
@@ -112,5 +120,20 @@ final class InvoiceController extends BaseController
         return $response->withJson([
             'invoices' => $invoices,
         ]);
+    }
+
+    private static function invoiceStatus(string $status): string
+    {
+        $key = in_array($status, [
+            'unpaid',
+            'paid_gateway',
+            'paid_balance',
+            'paid_admin',
+            'cancelled',
+            'refunded_balance',
+            'partially_paid',
+        ], true) ? $status : 'unknown';
+
+        return FrontendI18n::trans('invoice.status_values.' . $key);
     }
 }

@@ -189,6 +189,7 @@ final class OrderProcessingService
                 }
 
                 if ($order->create_time + 86400 < time() && $invoice->status !== 'partially_paid') {
+                    OrderReservationService::release($order);
                     $order->status = 'cancelled';
                     $order->update_time = time();
                     $order->save();

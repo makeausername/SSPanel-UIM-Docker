@@ -10,6 +10,7 @@ use App\Models\LoginIp;
 use App\Models\Node;
 use App\Models\OnlineLog;
 use App\Models\SubscribeLog;
+use App\Services\FrontendI18n;
 use App\Utils\Tools;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
@@ -40,9 +41,13 @@ final class ProfileController extends BaseController
         }
 
         foreach ($ips as $ip) {
+            $node = (new Node())->where('id', $ip->node_id)->first();
             $ip->ip = str_replace('::ffff:', '', $ip->ip);
             $ip->location = Tools::getIpLocation($ip->ip);
-            $ip->node_name = (new Node())->where('id', $ip->node_id)->first()->name;
+            $ip->node_name = $node?->name ?? FrontendI18n::trans(
+                'response.deleted_node',
+                ['%id%' => (string) $ip->node_id]
+            );
             $ip->last_time = Tools::toDateTime((int) $ip->last_time);
         }
 

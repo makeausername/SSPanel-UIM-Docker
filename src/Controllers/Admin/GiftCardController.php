@@ -118,7 +118,16 @@ final class GiftCardController extends BaseController
     public function delete(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $card_id = $args['id'];
-        (new GiftCard())->find($card_id)->delete();
+        $giftCard = (new GiftCard())->find($card_id);
+
+        if ($giftCard === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '礼品卡不存在',
+            ]);
+        }
+
+        $giftCard->delete();
 
         return $response->withJson([
             'ret' => 1,

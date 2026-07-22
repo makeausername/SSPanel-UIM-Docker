@@ -6,9 +6,10 @@ namespace App\Controllers\User;
 
 use App\Controllers\BaseController;
 use App\Models\GiftCard;
-use App\Models\UserMoneyLog;
 use App\Models\User;
+use App\Models\UserMoneyLog;
 use App\Services\DB;
+use App\Services\FrontendI18n;
 use App\Services\InvoiceAccountingService;
 use App\Utils\Tools;
 use Exception;
@@ -48,13 +49,13 @@ final class MoneyController extends BaseController
             $giftcard = (new GiftCard())->where('card', $giftcard_raw)->lockForUpdate()->first();
 
             if ($giftcard === null || (int) $giftcard->status !== 0) {
-                return ['ret' => 0, 'msg' => '礼品卡无效'];
+                return ['ret' => 0, 'msg' => FrontendI18n::trans('response.giftcard_invalid')];
             }
 
             $user = (new User())->where('id', $this->user->id)->lockForUpdate()->first();
 
             if ($user === null || $user->is_shadow_banned) {
-                return ['ret' => 0, 'msg' => '礼品卡无效'];
+                return ['ret' => 0, 'msg' => FrontendI18n::trans('response.giftcard_invalid')];
             }
 
             $giftcard->status = 1;
@@ -72,10 +73,10 @@ final class MoneyController extends BaseController
                 (float) $moneyBefore,
                 (float) $moneyAfter,
                 (float) $giftcard->balance,
-                '礼品卡充值 ' . $giftcard->card
+                '礼品卡充值 / Gift card top-up ' . $giftcard->card
             );
 
-            return ['ret' => 1, 'msg' => '充值成功'];
+            return ['ret' => 1, 'msg' => FrontendI18n::trans('response.topup_success')];
         });
 
         return $response->withJson($result);

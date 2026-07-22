@@ -128,6 +128,10 @@ final class DocsController extends BaseController
     {
         $doc = (new Docs())->find($args['id']);
 
+        if ($doc === null) {
+            return $response->withRedirect('/admin/docs');
+        }
+
         return $response->write(
             $this->view()
                 ->assign('doc', $doc)
@@ -188,7 +192,7 @@ final class DocsController extends BaseController
     {
         $doc = (new Docs())->find($args['id']);
 
-        if (! $doc->delete()) {
+        if ($doc === null || ! $doc->delete()) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '删除失败',

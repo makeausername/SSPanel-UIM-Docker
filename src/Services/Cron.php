@@ -68,22 +68,6 @@ final class Cron
         echo Tools::toDateTime(time()) . ' 数据库清理完成' . PHP_EOL;
     }
 
-    private static function deleteInBatches(
-        object $model,
-        string $column,
-        int|string $before,
-        array $conditions = []
-    ): void
-    {
-        do {
-            $query = $model->newQuery()->where($column, '<', $before);
-            foreach ($conditions as $field => $value) {
-                $query->where($field, $value);
-            }
-            $deleted = $query->limit(5000)->delete();
-        } while ($deleted === 5000);
-    }
-
     public static function deleteUnpaidRegistrations(): void
     {
         $dueUsers = (new User())
@@ -135,29 +119,6 @@ final class Cron
         echo Tools::toDateTime(time())
             . " Unpaid registration cleanup completed: deleted={$deleted}, protected={$protected}, failed={$failed}"
             . PHP_EOL;
-    }
-
-    private static function hasQualifyingPlanPurchase(int $userId): bool
-    {
-        $orders = (new Order())->where('user_id', $userId)
-            ->where('product_type', 'tabp')
-            ->get(['id', 'status']);
-
-        if ($orders->isEmpty()) {
-            return false;
-        }
-
-        foreach ($orders as $order) {
-            if (in_array($order->status, ['pending_activation', 'activated', 'expired'], true)) {
-                return true;
-            }
-        }
-
-        return (new Invoice())->where('user_id', $userId)
-            ->where('type', 'product')
-            ->whereIn('order_id', $orders->pluck('id')->all())
-            ->whereIn('status', ['paid_gateway', 'paid_balance', 'paid_admin'])
-            ->exists();
     }
 
     public static function detectInactiveUser(): void
@@ -408,10 +369,11 @@ final class Cron
             $text_html = '<table><tr><td>金额</td><td>用户ID</td><td>用户名</td><td>充值时间</td></tr>';
 
             foreach ($paylists as $paylist) {
+                $payer = (new User())->find($paylist->userid);
                 $text_html .= '<tr>';
                 $text_html .= '<td>' . $paylist->total . '</td>';
                 $text_html .= '<td>' . $paylist->userid . '</td>';
-                $text_html .= '<td>' . (new User())->find($paylist->userid)->user_name . '</td>';
+                $text_html .= '<td>' . ($payer?->user_name ?? '已注销用户 #' . $paylist->userid) . '</td>';
                 $text_html .= '<td>' . Tools::toDateTime((int) $paylist->datetime) . '</td>';
                 $text_html .= '</tr>';
             }
@@ -605,5 +567,43 @@ final class Cron
         }
 
         echo Tools::toDateTime(time()) . ' 更新节点 IP 完成' . PHP_EOL;
+    }
+
+    private static function deleteInBatches(
+        object $model,
+        string $column,
+        int|string $before,
+        array $conditions = []
+    ): void {
+        do {
+            $query = $model->newQuery()->where($column, '<', $before);
+            foreach ($conditions as $field => $value) {
+                $query->where($field, $value);
+            }
+            $deleted = $query->limit(5000)->delete();
+        } while ($deleted === 5000);
+    }
+
+    private static function hasQualifyingPlanPurchase(int $userId): bool
+    {
+        $orders = (new Order())->where('user_id', $userId)
+            ->where('product_type', 'tabp')
+            ->get(['id', 'status']);
+
+        if ($orders->isEmpty()) {
+            return false;
+        }
+
+        foreach ($orders as $order) {
+            if (in_array($order->status, ['pending_activation', 'activated', 'expired'], true)) {
+                return true;
+            }
+        }
+
+        return (new Invoice())->where('user_id', $userId)
+            ->where('type', 'product')
+            ->whereIn('order_id', $orders->pluck('id')->all())
+            ->whereIn('status', ['paid_gateway', 'paid_balance', 'paid_admin'])
+            ->exists();
     }
 }
