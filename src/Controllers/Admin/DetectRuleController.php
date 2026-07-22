@@ -148,7 +148,7 @@ final class DetectRuleController extends BaseController
             return $response->withJson(['ret' => 0, 'msg' => '系统托管规则不能删除，可以停用。']);
         }
 
-        DB::connection()->transaction(function () use ($rule): void {
+        DB::connection()->transaction(static function () use ($rule): void {
             (new XNodeAuditRulePattern())->where('rule_id', (int) $rule->id)->delete();
             $rule->delete();
         });
@@ -161,91 +161,150 @@ final class DetectRuleController extends BaseController
         $rules = (new XNodeAuditRule())->orderBy('priority')->orderBy('id')->get();
 
         foreach ($rules as $rule) {
-            $toggleLabel = (int) $rule->enabled === 1 ? '停用' : '启用';
-            $toggleIcon = (int) $rule->enabled === 1 ? 'ti-player-pause' : 'ti-player-play';
-            $toggleClass = (int) $rule->enabled === 1 ? 'btn-outline-secondary' : 'btn-primary';
-            $rule->op = '<div class="audit-rule-actions">'
-                . '<button type="button" class="btn btn-sm ' . $toggleClass . '" title="' . $toggleLabel . '规则" '
-                . 'onclick="toggleRule(' . (int) $rule->id . ')">'
-                . '<i class="icon ti ' . $toggleIcon . '"></i><span class="d-none d-xl-inline">' . $toggleLabel . '</span></button>';
-            if ((int) $rule->managed !== 1) {
-                $rule->op .= '<button type="button" class="btn btn-sm btn-outline-danger" title="删除规则" '
-                    . 'onclick="deleteRule(' . (int) $rule->id . ')">'
-                    . '<i class="icon ti ti-trash"></i><span class="d-none d-xl-inline">删除</span></button>';
-            }
-            $rule->op .= '</div>';
-
             $patterns = (new XNodeAuditRulePattern())
                 ->where('rule_id', (int) $rule->id)
                 ->orderBy('pattern')
                 ->pluck('pattern')
                 ->toArray();
+
+            $rule->op = $this->renderActions($rule);
             $rule->patterns = $this->renderPatterns($patterns);
-
-            $sourceLabel = match ((string) $rule->source) {
-                'system' => '系统默认',
-                'user_complaint' => '用户投诉清单',
-                default => '管理员',
-            };
-            $sourceClass = match ((string) $rule->source) {
-                'system' => 'bg-blue-lt text-blue',
-                'user_complaint' => 'bg-red-lt text-red',
-                default => 'bg-secondary-lt text-secondary',
-            };
-            $rule->name = '<div class="audit-rule-name">' . htmlspecialchars((string) $rule->name) . '</div>'
-                . '<div class="audit-rule-meta"><span class="badge ' . $sourceClass . '">' . $sourceLabel . '</span>'
-                . '<span>#' . (int) $rule->id . '</span><span>优先级 ' . (int) $rule->priority . '</span></div>';
-
-            $description = trim((string) $rule->description);
-            $rule->description = '<div class="audit-rule-description">'
-                . ($description === '' ? '—' : htmlspecialchars($description)) . '</div>';
-
-            $matchTypeLabel = match ((string) $rule->match_type) {
-                'domain_suffix' => '域名后缀',
-                'domain_regex' => '域名正则',
-                'protocol' => '协议识别',
-                'ip_cidr' => 'IP / CIDR',
-                'port' => '端口',
-                default => htmlspecialchars((string) $rule->match_type),
-            };
-            $networkLabel = match ((string) $rule->network) {
-                'tcp' => 'TCP',
-                'udp' => 'UDP',
-                default => '全部网络',
-            };
-            $severityLabel = match ((string) $rule->severity) {
-                'critical' => '严重',
-                'high' => '高风险',
-                'low' => '低风险',
-                default => '中风险',
-            };
-            $severityClass = match ((string) $rule->severity) {
-                'critical' => 'bg-red text-red-fg',
-                'high' => 'bg-orange-lt text-orange',
-                'low' => 'bg-green-lt text-green',
-                default => 'bg-yellow-lt text-yellow',
-            };
-            $rule->match_summary = '<div class="audit-policy-stack">'
-                . '<span class="badge bg-azure-lt text-azure">' . $matchTypeLabel . '</span>'
-                . '<span class="badge ' . $severityClass . '">' . $severityLabel . '</span>'
-                . '<span class="text-secondary small">' . $networkLabel . '</span></div>';
-
-            $rule->action_label = (string) $rule->action === 'block'
-                ? '<span class="badge bg-red-lt text-red"><i class="icon ti ti-ban me-1"></i>阻止并记录</span>'
-                : '<span class="badge bg-blue-lt text-blue"><i class="icon ti ti-file-description me-1"></i>仅记录</span>';
-
-            $scopeLabel = (string) $rule->scope_type === 'all'
-                ? '所有节点'
-                : ((string) $rule->scope_type === 'node' ? '节点 ' : '节点组 ') . (int) $rule->scope_value;
-            $rule->scope = '<span class="badge bg-secondary-lt text-secondary">' . $scopeLabel . '</span>';
-
-            $enabled = (int) $rule->enabled === 1;
-            $rule->enabled_label = '<span class="audit-status ' . ($enabled ? 'text-green' : 'text-secondary') . '">'
-                . '<span class="audit-status-dot ' . ($enabled ? 'bg-green' : 'bg-secondary') . '"></span>'
-                . ($enabled ? '已启用' : '已停用') . '</span>';
+            $rule->name = $this->renderRuleName($rule);
+            $rule->description = $this->renderDescription($rule);
+            $rule->match_summary = $this->renderMatchSummary($rule);
+            $rule->action_label = $this->renderAction($rule);
+            $rule->scope = $this->renderScope($rule);
+            $rule->enabled_label = $this->renderStatus($rule);
         }
 
         return $response->withJson(['rules' => $rules]);
+    }
+
+    private function renderActions(XNodeAuditRule $rule): string
+    {
+        $enabled = (int) $rule->enabled;
+        $toggleLabels = [0 => '启用', 1 => '停用'];
+        $toggleIcons = [0 => 'ti-player-play', 1 => 'ti-player-pause'];
+        $toggleClasses = [0 => 'btn-primary', 1 => 'btn-outline-secondary'];
+        $deleteButtons = [
+            0 => sprintf(
+                '<button type="button" class="btn btn-sm btn-outline-danger" title="删除规则" onclick="deleteRule(%d)"><i class="icon ti ti-trash"></i><span class="d-none d-xl-inline">删除</span></button>',
+                (int) $rule->id
+            ),
+            1 => '',
+        ];
+
+        return sprintf(
+            '<div class="audit-rule-actions"><button type="button" class="btn btn-sm %s" title="%s规则" onclick="toggleRule(%d)"><i class="icon ti %s"></i><span class="d-none d-xl-inline">%s</span></button>%s</div>',
+            $toggleClasses[$enabled],
+            $toggleLabels[$enabled],
+            (int) $rule->id,
+            $toggleIcons[$enabled],
+            $toggleLabels[$enabled],
+            $deleteButtons[(int) $rule->managed]
+        );
+    }
+
+    private function renderRuleName(XNodeAuditRule $rule): string
+    {
+        $source = (string) $rule->source;
+        $sourceLabels = [
+            'system' => '系统默认',
+            'user_complaint' => '用户投诉清单',
+            'admin' => '管理员',
+        ];
+        $sourceClasses = [
+            'system' => 'bg-blue-lt text-blue',
+            'user_complaint' => 'bg-red-lt text-red',
+            'admin' => 'bg-secondary-lt text-secondary',
+        ];
+
+        return sprintf(
+            '<div class="audit-rule-name">%s</div><div class="audit-rule-meta"><span class="badge %s">%s</span><span>#%d</span><span>优先级 %d</span></div>',
+            htmlspecialchars((string) $rule->name),
+            $sourceClasses[$source] ?? $sourceClasses['admin'],
+            $sourceLabels[$source] ?? $sourceLabels['admin'],
+            (int) $rule->id,
+            (int) $rule->priority
+        );
+    }
+
+    private function renderDescription(XNodeAuditRule $rule): string
+    {
+        return sprintf(
+            '<div class="audit-rule-description">%s</div>',
+            htmlspecialchars(trim((string) $rule->description))
+        );
+    }
+
+    private function renderMatchSummary(XNodeAuditRule $rule): string
+    {
+        $matchTypes = [
+            'domain_suffix' => '域名后缀',
+            'domain_regex' => '域名正则',
+            'protocol' => '协议识别',
+            'ip_cidr' => 'IP / CIDR',
+            'port' => '端口',
+        ];
+        $networks = ['any' => '全部网络', 'tcp' => 'TCP', 'udp' => 'UDP'];
+        $severityLabels = ['critical' => '严重', 'high' => '高风险', 'medium' => '中风险', 'low' => '低风险'];
+        $severityClasses = [
+            'critical' => 'bg-red text-red-fg',
+            'high' => 'bg-orange-lt text-orange',
+            'medium' => 'bg-yellow-lt text-yellow',
+            'low' => 'bg-green-lt text-green',
+        ];
+        $matchType = (string) $rule->match_type;
+        $network = (string) $rule->network;
+        $severity = (string) $rule->severity;
+
+        return sprintf(
+            '<div class="audit-policy-stack"><span class="badge bg-azure-lt text-azure">%s</span><span class="badge %s">%s</span><span class="text-secondary small">%s</span></div>',
+            $matchTypes[$matchType] ?? htmlspecialchars($matchType),
+            $severityClasses[$severity] ?? $severityClasses['medium'],
+            $severityLabels[$severity] ?? $severityLabels['medium'],
+            $networks[$network] ?? $networks['any']
+        );
+    }
+
+    private function renderAction(XNodeAuditRule $rule): string
+    {
+        $actions = [
+            'block' => '<span class="badge bg-red-lt text-red"><i class="icon ti ti-ban me-1"></i>阻止并记录</span>',
+            'log_only' => '<span class="badge bg-blue-lt text-blue"><i class="icon ti ti-file-description me-1"></i>仅记录</span>',
+        ];
+
+        return $actions[(string) $rule->action] ?? $actions['log_only'];
+    }
+
+    private function renderScope(XNodeAuditRule $rule): string
+    {
+        $scopeType = (string) $rule->scope_type;
+        $scopeLabels = [
+            'all' => '所有节点',
+            'node' => '节点 ' . (int) $rule->scope_value,
+            'group' => '节点组 ' . (int) $rule->scope_value,
+        ];
+
+        return sprintf(
+            '<span class="badge bg-secondary-lt text-secondary">%s</span>',
+            $scopeLabels[$scopeType] ?? $scopeLabels['all']
+        );
+    }
+
+    private function renderStatus(XNodeAuditRule $rule): string
+    {
+        $enabled = (int) $rule->enabled;
+        $textClasses = [0 => 'text-secondary', 1 => 'text-green'];
+        $dotClasses = [0 => 'bg-secondary', 1 => 'bg-green'];
+        $labels = [0 => '已停用', 1 => '已启用'];
+
+        return sprintf(
+            '<span class="audit-status %s"><span class="audit-status-dot %s"></span>%s</span>',
+            $textClasses[$enabled],
+            $dotClasses[$enabled],
+            $labels[$enabled]
+        );
     }
 
     private function renderPatterns(array $patterns): string
@@ -260,23 +319,26 @@ final class DetectRuleController extends BaseController
             return '<span class="text-secondary">—</span>';
         }
 
-        $preview = array_slice($patterns, 0, $count > 3 ? 2 : $count);
+        $preview = array_slice($patterns, 0, 2);
         $previewHtml = implode('', array_map(
-            static fn (string $pattern): string => '<code class="audit-pattern-chip">' . $pattern . '</code>',
+            static fn (string $pattern): string => sprintf('<code class="audit-pattern-chip">%s</code>', $pattern),
             $preview
         ));
 
-        if ($count <= 3) {
-            return '<div class="audit-pattern-preview">' . $previewHtml . '</div>';
+        if ($count <= 2) {
+            return sprintf('<div class="audit-pattern-preview">%s</div>', $previewHtml);
         }
 
         $allPatterns = implode('', array_map(
-            static fn (string $pattern): string => '<code class="audit-pattern-chip">' . $pattern . '</code>',
+            static fn (string $pattern): string => sprintf('<code class="audit-pattern-chip">%s</code>', $pattern),
             $patterns
         ));
 
-        return '<div class="audit-patterns"><div class="audit-pattern-preview">' . $previewHtml . '</div>'
-            . '<details><summary><i class="icon ti ti-chevron-down me-1"></i>查看全部 ' . $count . ' 项</summary>'
-            . '<div class="audit-pattern-list">' . $allPatterns . '</div></details></div>';
+        return sprintf(
+            '<div class="audit-patterns"><div class="audit-pattern-preview">%s</div><details><summary><i class="icon ti ti-chevron-down me-1"></i>查看全部 %d 项</summary><div class="audit-pattern-list">%s</div></details></div>',
+            $previewHtml,
+            $count,
+            $allPatterns
+        );
     }
 }
