@@ -59,10 +59,13 @@ return new class() implements MigrationInterface {
             return $statement->fetchColumn() !== false;
         }
 
-        $statement = $pdo->prepare('SHOW TABLES LIKE ?');
+        $statement = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
+        );
         $statement->execute(['node_profiles']);
 
-        return $statement->fetchColumn() !== false;
+        return (int) $statement->fetchColumn() > 0;
     }
 
     private function hasIndex(\PDO $pdo, string $driver): bool
@@ -77,9 +80,12 @@ return new class() implements MigrationInterface {
             return false;
         }
 
-        $statement = $pdo->prepare('SHOW INDEX FROM `node_profiles` WHERE `Key_name` = ?');
-        $statement->execute([self::INDEX]);
+        $statement = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?'
+        );
+        $statement->execute(['node_profiles', self::INDEX]);
 
-        return $statement->fetchColumn() !== false;
+        return (int) $statement->fetchColumn() > 0;
     }
 };
