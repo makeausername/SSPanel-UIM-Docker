@@ -120,7 +120,7 @@ return new class() implements MigrationInterface {
             return;
         }
 
-        $pdo->exec("UPDATE `mfa_devices` SET `type` = LOWER(`type`) WHERE `type` IS NOT NULL");
+        $pdo->exec('UPDATE `mfa_devices` SET `type` = LOWER(`type`) WHERE `type` IS NOT NULL');
         $duplicates = $pdo->query(
             "SELECT `userid`, `rawid`, MIN(`id`) AS `keep_id`
              FROM `mfa_devices`

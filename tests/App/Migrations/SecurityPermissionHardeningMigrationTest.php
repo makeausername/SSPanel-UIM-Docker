@@ -16,7 +16,7 @@ final class SecurityPermissionHardeningMigrationTest extends TestCase
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->exec('CREATE TABLE `user` (`id` INTEGER PRIMARY KEY, `is_admin` INTEGER NOT NULL DEFAULT 0, `is_banned` INTEGER NOT NULL DEFAULT 0)');
         $pdo->exec('CREATE TABLE `mfa_devices` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `userid` INTEGER NOT NULL, `rawid` VARCHAR(255), `type` VARCHAR(50))');
-        $pdo->exec("INSERT INTO `user` (`id`, `is_admin`) VALUES (1, 1), (2, 1), (3, 0)");
+        $pdo->exec('INSERT INTO `user` (`id`, `is_admin`) VALUES (1, 1), (2, 1), (3, 0)');
         $pdo->exec("INSERT INTO `mfa_devices` (`userid`, `rawid`, `type`) VALUES (1, 'TOTP', 'TOTP'), (1, 'TOTP', 'totp')");
         $migration = require dirname(__DIR__, 3)
             . '/db/migrations/2026072202-security-permission-hardening.php';

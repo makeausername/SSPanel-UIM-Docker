@@ -13,8 +13,8 @@ use Psr\Http\Server\RequestHandlerInterface;
 use Throwable;
 use function in_array;
 use function json_encode;
-use function time;
 use function strtoupper;
+use function time;
 
 final class AdminAudit implements MiddlewareInterface
 {
@@ -59,7 +59,7 @@ final class AdminAudit implements MiddlewareInterface
                 'datetime' => time(),
             ]);
         } catch (Throwable) {
-            // Auditing must not turn an otherwise valid admin response into an outage.
+            return;
         }
     }
 }

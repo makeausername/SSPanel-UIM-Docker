@@ -10,7 +10,7 @@ use function date_default_timezone_set;
 use function strlen;
 use const BASE_PATH;
 
-class ToolsTest extends TestCase
+final class ToolsTest extends TestCase
 {
     /**
      * @covers App\Utils\Tools::getIpLocation
@@ -355,7 +355,7 @@ class ToolsTest extends TestCase
     /**
      * @covers App\Utils\Tools::isJson
      */
-    public function testIsJson()
+    public function testIsJson(): void
     {
         $this->assertTrue(Tools::isJson('{}'));
         $this->assertFalse(Tools::isJson('[]'));

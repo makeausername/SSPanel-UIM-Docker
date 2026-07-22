@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\MFA;
 
 use App\Models\MFADevice;
 use App\Models\User;
-use App\Services\FrontendI18n;
 use App\Services\Cache;
+use App\Services\FrontendI18n;
 use App\Utils\Tools;
 use Cose\Algorithm\Manager;
 use Cose\Algorithm\Signature\ECDSA;
@@ -36,7 +38,7 @@ use Webauthn\PublicKeyCredentialRpEntity;
 use Webauthn\PublicKeyCredentialSource;
 use Webauthn\PublicKeyCredentialUserEntity;
 
-class WebAuthn
+final class WebAuthn
 {
     public static int $timeout = 30_000;
 

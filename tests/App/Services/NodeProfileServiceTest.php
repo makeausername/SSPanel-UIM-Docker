@@ -8,7 +8,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Schema\Blueprint;
 use PHPUnit\Framework\TestCase;
 
-class NodeProfileServiceTest extends TestCase
+final class NodeProfileServiceTest extends TestCase
 {
     private Capsule $db;
 

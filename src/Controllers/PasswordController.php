@@ -7,8 +7,8 @@ namespace App\Controllers;
 use App\Models\Config;
 use App\Models\User;
 use App\Services\Cache;
-use App\Services\ClientSessionService;
 use App\Services\Captcha;
+use App\Services\ClientSessionService;
 use App\Services\FrontendI18n;
 use App\Services\OneTimeTokenService;
 use App\Services\Password;
@@ -73,7 +73,7 @@ final class PasswordController extends BaseController
             try {
                 Password::sendResetEmail($email);
             } catch (ClientExceptionInterface | RedisException) {
-                // Keep the same outward response to avoid disclosing account existence.
+                return ResponseHelper::success($response, $msg);
             }
         }
 
@@ -133,31 +133,6 @@ final class PasswordController extends BaseController
             ->write($this->view()->fetch('password/token.tpl'));
     }
 
-    private static function resetTokenCookie(string $token): string
-    {
-        $ttl = max(1, min((int) Config::obtain('email_password_reset_ttl'), 900));
-        $cookie = 'password_reset_token=' . rawurlencode($token)
-            . '; Max-Age=' . $ttl
-            . '; Path=/password/token; HttpOnly; SameSite=Lax';
-
-        if (str_starts_with((string) $_ENV['baseUrl'], 'https://')) {
-            $cookie .= '; Secure';
-        }
-
-        return $cookie;
-    }
-
-    private static function clearResetTokenCookie(): string
-    {
-        $cookie = 'password_reset_token=; Max-Age=0; Path=/password/token; HttpOnly; SameSite=Lax';
-
-        if (str_starts_with((string) $_ENV['baseUrl'], 'https://')) {
-            $cookie .= '; Secure';
-        }
-
-        return $cookie;
-    }
-
     public function handleToken(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $token = $this->antiXss->xss_clean($request->getCookieParam('password_reset_token', ''));
@@ -209,5 +184,30 @@ final class PasswordController extends BaseController
 
         return ResponseHelper::success($response, FrontendI18n::trans('response.reset_success'))
             ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
+    }
+
+    private static function resetTokenCookie(string $token): string
+    {
+        $ttl = max(1, min((int) Config::obtain('email_password_reset_ttl'), 900));
+        $cookie = 'password_reset_token=' . rawurlencode($token)
+            . '; Max-Age=' . $ttl
+            . '; Path=/password/token; HttpOnly; SameSite=Lax';
+
+        if (str_starts_with((string) $_ENV['baseUrl'], 'https://')) {
+            $cookie .= '; Secure';
+        }
+
+        return $cookie;
+    }
+
+    private static function clearResetTokenCookie(): string
+    {
+        $cookie = 'password_reset_token=; Max-Age=0; Path=/password/token; HttpOnly; SameSite=Lax';
+
+        if (str_starts_with((string) $_ENV['baseUrl'], 'https://')) {
+            $cookie .= '; Secure';
+        }
+
+        return $cookie;
     }
 }

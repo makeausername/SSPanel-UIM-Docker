@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use stdClass;
 
-class V2RayTest extends TestCase
+final class V2RayTest extends TestCase
 {
     private const PUBLIC_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
@@ -109,10 +109,8 @@ class V2RayTest extends TestCase
         $profile = (new NodeProfileService())->buildDefaultConfig(2001, 'node.example.com');
 
         $this->assertSame(
-            'vless://11111111-2222-3333-4444-555555555555@node.example.com:443?'
-            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
-            . '&pbk=' . self::PUBLIC_KEY . '&sid=0123456789abcdef&type=tcp'
-            . '&flow=xtls-rprx-vision#XNode%20Alpha',
+            'vless://11111111-2222-3333-4444-555555555555@node.example.com:443?encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome&pbk='
+            . self::PUBLIC_KEY . '&sid=0123456789abcdef&type=tcp&flow=xtls-rprx-vision#XNode%20Alpha',
             $url
         );
         $this->assertSame(443, $profile['profile']['port']);

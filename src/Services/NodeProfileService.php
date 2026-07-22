@@ -30,6 +30,7 @@ final class NodeProfileService
 
     /**
      * @param int|string $nodeId
+     *
      * @throws JsonException
      */
     public function buildDefaultConfig($nodeId, string $domain): array
@@ -257,7 +258,7 @@ final class NodeProfileService
             throw new InvalidArgumentException('XNode SNI cannot be empty.');
         }
 
-        $target = trim((string) ($profile['target'] ?? ($serverName . ':443')));
+        $target = trim((string) ($profile['target'] ?? $serverName . ':443'));
         if ($target === '') {
             throw new InvalidArgumentException('XNode Reality target cannot be empty.');
         }

@@ -16,6 +16,7 @@ use App\Utils\ResponseHelper;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use Throwable;
 use function array_key_exists;
 use function is_array;
 use function json_decode;
@@ -26,7 +27,6 @@ use function strtolower;
 use function strtotime;
 use function time;
 use function trim;
-use Throwable;
 
 final class ClientApiController extends BaseController
 {

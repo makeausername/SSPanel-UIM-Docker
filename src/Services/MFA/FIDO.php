@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\MFA;
 
 use App\Models\MFADevice;
 use App\Models\User;
-use App\Services\FrontendI18n;
 use App\Services\Cache;
+use App\Services\FrontendI18n;
 use App\Utils\Tools;
 use Exception;
 use Webauthn\AuthenticatorAssertionResponse;
@@ -17,9 +19,8 @@ use Webauthn\PublicKeyCredentialDescriptor;
 use Webauthn\PublicKeyCredentialRequestOptions;
 use Webauthn\PublicKeyCredentialSource;
 
-class FIDO
+final class FIDO
 {
-
     public static function RegisterRequest(User $user): array
     {
         $rpEntity = WebAuthn::generateRPEntity();

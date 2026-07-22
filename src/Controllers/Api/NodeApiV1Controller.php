@@ -6,8 +6,8 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Services\NodeEnrollmentService;
-use App\Services\NodeProfileService;
 use App\Services\NodeProbeService;
+use App\Services\NodeProfileService;
 use App\Services\NodeRuntimeService;
 use App\Services\XNodeAuditService;
 use InvalidArgumentException;
