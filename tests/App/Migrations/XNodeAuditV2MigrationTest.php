@@ -9,6 +9,21 @@ use PHPUnit\Framework\TestCase;
 
 final class XNodeAuditV2MigrationTest extends TestCase
 {
+    public function testMariaDbMetadataLookupsUsePreparableInformationSchemaQueries(): void
+    {
+        $source = file_get_contents(
+            dirname(__DIR__, 3) . '/db/migrations/2026072200-add_xnode_audit_v2.php'
+        );
+
+        $this->assertIsString($source);
+        $this->assertStringContainsString('information_schema.TABLES', $source);
+        $this->assertStringContainsString('information_schema.COLUMNS', $source);
+        $this->assertStringContainsString('information_schema.STATISTICS', $source);
+        $this->assertStringNotContainsString('SHOW TABLES LIKE ?', $source);
+        $this->assertStringNotContainsString('SHOW COLUMNS FROM `{$table}` LIKE ?', $source);
+        $this->assertStringNotContainsString('SHOW INDEX FROM `{$table}` WHERE `Key_name` = ?', $source);
+    }
+
     public function testMigrationSeedsManagedRulesAndComplaintDomainsIdempotently(): void
     {
         $pdo = new PDO('sqlite::memory:');
