@@ -148,11 +148,19 @@ final class InviteSubscriptionRewardService
 
             foreach ($orders as $order) {
                 $content = json_decode((string) $order->product_content);
-                if ($content !== null && self::rewardDays($content) > 0) {
-                    $activeOrder = $order;
-                    $activeContent = $content;
-                    break;
+                if ($content === null || self::rewardDays($content) === 0) {
+                    continue;
                 }
+
+                if (self::effectiveExpiryTimestamp($order, $content) <= time()) {
+                    $order->status = 'expired';
+                    $order->save();
+                    continue;
+                }
+
+                $activeOrder = $order;
+                $activeContent = $content;
+                break;
             }
 
             if ($activeOrder === null || $activeContent === null) {

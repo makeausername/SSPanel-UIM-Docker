@@ -94,11 +94,17 @@ final class Config extends Model
         $value = is_array($value) ? json_encode($value) : $value;
 
         try {
-            (new Config())->where('item', $item)->update(['value' => $value]);
+            $config = (new Config())->where('item', $item)->first();
+
+            if ($config === null) {
+                return false;
+            }
+
+            $config->value = $value;
+
+            return $config->save();
         } catch (QueryException $e) {
             return false;
         }
-
-        return true;
     }
 }

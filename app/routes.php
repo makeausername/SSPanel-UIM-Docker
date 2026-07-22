@@ -71,7 +71,6 @@ return static function (Slim\App $app): void {
         $group->get('/detect/log', App\Controllers\User\DetectLogController::class . ':index');
         // 工单
         $group->get('/ticket', App\Controllers\User\TicketController::class . ':index');
-        $group->get('/ticket/create', App\Controllers\User\TicketController::class . ':create');
         $group->post('/ticket', App\Controllers\User\TicketController::class . ':add');
         $group->get('/ticket/{id:[0-9]+}/view', App\Controllers\User\TicketController::class . ':detail');
         $group->post('/ticket/{id:[0-9]+}', App\Controllers\User\TicketController::class . ':reply');
@@ -184,7 +183,6 @@ return static function (Slim\App $app): void {
         $group->post('/node/ajax', App\Controllers\Admin\NodeController::class . ':ajax');
         // Ticket
         $group->get('/ticket', App\Controllers\Admin\TicketController::class . ':index');
-        $group->post('/ticket', App\Controllers\Admin\TicketController::class . ':add');
         $group->get('/ticket/{id:[0-9]+}/view', App\Controllers\Admin\TicketController::class . ':detail');
         $group->post('/ticket/{id:[0-9]+}/close', App\Controllers\Admin\TicketController::class . ':close');
         $group->post('/ticket/{id:[0-9]+}', App\Controllers\Admin\TicketController::class . ':reply');

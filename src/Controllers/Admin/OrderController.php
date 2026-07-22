@@ -11,6 +11,7 @@ use App\Models\Paylist;
 use App\Models\User;
 use App\Services\DB;
 use App\Services\InvoiceRefundService;
+use App\Services\OrderReservationService;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -89,6 +90,11 @@ final class OrderController extends BaseController
         $order->content = json_decode($order->product_content);
 
         $invoice = (new Invoice())->where('order_id', $id)->first();
+
+        if ($invoice === null) {
+            return $response->withStatus(301)->withHeader('Location', '/admin/order');
+        }
+
         $invoice->status = $invoice->status();
         $invoice->create_time = Tools::toDateTime($invoice->create_time);
         $invoice->update_time = Tools::toDateTime($invoice->update_time);
@@ -127,6 +133,7 @@ final class OrderController extends BaseController
                 return ['ret' => 0, 'msg' => '无法取消账单已部分支付的订单'];
             }
 
+            OrderReservationService::release($order);
             $order->update_time = time();
             $order->status = 'cancelled';
             $order->save();

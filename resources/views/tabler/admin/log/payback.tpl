@@ -6,10 +6,10 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        <span class="home-title">返利记录</span>
+                        <span class="home-title">邀请订阅奖励</span>
                     </h2>
                     <div class="page-pretitle my-3">
-                        <span class="home-subtitle">查看用户的返利记录</span>
+                        <span class="home-subtitle">查看固定套餐邀请奖励的创建与应用状态</span>
                     </div>
                 </div>
             </div>

@@ -182,6 +182,11 @@ final class NodeController extends BaseController
     public function edit(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $node = (new Node())->find($args['id']);
+
+        if ($node === null) {
+            return $response->withRedirect('/admin/node');
+        }
+
         $runtime = (new NodeRuntime())->where('node_id', (int) $args['id'])->first();
         $nodeBandwidth = (int) $node->node_bandwidth;
 
@@ -206,6 +211,13 @@ final class NodeController extends BaseController
     public function update(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $node = (new Node())->find($args['id']);
+
+        if ($node === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点不存在',
+            ]);
+        }
 
         $node->name = $request->getParam('name');
         $node->node_group = $request->getParam('node_group') ?? 0;
@@ -265,6 +277,14 @@ final class NodeController extends BaseController
     public function resetPassword(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $node = (new Node())->find($args['id']);
+
+        if ($node === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点不存在',
+            ]);
+        }
+
         $node->password = Tools::genRandomChar(32);
         $node->save();
 
@@ -277,6 +297,14 @@ final class NodeController extends BaseController
     public function resetBandwidth(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $node = (new Node())->find($args['id']);
+
+        if ($node === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点不存在',
+            ]);
+        }
+
         $node->node_bandwidth = 0;
         $node->save();
 
@@ -394,6 +422,14 @@ final class NodeController extends BaseController
     public function copy($request, $response, $args)
     {
         $old_node = (new Node())->find($args['id']);
+
+        if ($old_node === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点不存在',
+            ]);
+        }
+
         $new_node = $old_node->replicate([
             'node_bandwidth',
         ]);

@@ -7,6 +7,7 @@ namespace App\Controllers\User;
 use App\Controllers\BaseController;
 use App\Models\Config;
 use App\Models\Ticket;
+use App\Services\FrontendI18n;
 use App\Services\Notification;
 use App\Services\RateLimit;
 use App\Utils\ResponseHelper;
@@ -39,8 +40,8 @@ final class TicketController extends BaseController
         $tickets = (new Ticket())->where('userid', $this->user->id)->orderBy('datetime', 'desc')->get();
 
         foreach ($tickets as $ticket) {
-            $ticket->status = $ticket->status();
-            $ticket->type = $ticket->type();
+            $ticket->status = self::ticketStatus((string) $ticket->status);
+            $ticket->type = self::ticketType((string) $ticket->type);
             $ticket->datetime = Tools::toDateTime((int) $ticket->datetime);
         }
 
@@ -69,7 +70,7 @@ final class TicketController extends BaseController
             $comment === '' ||
             $type === ''
         ) {
-            return ResponseHelper::error($response, '工单创建失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.ticket_create_failed'));
         }
 
         $content = [
@@ -115,13 +116,13 @@ final class TicketController extends BaseController
             $this->user->is_shadow_banned ||
             $comment === ''
         ) {
-            ResponseHelper::error($response, '工单回复失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.ticket_reply_failed'));
         }
 
         $ticket = (new Ticket())->where('id', $id)->where('userid', $this->user->id)->first();
 
         if ($ticket === null) {
-            ResponseHelper::error($response, '工单不存在');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.ticket_not_found'));
         }
 
         $content_old = json_decode($ticket->content, true);
@@ -174,8 +175,8 @@ final class TicketController extends BaseController
             $comment->datetime = Tools::toDateTime((int) $comment->datetime);
         }
 
-        $ticket->status = $ticket->status();
-        $ticket->type = $ticket->type();
+        $ticket->status = self::ticketStatus((string) $ticket->status);
+        $ticket->type = self::ticketType((string) $ticket->type);
         $ticket->datetime = Tools::toDateTime((int) $ticket->datetime);
 
         return $response->write(
@@ -184,5 +185,25 @@ final class TicketController extends BaseController
                 ->assign('comments', $comments)
                 ->fetch('user/ticket/view.tpl')
         );
+    }
+
+    private static function ticketStatus(string $status): string
+    {
+        return match ($status) {
+            'closed' => FrontendI18n::trans('ticket.status_closed'),
+            'open_wait_user' => FrontendI18n::trans('ticket.status_open_wait_user'),
+            'open_wait_admin' => FrontendI18n::trans('ticket.status_open_wait_admin'),
+            default => FrontendI18n::trans('ticket.status_unknown'),
+        };
+    }
+
+    private static function ticketType(string $type): string
+    {
+        return match ($type) {
+            'howto' => FrontendI18n::trans('ticket.type_howto'),
+            'billing' => FrontendI18n::trans('ticket.type_billing'),
+            'account' => FrontendI18n::trans('ticket.type_account'),
+            default => FrontendI18n::trans('ticket.type_other'),
+        };
     }
 }

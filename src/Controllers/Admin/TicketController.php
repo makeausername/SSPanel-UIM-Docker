@@ -81,10 +81,15 @@ final class TicketController extends BaseController
         $ticket->content = json_encode(array_merge($content_old, $content_new));
         $ticket->status = 'open_wait_user';
         $ticket->save();
+        $ticketUser = (new User())->find($ticket->userid);
+
+        if ($ticketUser === null) {
+            return $response->withHeader('HX-Refresh', 'true');
+        }
 
         try {
             Notification::notifyUser(
-                (new User())->find($ticket->userid),
+                $ticketUser,
                 $_ENV['appName'] . '-工单被回复',
                 '你好，有人回复了<a href="' . $_ENV['baseUrl'] . '/user/ticket/' . $ticket->id . '/view">工单</a>，请你查看。'
             );
@@ -126,8 +131,12 @@ final class TicketController extends BaseController
             ];
 
             foreach ($content_old as $comment) {
+                $commenterType = $comment['commenter_type'] ?? null;
+                $isUserComment = $commenterType !== null
+                    ? $commenterType === 'user'
+                    : ($comment['commenter_name'] ?? '') !== 'Admin';
                 $context[] = [
-                    'role' => $comment['commenter_type'] ?? $comment['commenter_name'] === 'Admin' ? 'admin' : 'user',
+                    'role' => $isUserComment ? 'user' : 'admin',
                     'content' => $comment['comment'],
                 ];
             }
@@ -148,10 +157,15 @@ final class TicketController extends BaseController
         $ticket->content = json_encode(array_merge($content_old, $content_new));
         $ticket->status = 'open_wait_user';
         $ticket->save();
+        $ticketUser = (new User())->find($ticket->userid);
+
+        if ($ticketUser === null) {
+            return $response->withHeader('HX-Refresh', 'true');
+        }
 
         try {
             Notification::notifyUser(
-                (new User())->find($ticket->userid),
+                $ticketUser,
                 $_ENV['appName'] . '-工单被回复',
                 '你好，AI助理回复了<a href="' . $_ENV['baseUrl'] . '/user/ticket/' . $ticket->id . '/view">工单</a>，请你查看。'
             );

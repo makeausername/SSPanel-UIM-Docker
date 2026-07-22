@@ -408,10 +408,11 @@ final class Cron
             $text_html = '<table><tr><td>金额</td><td>用户ID</td><td>用户名</td><td>充值时间</td></tr>';
 
             foreach ($paylists as $paylist) {
+                $payer = (new User())->find($paylist->userid);
                 $text_html .= '<tr>';
                 $text_html .= '<td>' . $paylist->total . '</td>';
                 $text_html .= '<td>' . $paylist->userid . '</td>';
-                $text_html .= '<td>' . (new User())->find($paylist->userid)->user_name . '</td>';
+                $text_html .= '<td>' . ($payer?->user_name ?? '已注销用户 #' . $paylist->userid) . '</td>';
                 $text_html .= '<td>' . Tools::toDateTime((int) $paylist->datetime) . '</td>';
                 $text_html .= '</tr>';
             }

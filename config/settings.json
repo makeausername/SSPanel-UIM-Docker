@@ -1030,8 +1030,8 @@
         "value": "",
         "class": "im",
         "is_public": 0,
-        "type": "",
-        "default": "string",
+        "type": "string",
+        "default": "",
         "mark": "Slack Client ID"
     },
     {

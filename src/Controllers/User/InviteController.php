@@ -7,6 +7,7 @@ namespace App\Controllers\User;
 use App\Controllers\BaseController;
 use App\Models\InviteCode;
 use App\Models\InviteSubscriptionReward;
+use App\Services\FrontendI18n;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -63,7 +64,7 @@ final class InviteController extends BaseController
 
         return $response->withJson([
             'ret' => 1,
-            'msg' => '重置成功',
+            'msg' => FrontendI18n::trans('response.invite_reset_success'),
             'data' => [
                 'invite-url' => $_ENV['baseUrl'] . '/auth/register?code=' . $code,
             ],

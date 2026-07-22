@@ -930,13 +930,14 @@ final class Callback
 
         if ($OpEnd === 'get') {
             $this->allow_edit_message = false;
-            $code = (new InviteCode())->where('user_id', $this->user->id)->first();
+            $inviteCode = (new InviteCode())->where('user_id', $this->user->id)->first();
+            $code = $inviteCode?->code;
 
             if ($code === null) {
                 $code = (new InviteCode())->add($this->user->id);
             }
 
-            $inviteUrl = $_ENV['baseUrl'] . '/auth/register?code=' . $code->code;
+            $inviteUrl = $_ENV['baseUrl'] . '/auth/register?code=' . $code;
             $text = '<a href="' . $inviteUrl . '">' . $inviteUrl . '</a>';
 
             $sendMessage = [

@@ -159,6 +159,11 @@ final class UserController extends BaseController
     public function edit(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $user = (new User())->find($args['id']);
+
+        if ($user === null) {
+            return $response->withRedirect('/admin/user');
+        }
+
         $user->last_use_time = Tools::toDateTime($user->last_use_time);
         $user->last_check_in_time = Tools::toDateTime($user->last_check_in_time);
         $user->last_login_time = Tools::toDateTime($user->last_login_time);
@@ -250,7 +255,7 @@ final class UserController extends BaseController
         $id = $args['id'];
         $user = (new User())->find((int) $id);
 
-        if (! $user->kill()) {
+        if ($user === null || ! $user->kill()) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '删除失败',

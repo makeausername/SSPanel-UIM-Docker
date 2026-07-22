@@ -7,6 +7,7 @@ namespace App\Controllers\User;
 use App\Controllers\BaseController;
 use App\Models\Node;
 use App\Services\DynamicRate;
+use App\Services\FrontendI18n;
 use App\Services\Subscribe;
 use App\Utils\ResponseHelper;
 use Exception;
@@ -38,7 +39,7 @@ final class RateController extends BaseController
         if (count($node_list) === 0) {
             $node_list[] = [
                 'id' => 0,
-                'name' => '暂无节点',
+                'name' => FrontendI18n::trans('response.no_nodes'),
             ];
         }
 
@@ -70,7 +71,7 @@ final class RateController extends BaseController
         $node = $nodes->find($request->getParam('node_id'));
 
         if ($node === null) {
-            return ResponseHelper::error($response, '节点不存在');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.node_not_found'));
         }
 
         $event = json_encode([

@@ -148,9 +148,15 @@ final class AnnController extends BaseController
      */
     public function edit(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
+        $announcement = (new Ann())->find($args['id']);
+
+        if ($announcement === null) {
+            return $response->withRedirect('/admin/announcement');
+        }
+
         return $response->write(
             $this->view()
-                ->assign('ann', (new Ann())->find($args['id']))
+                ->assign('ann', $announcement)
                 ->assign('update_field', self::$update_field)
                 ->fetch('admin/announcement/edit.tpl')
         );
@@ -218,7 +224,9 @@ final class AnnController extends BaseController
      */
     public function delete(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        if ((new Ann())->find($args['id'])->delete()) {
+        $announcement = (new Ann())->find($args['id']);
+
+        if ($announcement !== null && $announcement->delete()) {
             return $response->withJson([
                 'ret' => 1,
                 'msg' => '删除成功',

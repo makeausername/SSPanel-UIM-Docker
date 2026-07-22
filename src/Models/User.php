@@ -261,16 +261,19 @@ final class User extends Model
 
     public function unbindIM(): bool
     {
-        $this->im_type = 0;
-        $this->im_value = '';
+        $imType = (int) $this->im_type;
+        $imValue = (string) $this->im_value;
 
-        if ($this->im_type === 4 && Config::obtain('telegram_unbind_kick_member')) {
+        if ($imType === 4 && Config::obtain('telegram_unbind_kick_member')) {
             try {
-                (new Telegram())->banGroupMember((int) $this->im_value);
+                (new Telegram())->banGroupMember((int) $imValue);
             } catch (TelegramSDKException) {
                 return false;
             }
         }
+
+        $this->im_type = 0;
+        $this->im_value = '';
 
         return $this->save();
     }

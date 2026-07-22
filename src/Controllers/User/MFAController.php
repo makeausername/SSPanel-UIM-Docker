@@ -6,6 +6,7 @@ namespace App\Controllers\User;
 
 use App\Controllers\BaseController;
 use App\Models\MFADevice;
+use App\Services\FrontendI18n;
 use App\Services\MFA\FIDO;
 use App\Services\MFA\TOTP;
 use App\Services\MFA\WebAuthn;
@@ -29,7 +30,10 @@ final class MFAController extends BaseController
         try {
             return $response->withJson(WebAuthn::RegisterHandle($this->user, $this->antiXss->xss_clean($request)));
         } catch (Exception $e) {
-            return $response->withJson(['ret' => 0, 'msg' => '请求失败: ' . $e->getMessage()]);
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => FrontendI18n::trans('response.request_failed', ['%message%' => $e->getMessage()]),
+            ]);
         }
     }
 
@@ -43,13 +47,13 @@ final class MFAController extends BaseController
         if ($webauthnDevice === null) {
             return $response->withJson([
                 'ret' => 0,
-                'msg' => '设备不存在',
+                'msg' => FrontendI18n::trans('response.device_not_found'),
             ]);
         }
         $webauthnDevice->delete();
         return $response->withHeader('HX-Refresh', 'true')->withJson([
             'ret' => 1,
-            'msg' => '删除成功',
+            'msg' => FrontendI18n::trans('response.device_delete_success'),
         ]);
     }
 
@@ -63,7 +67,10 @@ final class MFAController extends BaseController
         try {
             return $response->withJson(TOTP::RegisterHandle($this->user, $this->antiXss->xss_clean($request->getParam('code', ''))));
         } catch (Exception $e) {
-            return $response->withJson(['ret' => 0, 'msg' => '请求失败: ' . $e->getMessage()]);
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => FrontendI18n::trans('response.request_failed', ['%message%' => $e->getMessage()]),
+            ]);
         }
     }
 
@@ -76,13 +83,13 @@ final class MFAController extends BaseController
         if ($totpDevice === null) {
             return $response->withJson([
                 'ret' => 0,
-                'msg' => '设备不存在',
+                'msg' => FrontendI18n::trans('response.device_not_found'),
             ]);
         }
         $totpDevice->delete();
         return $response->withHeader('HX-Refresh', 'true')->withJson([
             'ret' => 1,
-            'msg' => '删除成功',
+            'msg' => FrontendI18n::trans('response.device_delete_success'),
         ]);
     }
 
@@ -96,7 +103,10 @@ final class MFAController extends BaseController
         try {
             return $response->withJson(FIDO::RegisterHandle($this->user, $this->antiXss->xss_clean($request->getParsedBody())));
         } catch (Exception $e) {
-            return $response->withJson(['ret' => 0, 'msg' => '请求失败: ' . $e->getMessage()]);
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => FrontendI18n::trans('response.request_failed', ['%message%' => $e->getMessage()]),
+            ]);
         }
     }
 
@@ -110,13 +120,13 @@ final class MFAController extends BaseController
         if ($fidoDevice === null) {
             return $response->withJson([
                 'ret' => 0,
-                'msg' => '设备不存在',
+                'msg' => FrontendI18n::trans('response.device_not_found'),
             ]);
         }
         $fidoDevice->delete();
         return $response->withHeader('HX-Refresh', 'true')->withJson([
             'ret' => 1,
-            'msg' => '删除成功',
+            'msg' => FrontendI18n::trans('response.device_delete_success'),
         ]);
     }
 }

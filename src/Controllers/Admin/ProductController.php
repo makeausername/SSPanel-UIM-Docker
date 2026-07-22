@@ -13,6 +13,7 @@ use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use function is_array;
+use function is_object;
 use function json_decode;
 use function json_encode;
 use function time;
@@ -84,8 +85,17 @@ final class ProductController extends BaseController
     {
         $id = $args['id'];
         $product = (new Product())->find($id);
+
+        if ($product === null) {
+            return $response->withRedirect('/admin/product');
+        }
+
         $content = json_decode($product->content);
         $limit = json_decode($product->limit);
+
+        if (! is_object($content) || ! is_object($limit)) {
+            return $response->withRedirect('/admin/product');
+        }
 
         $content->time = $content->time ?? 0;
         $content->class = $content->class ?? 0;
@@ -233,6 +243,14 @@ final class ProductController extends BaseController
         $new_user_required = $request->getParam('new_user_required') === 'true' ? 1 : 0;
 
         $product = (new Product())->find($product_id);
+
+        if ($product === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '商品不存在',
+            ]);
+        }
+
         $existing_content = json_decode($product->content, true);
 
         if ($price < 0) {
@@ -343,7 +361,16 @@ final class ProductController extends BaseController
     public function delete(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $product_id = $args['id'];
-        (new Product())->find($product_id)->delete();
+        $product = (new Product())->find($product_id);
+
+        if ($product === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '商品不存在',
+            ]);
+        }
+
+        $product->delete();
 
         return $response->withJson([
             'ret' => 1,
@@ -355,6 +382,13 @@ final class ProductController extends BaseController
     {
         $old_product_id = $args['id'];
         $old_product = (new Product())->find($old_product_id);
+
+        if ($old_product === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '商品不存在',
+            ]);
+        }
 
         $new_product = $old_product->replicate([
             'create_time',

@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Auth;
 use App\Services\Cache;
 use App\Services\Filter;
+use App\Services\FrontendI18n;
 use App\Services\OneTimeTokenService;
 use App\Utils\Hash;
 use App\Utils\ResponseHelper;
@@ -63,23 +64,23 @@ final class InfoController extends BaseController
         $old_email = $user->email;
 
         if (! $_ENV['enable_change_email'] || $user->is_shadow_banned) {
-            return ResponseHelper::error($response, '修改失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.update_failed'));
         }
 
         if ($new_email === '') {
-            return ResponseHelper::error($response, '未填写邮箱');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.email_required'));
         }
 
         if (! Filter::checkEmailFilter($new_email)) {
-            return ResponseHelper::error($response, '无效的邮箱');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.email_invalid'));
         }
 
         if ($new_email === $old_email) {
-            return ResponseHelper::error($response, '新邮箱不能和旧邮箱一样');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.email_same'));
         }
 
         if ((new User())->where('email', $new_email)->first() !== null) {
-            return ResponseHelper::error($response, '邮箱已经被使用了');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.email_in_use'));
         }
 
         if (Config::obtain('reg_email_verify')) {
@@ -88,7 +89,7 @@ final class InfoController extends BaseController
             $email_verify = OneTimeTokenService::consume($redis, 'email_verify:' . $email_verify_code);
 
             if (! is_string($email_verify) || ! hash_equals(strtolower(trim($email_verify)), $new_email)) {
-                return ResponseHelper::error($response, '你的邮箱验证码不正确');
+                return ResponseHelper::error($response, FrontendI18n::trans('response.email_verification_invalid'));
             }
 
         }
@@ -96,12 +97,12 @@ final class InfoController extends BaseController
         $user->email = $new_email;
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '修改失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.update_failed'));
         }
 
         return $response->withJson([
             'ret' => 1,
-            'msg' => '修改成功',
+            'msg' => FrontendI18n::trans('response.update_success'),
             'data' => [
                 'email' => $user->email,
             ],
@@ -114,18 +115,18 @@ final class InfoController extends BaseController
         $user = $this->user;
 
         if ($user->is_shadow_banned) {
-            return ResponseHelper::error($response, '修改失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.update_failed'));
         }
 
         $user->user_name = $newusername;
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '修改失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.update_failed'));
         }
 
         return $response->withJson([
             'ret' => 1,
-            'msg' => '修改成功',
+            'msg' => FrontendI18n::trans('response.update_success'),
             'data' => [
                 'username' => $user->user_name,
             ],
@@ -135,7 +136,7 @@ final class InfoController extends BaseController
     public function unbindIm(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         if (! $this->user->unbindIM()) {
-            return ResponseHelper::error($response, '解绑失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.unbind_failed'));
         }
 
         return $response->withHeader('HX-Refresh', 'true');
@@ -149,32 +150,32 @@ final class InfoController extends BaseController
         $user = $this->user;
 
         if ($password === '' || $new_password === '' || $confirm_new_password === '') {
-            return ResponseHelper::error($response, '密码不能为空');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.password_required'));
         }
 
         if (! Hash::checkPassword($user->pass, $password)) {
-            return ResponseHelper::error($response, '旧密码错误');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.old_password_wrong'));
         }
 
         if ($new_password !== $confirm_new_password) {
-            return ResponseHelper::error($response, '两次输入不符合');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.password_mismatch'));
         }
 
         if (strlen($new_password) < 8) {
-            return ResponseHelper::error($response, '密码太短啦');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.password_too_short'));
         }
 
         $user->pass = Hash::passwordHash($new_password);
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '修改失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.update_failed'));
         }
 
         if (Config::obtain('enable_forced_replacement')) {
             $user->removeLink();
         }
 
-        return ResponseHelper::success($response, '修改成功');
+        return ResponseHelper::success($response, FrontendI18n::trans('response.update_success'));
     }
 
     public function resetPasswd(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -184,12 +185,12 @@ final class InfoController extends BaseController
         $user->uuid = Uuid::uuid4();
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '重置失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.reset_failed'));
         }
 
         return $response->withJson([
             'ret' => 1,
-            'msg' => '重置成功',
+            'msg' => FrontendI18n::trans('response.reset_success'),
             'data' => [
                 'passwd' => $user->passwd,
                 'uuid' => $user->uuid,
@@ -203,10 +204,10 @@ final class InfoController extends BaseController
         $user->api_token = Tools::genRandomChar(32);
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '重置失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.reset_failed'));
         }
 
-        return ResponseHelper::success($response, '重置成功');
+        return ResponseHelper::success($response, FrontendI18n::trans('response.reset_success'));
     }
 
     public function updateMethod(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -215,27 +216,27 @@ final class InfoController extends BaseController
         $method = strtolower($this->antiXss->xss_clean($request->getParam('method')));
 
         if ($method === '') {
-            ResponseHelper::error($response, '非法输入');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.invalid_input'));
         }
 
         if (! Tools::isParamValidate('method', $method)) {
-            ResponseHelper::error($response, '加密无效');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.encryption_invalid'));
         }
 
         $user->method = $method;
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '修改失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.update_failed'));
         }
 
-        return ResponseHelper::success($response, '修改成功');
+        return ResponseHelper::success($response, FrontendI18n::trans('response.update_success'));
     }
 
     public function resetUrl(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $this->user->removeLink();
 
-        return ResponseHelper::success($response, '重置成功');
+        return ResponseHelper::success($response, FrontendI18n::trans('response.reset_success'));
     }
 
     public function updateDailyMail(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -243,17 +244,17 @@ final class InfoController extends BaseController
         $value = (int) $request->getParam('mail');
 
         if (! in_array($value, [0, 1, 2])) {
-            return ResponseHelper::error($response, '参数错误');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.invalid_parameter'));
         }
 
         $user = $this->user;
         $user->daily_mail_enable = $value;
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '修改失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.update_failed'));
         }
 
-        return ResponseHelper::success($response, '修改成功');
+        return ResponseHelper::success($response, FrontendI18n::trans('response.update_success'));
     }
 
     public function updateContactMethod(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -261,17 +262,17 @@ final class InfoController extends BaseController
         $value = (int) $request->getParam('contact');
 
         if (! in_array($value, [1, 2])) {
-            return ResponseHelper::error($response, '参数错误');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.invalid_parameter'));
         }
 
         $user = $this->user;
         $user->contact_method = $value;
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '修改失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.update_failed'));
         }
 
-        return ResponseHelper::success($response, '修改成功');
+        return ResponseHelper::success($response, FrontendI18n::trans('response.update_success'));
     }
 
     public function updateTheme(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -280,13 +281,13 @@ final class InfoController extends BaseController
         $user = $this->user;
 
         if ($theme === '') {
-            return ResponseHelper::error($response, '主题不能为空');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.theme_required'));
         }
 
         $user->theme = $theme;
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '修改失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.update_failed'));
         }
 
         return $response->withHeader('HX-Refresh', 'true');
@@ -300,7 +301,7 @@ final class InfoController extends BaseController
         $user->is_dark_mode = in_array($theme_mode, [0, 1, 2]) ? $theme_mode : 0;
 
         if (! $user->save()) {
-            return ResponseHelper::error($response, '切换失败');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.switch_failed'));
         }
 
         return $response->withHeader('HX-Refresh', 'true');
@@ -312,7 +313,7 @@ final class InfoController extends BaseController
         $password = $request->getParam('password');
 
         if ($password === '' || ! Hash::checkPassword($user->pass, $password)) {
-            return ResponseHelper::error($response, '密码错误');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.password_wrong'));
         }
 
         if ($_ENV['enable_kill']) {
@@ -322,6 +323,6 @@ final class InfoController extends BaseController
             return $response->withHeader('HX-Redirect', '/auth/login');
         }
 
-        return ResponseHelper::error($response, '自助账号删除未启用');
+        return ResponseHelper::error($response, FrontendI18n::trans('response.self_delete_disabled'));
     }
 }
