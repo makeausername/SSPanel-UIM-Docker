@@ -32,8 +32,8 @@ use function in_array;
 use function is_string;
 use function round;
 use function rtrim;
-use function strtolower;
 use function str_replace;
+use function strtolower;
 use function time;
 use function trim;
 use const ENT_QUOTES;
@@ -41,8 +41,7 @@ use const ENT_SUBSTITUTE;
 
 final class NodeController extends BaseController
 {
-    private const XNODE_INSTALLER_URL = 'https://raw.githubusercontent.com/makeausername/xnode-agent/'
-        . '9f9cef203f0a37ed4c1301f6d96254824b40adc5/scripts/install.sh';
+    private const XNODE_INSTALLER_URL = 'https://raw.githubusercontent.com/makeausername/xnode-agent/9f9cef203f0a37ed4c1301f6d96254824b40adc5/scripts/install.sh';
     private const XNODE_INSTALL_VERSION = 'v0.1.7';
 
     private static array $details = [
@@ -355,7 +354,7 @@ final class NodeController extends BaseController
         }
 
         $panelUrl = $this->resolvePanelUrl($request);
-        $expiresAt = (int) ($tokenRecord->expires_at ?? (time() + $ttlSeconds));
+        $expiresAt = (int) ($tokenRecord->expires_at ?? time() + $ttlSeconds);
         $command = $this->buildXNodeOneClickInstallCommand($panelUrl, $nodeId, $nodeDomain, $token);
 
         return $response->withJson([
@@ -450,6 +449,51 @@ final class NodeController extends BaseController
         ]);
     }
 
+    /**
+     * 后台节点页面 AJAX
+     */
+    public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        $nodes = (new Node())->orderBy('id', 'desc')->get();
+        $runtimeByNodeId = [];
+        $nodeIds = $nodes->pluck('id')->toArray();
+        $probeSummaries = NodeProbeService::summarizeNodes($nodeIds);
+
+        if ($nodeIds !== []) {
+            foreach ((new NodeRuntime())->whereIn('node_id', $nodeIds)->get() as $runtime) {
+                $runtimeByNodeId[(int) $runtime->node_id] = $runtime;
+            }
+        }
+
+        foreach ($nodes as $node) {
+            $node->op = '<button class="btn btn-red" id="delete-node-' . $node->id . '"
+            onclick="deleteNode(' . $node->id . ')">删除</button>
+            <button class="btn btn-orange" id="copy-node-' . $node->id . '"
+            onclick="copyNode(' . $node->id . ')">复制</button>
+            <a class="btn btn-primary" href="/admin/node/' . $node->id . '/edit">编辑</a>';
+            $xnodeFields = $this->buildXNodeRuntimeListFields($runtimeByNodeId[(int) $node->id] ?? null);
+            $node->type = $node->type();
+            $node->sort = $node->sort();
+            $node->xnode_status = $xnodeFields['xnode_status'];
+            $node->xnode_last_seen = $xnodeFields['xnode_last_seen'];
+            $node->xnode_agent = $xnodeFields['xnode_agent'];
+            $node->xnode_audit = $xnodeFields['xnode_audit'];
+            $node->xnode_error = $xnodeFields['xnode_error'];
+            $probeSummary = $probeSummaries[(int) $node->id] ?? NodeProbeService::summarizeNode((int) $node->id);
+            $node->probe_status = $this->buildProbeStatusBadge(
+                (string) $probeSummary['badge_class'],
+                (string) $probeSummary['label']
+            );
+            $node->probe_checked_at = $this->formatXNodeTextValue($probeSummary['latest_checked_at'] ?? '-');
+            $node->node_bandwidth = round(Tools::bToGB($node->node_bandwidth), 2);
+            $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
+        }
+
+        return $response->withJson([
+            'nodes' => $nodes,
+        ]);
+    }
+
     private function resolvePanelUrl(ServerRequest $request): string
     {
         $panelUrl = $_ENV['baseUrl'] ?? '';
@@ -480,11 +524,11 @@ final class NodeController extends BaseController
         string $token
     ): string {
         return implode("\n", [
-            'curl -fsSL ' . $this->quoteShellValue(self::XNODE_INSTALLER_URL) . ' | bash -s -- ' . '\\',
-            '  --panel-url ' . $this->quoteShellValue($panelUrl) . ' ' . '\\',
-            '  --node-id ' . $this->quoteShellValue((string) $nodeId) . ' ' . '\\',
-            '  --node-domain ' . $this->quoteShellValue($nodeDomain) . ' ' . '\\',
-            '  --enroll-token ' . $this->quoteShellValue($token) . ' ' . '\\',
+            'curl -fsSL ' . $this->quoteShellValue(self::XNODE_INSTALLER_URL) . ' | bash -s -- \\',
+            '  --panel-url ' . $this->quoteShellValue($panelUrl) . ' \\',
+            '  --node-id ' . $this->quoteShellValue((string) $nodeId) . ' \\',
+            '  --node-domain ' . $this->quoteShellValue($nodeDomain) . ' \\',
+            '  --enroll-token ' . $this->quoteShellValue($token) . ' \\',
             '  --version ' . $this->quoteShellValue(self::XNODE_INSTALL_VERSION),
         ]);
     }
@@ -663,51 +707,6 @@ final class NodeController extends BaseController
         }
 
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    }
-
-    /**
-     * 后台节点页面 AJAX
-     */
-    public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
-    {
-        $nodes = (new Node())->orderBy('id', 'desc')->get();
-        $runtimeByNodeId = [];
-        $nodeIds = $nodes->pluck('id')->toArray();
-        $probeSummaries = NodeProbeService::summarizeNodes($nodeIds);
-
-        if ($nodeIds !== []) {
-            foreach ((new NodeRuntime())->whereIn('node_id', $nodeIds)->get() as $runtime) {
-                $runtimeByNodeId[(int) $runtime->node_id] = $runtime;
-            }
-        }
-
-        foreach ($nodes as $node) {
-            $node->op = '<button class="btn btn-red" id="delete-node-' . $node->id . '" 
-            onclick="deleteNode(' . $node->id . ')">删除</button>
-            <button class="btn btn-orange" id="copy-node-' . $node->id . '" 
-            onclick="copyNode(' . $node->id . ')">复制</button>
-            <a class="btn btn-primary" href="/admin/node/' . $node->id . '/edit">编辑</a>';
-            $xnodeFields = $this->buildXNodeRuntimeListFields($runtimeByNodeId[(int) $node->id] ?? null);
-            $node->type = $node->type();
-            $node->sort = $node->sort();
-            $node->xnode_status = $xnodeFields['xnode_status'];
-            $node->xnode_last_seen = $xnodeFields['xnode_last_seen'];
-            $node->xnode_agent = $xnodeFields['xnode_agent'];
-            $node->xnode_audit = $xnodeFields['xnode_audit'];
-            $node->xnode_error = $xnodeFields['xnode_error'];
-            $probeSummary = $probeSummaries[(int) $node->id] ?? NodeProbeService::summarizeNode((int) $node->id);
-            $node->probe_status = $this->buildProbeStatusBadge(
-                (string) $probeSummary['badge_class'],
-                (string) $probeSummary['label']
-            );
-            $node->probe_checked_at = $this->formatXNodeTextValue($probeSummary['latest_checked_at'] ?? '-');
-            $node->node_bandwidth = round(Tools::bToGB($node->node_bandwidth), 2);
-            $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
-        }
-
-        return $response->withJson([
-            'nodes' => $nodes,
-        ]);
     }
 
     private function buildProbeStatusBadge(string $className, string $text): string

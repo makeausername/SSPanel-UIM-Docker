@@ -61,6 +61,7 @@ final class FrontendI18nTest extends TestCase
 
     /**
      * @param array<string, mixed> $values
+     *
      * @return list<string>
      */
     private static function flattenKeys(array $values, string $prefix = ''): array

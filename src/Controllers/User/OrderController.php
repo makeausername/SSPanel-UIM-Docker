@@ -273,11 +273,13 @@ final class OrderController extends BaseController
             $order->update_time = $now;
             $order->save();
 
-            $invoice_content = [[
-                'content_id' => 0,
-                'name' => $product->name,
-                'price' => InvoiceAccountingService::money($product->price),
-            ]];
+            $invoice_content = [
+                [
+                    'content_id' => 0,
+                    'name' => $product->name,
+                    'price' => InvoiceAccountingService::money($product->price),
+                ],
+            ];
 
             if ($coupon !== null) {
                 $invoice_content[] = [
@@ -348,11 +350,13 @@ final class OrderController extends BaseController
             $invoice = new Invoice();
             $invoice->user_id = $this->user->id;
             $invoice->order_id = $order->id;
-            $invoice->content = json_encode([[
-                'content_id' => 0,
-                'name' => '余额充值 / Balance top-up',
-                'price' => $amount,
-            ]]);
+            $invoice->content = json_encode([
+                [
+                    'content_id' => 0,
+                    'name' => '余额充值 / Balance top-up',
+                    'price' => $amount,
+                ],
+            ]);
             $invoice->price = $amount;
             $invoice->original_price = $amount;
             $invoice->paid_amount = '0.00';

@@ -543,7 +543,7 @@ EOL;
                 ) === false) {
                     throw new Exception('Unable to persist GeoIP2 update checkpoint.');
                 }
-                if (!is_file(BASE_PATH . '/storage/GeoLite2-City/GeoLite2-City.mmdb')) {
+                if (! is_file(BASE_PATH . '/storage/GeoLite2-City/GeoLite2-City.mmdb')) {
                     echo 'GeoLite2 City database unavailable; using Country database.' . PHP_EOL;
                 }
                 echo 'Successfully updated GeoIP2 database.' . PHP_EOL;

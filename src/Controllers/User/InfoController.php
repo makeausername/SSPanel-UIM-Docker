@@ -22,8 +22,8 @@ use Ramsey\Uuid\Uuid;
 use RedisException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
-use function in_array;
 use function hash_equals;
+use function in_array;
 use function is_string;
 use function strlen;
 use function strtolower;
@@ -39,18 +39,19 @@ final class InfoController extends BaseController
     {
         $themes = Tools::getDir(BASE_PATH . '/resources/views');
         $methods = Tools::getSsMethod();
-        $webauthnDevices = array_map(static fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'passkey')->get()->toArray());
-        $totpDevices = array_map(static fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'totp')->get()->toArray());
-        $fidoDevices = array_map(static fn($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'fido')->get()->toArray());
+        $webauthnDevices = array_map(static fn ($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'passkey')->get()->toArray());
+        $totpDevices = array_map(static fn ($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'totp')->get()->toArray());
+        $fidoDevices = array_map(static fn ($item) => (object) $item, (new MFADevice())->where('userid', $this->user->id)->where('type', 'fido')->get()->toArray());
 
-        return $response->write($this->view()
-            ->assign('user', $this->user)
-            ->assign('themes', $themes)
-            ->assign('methods', $methods)
-            ->assign('webauthnDevices', $webauthnDevices)
-            ->assign('totpDevices', $totpDevices)
-            ->assign('fidoDevices', $fidoDevices)
-            ->fetch('user/edit.tpl')
+        return $response->write(
+            $this->view()
+                ->assign('user', $this->user)
+                ->assign('themes', $themes)
+                ->assign('methods', $methods)
+                ->assign('webauthnDevices', $webauthnDevices)
+                ->assign('totpDevices', $totpDevices)
+                ->assign('fidoDevices', $fidoDevices)
+                ->fetch('user/edit.tpl')
         );
     }
 
@@ -91,7 +92,6 @@ final class InfoController extends BaseController
             if (! is_string($email_verify) || ! hash_equals(strtolower(trim($email_verify)), $new_email)) {
                 return ResponseHelper::error($response, FrontendI18n::trans('response.email_verification_invalid'));
             }
-
         }
 
         $user->email = $new_email;
