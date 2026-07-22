@@ -305,10 +305,12 @@ return [
         'view_invoice' => 'View invoice',
     ],
     'rate' => [
+        'chart_unavailable' => 'The traffic rate chart could not be loaded. Please refresh and try again.',
         'chart_title' => 'Traffic Rate Chart',
         'description' => 'View each node hourly traffic rate',
         'hour' => 'Hour',
         'multiplier' => 'Rate',
+        'no_data' => 'No traffic rate data is available.',
         'title' => 'Traffic Rates',
     ],
     'payment' => [

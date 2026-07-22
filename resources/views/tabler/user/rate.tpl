@@ -38,7 +38,11 @@
                                     </div>
                                 </div>
                             </div>
-                            <div id="rate-chart"></div>
+                            <div id="rate-chart"
+                                 data-empty-message="{trans key='rate.no_data'}"
+                                 data-error-message="{trans key='rate.chart_unavailable'}">
+                                <div class="py-5 text-center text-secondary">{trans key='common.loading'}</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -46,13 +50,43 @@
         </div>
     </div>
 
+    <script src="https://{$config['jsdelivr_url']}/npm/@tabler/core@1.4.0/dist/libs/apexcharts/dist/apexcharts.min.js"></script>
+
     <script>
-        document.body.addEventListener("drawChart", function(evt) {
-            let chart = window.ApexCharts && new ApexCharts(document.getElementById('rate-chart'), {
+        (() => {
+            const chartElement = document.getElementById('rate-chart');
+            const dropdownToggle = document.getElementById('dropdown-toggle');
+            const initialChartData = {$initial_chart};
+            let chart = null;
+
+            const showStatus = (message) => {
+                chartElement.replaceChildren();
+
+                const status = document.createElement('div');
+                status.className = 'py-5 text-center text-secondary';
+                status.textContent = message;
+                chartElement.appendChild(status);
+            };
+
+            const destroyChart = () => {
+                if (chart === null) {
+                    return;
+                }
+
+                try {
+                    chart.destroy();
+                } catch (error) {
+                    console.error('Traffic rate chart cleanup failed:', error);
+                } finally {
+                    chart = null;
+                }
+            };
+
+            const chartOptions = (data) => ({
                 chart: {
                     type: "bar",
                     fontFamily: 'inherit',
-                    height: '250%',
+                    height: 288,
                     parentHeightOffset: 0,
                     toolbar: {
                         show: false,
@@ -81,7 +115,7 @@
                 },
                 series: [{
                     name: "{trans key='rate.multiplier'}",
-                    data: []
+                    data: data
                 }],
                 tooltip: {
                     theme: 'dark'
@@ -125,17 +159,51 @@
                     show: false,
                 },
             });
-            document.getElementById('dropdown-toggle').innerHTML = evt.detail.msg;
-            chart.render();
-            chart.updateOptions({
-                series: [{
-                    name: "{trans key='rate.multiplier'}",
-                    data: evt.detail.data
-                }],
-            });
-        })
-    </script>
 
-    <script src="https://{$config['jsdelivr_url']}/npm/@tabler/core@1.4.0/dist/libs/apexcharts/dist/apexcharts.min.js"></script>
+            const handleChartFailure = (error) => {
+                console.error('Traffic rate chart rendering failed:', error);
+                destroyChart();
+                showStatus(chartElement.dataset.errorMessage);
+            };
+
+            const drawChart = (detail) => {
+                const data = detail && Array.isArray(detail.data) ? detail.data : [];
+
+                if (detail && typeof detail.msg === 'string') {
+                    dropdownToggle.textContent = detail.msg;
+                }
+
+                if (data.length === 0) {
+                    destroyChart();
+                    showStatus(chartElement.dataset.emptyMessage);
+                    return;
+                }
+
+                if (!window.ApexCharts) {
+                    showStatus(chartElement.dataset.errorMessage);
+                    return;
+                }
+
+                try {
+                    if (chart !== null) {
+                        Promise.resolve(chart.updateSeries([{
+                            name: "{trans key='rate.multiplier'}",
+                            data: data,
+                        }])).catch(handleChartFailure);
+                        return;
+                    }
+
+                    chartElement.replaceChildren();
+                    chart = new ApexCharts(chartElement, chartOptions(data));
+                    Promise.resolve(chart.render()).catch(handleChartFailure);
+                } catch (error) {
+                    handleChartFailure(error);
+                }
+            };
+
+            document.body.addEventListener('drawChart', (event) => drawChart(event.detail));
+            drawChart(initialChartData);
+        })();
+    </script>
 
 {include file='user/footer.tpl'}
