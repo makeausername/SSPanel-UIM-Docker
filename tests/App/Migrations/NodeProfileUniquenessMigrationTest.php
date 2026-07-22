@@ -10,6 +10,19 @@ use PHPUnit\Framework\TestCase;
 
 final class NodeProfileUniquenessMigrationTest extends TestCase
 {
+    public function testMariaDbMetadataLookupsUsePreparableInformationSchemaQueries(): void
+    {
+        $source = file_get_contents(
+            dirname(__DIR__, 3) . '/db/migrations/2026072203-node-profile-uniqueness.php'
+        );
+
+        $this->assertIsString($source);
+        $this->assertStringContainsString('information_schema.TABLES', $source);
+        $this->assertStringContainsString('information_schema.STATISTICS', $source);
+        $this->assertStringNotContainsString('SHOW TABLES LIKE ?', $source);
+        $this->assertStringNotContainsString('SHOW INDEX FROM `node_profiles` WHERE `Key_name` = ?', $source);
+    }
+
     public function testMigrationDeduplicatesProfilesAndCreatesUniqueNodeIndex(): void
     {
         $pdo = new PDO('sqlite::memory:');
