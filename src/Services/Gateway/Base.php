@@ -11,13 +11,13 @@ use App\Models\User;
 use App\Models\UserMoneyLog;
 use App\Services\DB;
 use App\Services\InvoiceAccountingService;
-use App\Services\Reward;
 use App\Utils\Tools;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use voku\helper\AntiXSS;
+
 use function bcadd;
 use function bccomp;
 use function bcsub;
@@ -73,12 +73,12 @@ abstract class Base
         ?string $providerTransactionId = null
     ): void
     {
-        $reward = DB::connection()->transaction(function () use (
+        DB::connection()->transaction(function () use (
             $trade_no,
             $providerAmount,
             $providerCurrency,
             $providerTransactionId
-        ): ?array {
+        ): void {
             $paylist = (new Paylist())
                 ->where('tradeno', $trade_no)
                 ->lockForUpdate()
@@ -111,7 +111,7 @@ abstract class Base
             InvoiceAccountingService::initialize($invoice);
 
             if ((int) $paylist->status === 1) {
-                return $this->rewardContext($invoice, $user);
+                return;
             }
 
             $paidAmount = self::money($paylist->total);
@@ -127,7 +127,7 @@ abstract class Base
                 $paylist->save();
                 $this->creditBalance($user, $paidAmount, (int) $invoice->id, 'Duplicate invoice payment');
 
-                return null;
+                return;
             }
 
             $invoiceDue = InvoiceAccountingService::remaining($invoice);
@@ -163,17 +163,8 @@ abstract class Base
                 );
             }
 
-            return $comparison >= 0 ? $this->rewardContext($invoice, $user) : null;
+            return;
         });
-
-        if ($reward !== null) {
-            Reward::issuePaybackReward(
-                $reward['user_id'],
-                $reward['ref_user_id'],
-                $reward['total'],
-                $reward['invoice_id']
-            );
-        }
     }
 
     protected function getPayableInvoiceForUser(mixed $invoiceId, User $user): ?Invoice
@@ -267,27 +258,6 @@ abstract class Base
 
             $paylist->provider_transaction_id = $providerTransactionId;
         }
-    }
-
-    /**
-     * @return array{user_id:int,ref_user_id:int,total:float,invoice_id:int}|null
-     */
-    private function rewardContext(Invoice $invoice, User $user): ?array
-    {
-        if (
-            $invoice->status !== 'paid_gateway'
-            || (int) $user->ref_by <= 0
-            || Config::obtain('invite_mode') !== 'reward'
-        ) {
-            return null;
-        }
-
-        return [
-            'user_id' => (int) $user->id,
-            'ref_user_id' => (int) $user->ref_by,
-            'total' => (float) InvoiceAccountingService::money($invoice->original_price),
-            'invoice_id' => (int) $invoice->id,
-        ];
     }
 
     private function creditBalance(User $user, string $amount, int $invoiceId, string $reason): void
