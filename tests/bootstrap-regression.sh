@@ -115,6 +115,53 @@ assert_git_mode() {
     }
 }
 
+assert_php_config_nonempty() {
+    local key="$1"
+    local file="$2"
+
+    grep -Eq "^[[:space:]]*\\\$_ENV\['${key}'\][[:space:]]*=[[:space:]]*'[^']+';" "$file" || {
+        printf 'ERROR: %s must provide a non-empty %s default.\n' "$file" "$key" >&2
+        return 1
+    }
+}
+
+test_geoip_config_sync() {
+    local temp_dir
+    local defaults
+    local target
+
+    temp_dir="$(mktemp -d)"
+    defaults="${temp_dir}/defaults.php"
+    target="${temp_dir}/target.php"
+    trap 'rm -rf -- "$temp_dir"' RETURN
+
+    printf '%s\n' \
+        "\$_ENV['maxmind_account_id'] = '12345';" \
+        "\$_ENV['maxmind_license_key'] = 'test_key_mmk';" \
+        "\$_ENV['geoip_locale'] = 'zh-CN';" > "$defaults"
+    printf '%s\n' \
+        "\$_ENV['maxmind_account_id'] = '';" \
+        "\$_ENV['maxmind_license_key'] = '';" \
+        "\$_ENV['geoip_locale'] = 'en';" > "$target"
+
+    bash docker/geoip/sync-config.sh "$defaults" "$target" >/dev/null
+    assert_file_contains "$target" "\$_ENV['maxmind_account_id'] = '12345';"
+    assert_file_contains "$target" "\$_ENV['maxmind_license_key'] = 'test_key_mmk';"
+    assert_file_contains "$target" "\$_ENV['geoip_locale'] = 'zh-CN';"
+
+    printf '%s\n' \
+        "\$_ENV['maxmind_account_id'] = '67890';" \
+        "\$_ENV['maxmind_license_key'] = 'custom_key_mmk';" \
+        "\$_ENV['geoip_locale'] = 'ja';" > "$target"
+    bash docker/geoip/sync-config.sh "$defaults" "$target" >/dev/null
+    assert_file_contains "$target" "\$_ENV['maxmind_account_id'] = '67890';"
+    assert_file_contains "$target" "\$_ENV['maxmind_license_key'] = 'custom_key_mmk';"
+    assert_file_contains "$target" "\$_ENV['geoip_locale'] = 'ja';"
+
+    rm -rf -- "$temp_dir"
+    trap - RETURN
+}
+
 create_strict_clone() {
     local target="$1"
     local scheduler_mode
@@ -267,15 +314,23 @@ assert_git_mode 100755 install.sh
 assert_git_mode 100755 docker/entrypoint.sh
 assert_git_mode 100755 docker/cron/scheduler
 test_strict_umask_normalization
+test_geoip_config_sync
 assert_read_tty_shape install.sh
 assert_read_tty_shape bootstrap.sh
 assert_file_contains docker-compose.yml '      - bash'
 assert_file_contains docker-compose.yml '      - /var/www/html/docker/cron/scheduler'
 assert_file_contains docker-compose.yml 'scheduler.last_success'
 assert_file_contains docker-compose.yml 'SCHEDULER_HEARTBEAT_MAX_AGE_SECONDS'
+assert_file_contains docker-compose.yml 'geoip_city:/var/www/html/storage/GeoLite2-City'
+assert_file_contains docker-compose.yml 'geoip_country:/var/www/html/storage/GeoLite2-Country'
 assert_file_contains docker-compose.yml 'wget -q -O /dev/null http://127.0.0.1/index.php'
 assert_file_contains docker/cron/scheduler 'HEARTBEAT_FILE='
 assert_file_contains docker/cron/scheduler 'php xcat Cron'
+assert_file_contains docker/cron/scheduler 'php xcat Tool updateGeoIP2'
+assert_file_contains docker/cron/scheduler 'GEOIP_UPDATE_INTERVAL_SECONDS'
+assert_php_config_nonempty maxmind_account_id config/.config.example.php
+assert_php_config_nonempty maxmind_license_key config/.config.example.php
+assert_file_contains config/.config.example.php "\$_ENV['geoip_locale'] = 'zh-CN';"
 assert_file_contains Dockerfile 'bash -n docker/entrypoint.sh; \'
 assert_file_contains Dockerfile 'bash -n docker/cron/scheduler; \'
 assert_file_contains Dockerfile 'test -r docker/cron/scheduler; \'
@@ -288,14 +343,17 @@ assert_function_contains update_repository bootstrap.sh 'normalize_repository_pe
 assert_function_contains run_upgrade bootstrap.sh 'docker compose stop scheduler'
 assert_function_contains run_upgrade bootstrap.sh 'docker compose up -d mariadb redis'
 assert_function_contains run_upgrade bootstrap.sh 'create_upgrade_backup'
+assert_function_contains run_upgrade bootstrap.sh 'sync_geoip_defaults'
 assert_function_contains run_upgrade bootstrap.sh 'docker compose run --rm -T app php xcat Migration latest'
 assert_function_contains run_upgrade bootstrap.sh 'docker compose up -d app nginx caddy'
+assert_function_contains run_upgrade bootstrap.sh 'update_geoip_database'
 assert_function_contains run_upgrade bootstrap.sh 'docker compose up -d scheduler'
 assert_function_contains run_upgrade bootstrap.sh 'docker compose restart nginx'
 assert_function_contains run_upgrade bootstrap.sh 'wait_for_service_ready nginx 180'
 assert_function_contains run_upgrade bootstrap.sh 'wait_for_service_ready scheduler 300'
 assert_function_order run_upgrade bootstrap.sh 'create_upgrade_backup' 'php xcat Migration latest'
 assert_function_order run_upgrade bootstrap.sh 'php xcat Migration latest' 'docker compose up -d scheduler'
+assert_function_order run_upgrade bootstrap.sh 'update_geoip_database' 'docker compose up -d scheduler'
 assert_function_order run_upgrade bootstrap.sh 'docker compose up -d scheduler' 'docker compose restart nginx'
 assert_function_contains build_images install.sh 'normalize_repository_permissions'
 assert_function_contains build_images install.sh 'verify_repository_permissions'
@@ -305,10 +363,15 @@ assert_function_contains verify_containers install.sh 'sleep 3'
 assert_function_contains verify_containers install.sh 'docker compose logs --tail=100 "$service"'
 assert_function_contains verify_containers install.sh 'ExitCode=${exit_code:-unknown}'
 assert_function_contains resume_installation install.sh 'run_init_command Migration latest'
+assert_function_contains resume_installation install.sh 'sync_geoip_defaults'
+assert_function_contains resume_installation install.sh 'update_geoip_database'
 assert_function_contains resume_installation install.sh 'docker_compose_up scheduler'
 assert_function_order resume_installation install.sh 'run_init_command Migration latest' 'docker_compose_up scheduler'
+assert_function_order resume_installation install.sh 'update_geoip_database' 'docker_compose_up scheduler'
 assert_function_contains main install.sh 'docker_compose_up scheduler'
+assert_function_contains main install.sh 'update_geoip_database'
 assert_function_order main install.sh 'run_init_command Migration latest' 'docker_compose_up scheduler'
+assert_function_order main install.sh 'update_geoip_database' 'docker_compose_up scheduler'
 assert_function_excludes resume_installation install.sh 'Migration new'
 assert_function_contains resume_installation install.sh 'ensure_admin_for_resume'
 assert_function_contains resume_installation install.sh 'verify_https'

@@ -113,9 +113,9 @@ $_ENV['jsdelivr_url'] = 'fastly.jsdelivr.net';
 $_ENV['sentry_dsn'] = '';
 // Maxmind GeoIP2 database
 //TODO: move these settings to DB
-$_ENV['maxmind_account_id'] = '';
-$_ENV['maxmind_license_key'] = '';
-$_ENV['geoip_locale'] = 'en';
+$_ENV['maxmind_account_id'] = '1242550';
+$_ENV['maxmind_license_key'] = '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';
+$_ENV['geoip_locale'] = 'zh-CN';
 // ClientDownload 命令解决 API 访问频率高而被限制使用的 Github access token
 $_ENV['github_access_token'] = '';
 // use Cloudflare R2 for clients download

@@ -31,6 +31,8 @@ services:
       - ./config/.config.php:/var/www/html/config/.config.php:ro
       - ./config/appprofile.php:/var/www/html/config/appprofile.php:ro
       - app_storage:/var/www/html/storage/framework
+      - geoip_city:/var/www/html/storage/GeoLite2-City
+      - geoip_country:/var/www/html/storage/GeoLite2-Country
       - app_clients:/var/www/html/public/clients
     depends_on:
       mariadb:
@@ -163,6 +165,8 @@ services:
       - ./config/.config.php:/var/www/html/config/.config.php:ro
       - ./config/appprofile.php:/var/www/html/config/appprofile.php:ro
       - app_storage:/var/www/html/storage/framework
+      - geoip_city:/var/www/html/storage/GeoLite2-City
+      - geoip_country:/var/www/html/storage/GeoLite2-Country
       - app_clients:/var/www/html/public/clients
     depends_on:
       mariadb:
@@ -182,6 +186,8 @@ volumes:
   mariadb_data:
   redis_data:
   app_storage:
+  geoip_city:
+  geoip_country:
   app_clients:
   caddy_data:
   caddy_config:
