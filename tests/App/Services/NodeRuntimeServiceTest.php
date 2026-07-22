@@ -289,6 +289,49 @@ final class NodeRuntimeServiceTest extends TestCase
         $this->assertGreaterThan(0, (int) $logs[0]->datetime);
     }
 
+    public function testAuditEventPreservesTargetAndDeduplicatesAcrossReportBatches(): void
+    {
+        $this->seedNode(['id' => 1, 'node_group' => 3]);
+        $this->seedUser(['id' => 10, 'node_group' => 3]);
+        Capsule::table('xnode_audit_rules')->insert([
+            'id' => 7,
+            'name' => 'complaint domains',
+            'match_type' => 'domain_suffix',
+            'network' => 'any',
+            'action' => 'block',
+            'severity' => 'high',
+            'enabled' => 1,
+            'scope_type' => 'all',
+            'scope_value' => null,
+            'priority' => 10,
+            'revision' => 1,
+        ]);
+
+        $item = [
+            'event_id' => 'stable-event-1',
+            'user_id' => 10,
+            'rule_id' => 7,
+            'source_ip' => '1.2.3.4',
+            'target_host' => 'example.com',
+            'target_port' => 443,
+            'protocol' => 'tls',
+            'observed_at' => 123456,
+        ];
+        $service = new NodeRuntimeService();
+        $first = $service->acceptDetectLog(['report_id' => 'audit-batch-1', 'data' => [$item]], 1);
+        $second = $service->acceptDetectLog(['report_id' => 'audit-batch-2', 'data' => [$item]], 1);
+
+        $this->assertSame(1, $first['count']);
+        $this->assertSame(0, $second['count']);
+        $this->assertSame(1, Capsule::table('xnode_audit_events')->count());
+        $event = Capsule::table('xnode_audit_events')->first();
+        $this->assertSame('::ffff:1.2.3.4', $event->source_ip);
+        $this->assertSame('example.com', $event->target_host);
+        $this->assertSame(443, (int) $event->target_port);
+        $this->assertSame('block', $event->action);
+        $this->assertSame(0, Capsule::table('detect_log')->count());
+    }
+
     public function testSameReportIdIsIndependentAcrossNodesAndReportTypes(): void
     {
         $this->seedNode(['id' => 7]);
@@ -532,6 +575,36 @@ final class NodeRuntimeServiceTest extends TestCase
             $table->integer('status')->default(0);
         });
 
+        Capsule::schema()->create('xnode_audit_rules', static function (Blueprint $table): void {
+            $table->increments('id');
+            $table->string('name');
+            $table->string('match_type');
+            $table->string('network');
+            $table->string('action');
+            $table->string('severity');
+            $table->integer('enabled');
+            $table->string('scope_type');
+            $table->integer('scope_value')->nullable();
+            $table->integer('priority');
+            $table->integer('revision');
+        });
+
+        Capsule::schema()->create('xnode_audit_events', static function (Blueprint $table): void {
+            $table->increments('id');
+            $table->string('event_key')->unique();
+            $table->integer('node_id');
+            $table->integer('user_id');
+            $table->integer('rule_id');
+            $table->string('source_ip')->nullable();
+            $table->string('target_host')->nullable();
+            $table->integer('target_port')->nullable();
+            $table->string('protocol')->nullable();
+            $table->string('action');
+            $table->integer('observed_at');
+            $table->integer('created_at');
+            $table->integer('processed')->default(0);
+        });
+
         Capsule::schema()->create('node_runtimes', static function (Blueprint $table): void {
             $table->increments('id');
             $table->integer('node_id')->unique();
@@ -543,6 +616,11 @@ final class NodeRuntimeServiceTest extends TestCase
             $table->string('reality_hash', 64)->nullable();
             $table->text('capabilities_json')->nullable();
             $table->string('config_hash')->nullable();
+            $table->string('audit_revision')->nullable();
+            $table->string('audit_hash')->nullable();
+            $table->string('audit_status')->nullable();
+            $table->text('audit_error')->nullable();
+            $table->integer('audit_applied_at')->nullable();
             $table->integer('last_seen')->nullable();
             $table->text('last_error')->nullable();
             $table->integer('created_at');

@@ -8,6 +8,7 @@ Implemented endpoints:
 - `GET /node/api/v1/config`
 - `GET /node/api/v1/users`
 - `GET /node/api/v1/detect-rules`
+- `GET /node/api/v1/audit-rules`
 - `POST /node/api/v1/runtime`
 - `POST /node/api/v1/traffic`
 - `POST /node/api/v1/online`
@@ -148,6 +149,15 @@ Fetch detect rules:
 curl -sS https://panel.example.com/node/api/v1/detect-rules \
   -H "Authorization: Bearer xn_xxx"
 ```
+
+`/detect-rules` remains available for older agents. XNode v0.1.7 and later use the scoped v2 bundle:
+
+```bash
+curl -sS https://panel.example.com/node/api/v1/audit-rules \
+  -H "Authorization: Bearer xn_xxx"
+```
+
+The v2 response carries `revision`, `rules_hash`, and rules for protocol, domain suffix/regex, IP/CIDR, and port matching. It supports `If-None-Match`; agents keep a last-good local cache and acknowledge the applied revision, hash, status, and apply time in runtime/heartbeat reports.
 
 Report runtime metadata:
 
