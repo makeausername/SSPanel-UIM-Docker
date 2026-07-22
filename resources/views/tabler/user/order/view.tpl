@@ -14,7 +14,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="btn-list">
-                        <a href="/user/invoice/{$invoice->id}/view" targer="_blank" class="btn btn-primary">
+                        <a href="/user/invoice/{$invoice->id}/view" target="_blank" rel="noopener" class="btn btn-primary">
                             <i class="icon ti ti-file-dollar"></i>
                             {trans key='order.view_invoice'}
                         </a>

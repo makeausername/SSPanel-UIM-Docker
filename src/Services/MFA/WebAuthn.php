@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\MFA;
 
 use App\Models\MFADevice;
 use App\Models\User;
 use App\Services\Cache;
+use App\Services\FrontendI18n;
 use App\Utils\Tools;
 use Cose\Algorithm\Manager;
 use Cose\Algorithm\Signature\ECDSA;
@@ -35,7 +38,7 @@ use Webauthn\PublicKeyCredentialRpEntity;
 use Webauthn\PublicKeyCredentialSource;
 use Webauthn\PublicKeyCredentialUserEntity;
 
-class WebAuthn
+final class WebAuthn
 {
     public static int $timeout = 30_000;
 
@@ -63,10 +66,10 @@ class WebAuthn
             $jsonObject = $serializer->serialize($publicKeyCredentialCreationOptions, 'json');
             $redis->setex('webauthn_register_' . session_id(), 300, $jsonObject);
             return json_decode($jsonObject, true);
-        } catch (Exception $e) {
+        } catch (Exception) {
             return [
                 'ret' => 0,
-                'msg' => '请求失败: ' . $e->getMessage(),
+                'msg' => FrontendI18n::trans('response.update_failed'),
             ];
         }
     }
@@ -122,10 +125,10 @@ class WebAuthn
             $redis = (new Cache())->initRedis();
             $redis->setex('webauthn_assertion_' . session_id(), 300, $jsonObject);
             return json_decode($jsonObject, true);
-        } catch (Exception $e) {
+        } catch (Exception) {
             return [
                 'ret' => 0,
-                'msg' => '请求失败: ' . $e->getMessage(),
+                'msg' => FrontendI18n::trans('response.update_failed'),
             ];
         }
     }
@@ -145,18 +148,18 @@ class WebAuthn
         $serializer = self::getSerializer();
         $publicKeyCredential = $serializer->deserialize(json_encode($data), PublicKeyCredential::class, 'json');
         if (! $publicKeyCredential->response instanceof AuthenticatorAssertionResponse) {
-            return ['ret' => 0, 'msg' => '验证失败'];
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.verification_failed')];
         }
         $publicKeyCredentialSource = (new MFADevice())
             ->where('rawid', $data['id'])
             ->where('type', 'passkey')
             ->first();
         if ($publicKeyCredentialSource === null) {
-            return ['ret' => 0, 'msg' => '设备未注册'];
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.device_not_registered')];
         }
         $user = (new User())->where('id', $publicKeyCredentialSource->userid)->first();
         if ($user === null) {
-            return ['ret' => 0, 'msg' => '用户不存在'];
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.user_not_found')];
         }
         $redis = (new Cache())->initRedis();
         try {
@@ -175,14 +178,18 @@ class WebAuthn
                 Tools::getSiteDomain(),
                 $user->uuid,
             );
-        } catch (Exception $e) {
-            return ['ret' => 0, 'msg' => $e->getMessage()];
+        } catch (Exception) {
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.verification_failed')];
         }
         $publicKeyCredentialSource->body = $serializer->serialize($result, 'json');
         $publicKeyCredentialSource->used_at = date('Y-m-d H:i:s');
         $publicKeyCredentialSource->save();
         $redis->del('webauthn_assertion_' . session_id());
-        return ['ret' => 1, 'msg' => '验证成功', 'user' => $user];
+        return [
+            'ret' => 1,
+            'msg' => FrontendI18n::trans('response.auth.verification_success'),
+            'user' => $user,
+        ];
     }
 
     public static function getAuthenticatorAssertionResponseValidator(): AuthenticatorAssertionResponseValidator
@@ -204,11 +211,11 @@ class WebAuthn
                     PublicKeyCredential::class,
                     'json'
                 );
-            } catch (Exception $e) {
-                return ['ret' => 0, 'msg' => $e->getMessage()];
+            } catch (Exception) {
+                return ['ret' => 0, 'msg' => FrontendI18n::trans('response.update_failed')];
             }
             if (! isset($publicKeyCredential->response) || ! $publicKeyCredential->response instanceof AuthenticatorAttestationResponse) {
-                return ['ret' => 0, 'msg' => '密钥类型错误'];
+                return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.credential_type_invalid')];
             }
             $redis = (new Cache())->initRedis();
             $publicKeyCredentialCreationOptions = $serializer->deserialize(
@@ -225,7 +232,7 @@ class WebAuthn
                     Tools::getSiteDomain(),
                 );
             } catch (Exception) {
-                return ['ret' => 0, 'msg' => '验证失败'];
+                return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.verification_failed')];
             }
             // save public key credential source
             $jsonStr = self::getSerializer()->serialize($publicKeyCredentialSource, 'json');
@@ -240,9 +247,9 @@ class WebAuthn
             $webauthn->type = 'passkey';
             $webauthn->save();
             $redis->del('webauthn_register_' . session_id());
-            return ['ret' => 1, 'msg' => '注册成功'];
-        } catch (Exception $e) {
-            return ['ret' => 0, 'msg' => '请求失败: ' . $e->getMessage()];
+            return ['ret' => 1, 'msg' => FrontendI18n::trans('response.auth.registration_success')];
+        } catch (Exception) {
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.update_failed')];
         }
     }
 

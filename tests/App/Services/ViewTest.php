@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use PHPUnit\Framework\TestCase;
 use App\Models\User;
+use PHPUnit\Framework\TestCase;
 
 final class ViewTest extends TestCase
 {
@@ -36,7 +36,9 @@ final class ViewTest extends TestCase
 
         $theme = $this->view->getTheme($this->user);
 
-        $this->assertEquals('not-tabler', $theme);
+        $this->assertEquals('tabler', $theme);
+        $this->assertFalse(View::isValidTheme('../tabler'));
+        $this->assertTrue(View::isValidTheme('tabler'));
     }
 
     /**

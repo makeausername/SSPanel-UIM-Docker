@@ -189,7 +189,7 @@ final class Tools
 
     public static function genSubToken(): string
     {
-        return self::genRandomChar(max($_ENV['sub_token_len'], 8));
+        return self::genRandomChar(max((int) ($_ENV['sub_token_len'] ?? 32), 32));
     }
 
     public static function genRandomChar(int $length = 8): string|false

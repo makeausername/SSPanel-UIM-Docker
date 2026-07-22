@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Models\User;
+use App\Services\ClientSessionService;
+use App\Services\FrontendI18n;
+use App\Services\MFA\TOTP;
 use App\Services\RateLimit;
 use App\Services\Subscribe;
 use App\Services\UserAccessPolicy;
@@ -13,6 +16,7 @@ use App\Utils\ResponseHelper;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use Throwable;
 use function array_key_exists;
 use function is_array;
 use function json_decode;
@@ -23,7 +27,6 @@ use function strtolower;
 use function strtotime;
 use function time;
 use function trim;
-use Throwable;
 
 final class ClientApiController extends BaseController
 {
@@ -35,41 +38,80 @@ final class ClientApiController extends BaseController
                 (string) ($request->getServerParams()['REMOTE_ADDR'] ?? 'unknown')
             );
         } catch (Throwable) {
-            return ResponseHelper::error($response, '登录服务暂时不可用，请稍后重试', 503);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.login_unavailable'), 503);
         }
 
         if (! $ipAllowed) {
-            return ResponseHelper::error($response, '登录请求过于频繁，请稍后重试', 429);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.login_rate_limited'), 429);
         }
 
         $email = strtolower(trim((string) $this->getBodyParam($request, 'email', '')));
         $password = (string) $this->getBodyParam($request, 'password', '');
 
         if ($email === '' || $password === '') {
-            return ResponseHelper::error($response, '请输入邮箱和密码', 400);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.credentials_required'), 400);
         }
 
         try {
             $accountAllowed = (new RateLimit())->checkRateLimit('login_account', hash('sha256', $email));
         } catch (Throwable) {
-            return ResponseHelper::error($response, '登录服务暂时不可用，请稍后重试', 503);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.login_unavailable'), 503);
         }
 
         if (! $accountAllowed) {
-            return ResponseHelper::error($response, '登录请求过于频繁，请稍后重试', 429);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.login_rate_limited'), 429);
         }
 
         $user = (new User())->where('email', $email)->first();
 
         if ($user === null || ! Hash::checkPassword($user->pass, $password)) {
-            return ResponseHelper::error($response, '邮箱或者密码错误', 401);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.credentials_invalid'), 401);
         }
 
         if ((int) $user->is_banned === 1) {
-            return ResponseHelper::error($response, '账号已被禁用，请联系客服', 403);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.account_disabled'), 403);
         }
 
-        return ResponseHelper::successWithData($response, '登录成功', $this->buildClientPayload($user));
+        $mfaStatus = $user->checkMfaStatus();
+        if ($mfaStatus['require'] ?? false) {
+            $mfaCode = trim((string) $this->getBodyParam($request, 'mfa_code', ''));
+            if (! ($mfaStatus['totp'] ?? false)) {
+                return $this->mfaError(
+                    $response,
+                    FrontendI18n::trans('response.client.mfa_interactive_required'),
+                    'MFA_INTERACTIVE_REQUIRED'
+                );
+            }
+
+            if ($mfaCode === '') {
+                return $this->mfaError(
+                    $response,
+                    FrontendI18n::trans('response.client.mfa_required'),
+                    'MFA_REQUIRED'
+                );
+            }
+
+            $mfaResult = TOTP::AssertHandle($user, $mfaCode);
+            if (($mfaResult['ret'] ?? 0) !== 1) {
+                return $this->mfaError(
+                    $response,
+                    FrontendI18n::trans('response.client.mfa_invalid'),
+                    'MFA_INVALID',
+                    401
+                );
+            }
+        }
+
+        $session = (new ClientSessionService())->issue(
+            (int) $user->id,
+            trim((string) $this->getBodyParam($request, 'device_name', 'windows-client'))
+        );
+
+        return ResponseHelper::successWithData(
+            $response,
+            FrontendI18n::trans('response.client.login_success'),
+            $this->buildClientPayload($user, $session['token'], $session['expires_at'])
+        );
     }
 
     public function me(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -77,14 +119,18 @@ final class ClientApiController extends BaseController
         $user = $this->getUserByBearerToken($request);
 
         if ($user === null) {
-            return ResponseHelper::error($response, '登录已失效，请重新登录', 401);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.session_expired'), 401);
         }
 
         if ((int) $user->is_banned === 1) {
-            return ResponseHelper::error($response, '账号已被禁用，请联系客服', 403);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.account_disabled'), 403);
         }
 
-        return ResponseHelper::successWithData($response, '获取成功', $this->buildClientPayload($user));
+        return ResponseHelper::successWithData(
+            $response,
+            FrontendI18n::trans('response.client.fetch_success'),
+            $this->buildClientPayload($user)
+        );
     }
 
     public function subscription(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -92,14 +138,14 @@ final class ClientApiController extends BaseController
         $user = $this->getUserByBearerToken($request);
 
         if ($user === null) {
-            return ResponseHelper::error($response, '登录已失效，请重新登录', 401);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.session_expired'), 401);
         }
 
         if ((int) $user->is_banned === 1) {
-            return ResponseHelper::error($response, '账号已被禁用，请联系客服', 403);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.client.account_disabled'), 403);
         }
 
-        return ResponseHelper::successWithData($response, '获取成功', [
+        return ResponseHelper::successWithData($response, FrontendI18n::trans('response.client.fetch_success'), [
             'subscription' => $this->buildSubscriptionPayload($user),
             'usage' => $this->buildUsagePayload($user),
         ]);
@@ -107,14 +153,14 @@ final class ClientApiController extends BaseController
 
     public function logout(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        return ResponseHelper::success($response, '已退出登录');
+        (new ClientSessionService())->revoke($this->bearerToken($request) ?? '');
+
+        return ResponseHelper::success($response, FrontendI18n::trans('response.client.logout_success'));
     }
 
-    private function buildClientPayload(User $user): array
+    private function buildClientPayload(User $user, ?string $accessToken = null, ?int $expiresAt = null): array
     {
-        return [
-            'accessToken' => (string) $user->api_token,
-            'tokenType' => 'Bearer',
+        $payload = [
             'user' => [
                 'id' => (int) $user->id,
                 'email' => (string) $user->email,
@@ -127,6 +173,14 @@ final class ClientApiController extends BaseController
             'usage' => $this->buildUsagePayload($user),
             'subscription' => $this->buildSubscriptionPayload($user),
         ];
+
+        if ($accessToken !== null) {
+            $payload['accessToken'] = $accessToken;
+            $payload['tokenType'] = 'Bearer';
+            $payload['accessTokenExpiresAt'] = $expiresAt;
+        }
+
+        return $payload;
     }
 
     private function buildSubscriptionPayload(User $user): array
@@ -172,23 +226,34 @@ final class ClientApiController extends BaseController
 
     private function getUserByBearerToken(ServerRequest $request): ?User
     {
+        $token = $this->bearerToken($request);
+
+        return $token === null ? null : (new ClientSessionService())->authenticate($token);
+    }
+
+    private function bearerToken(ServerRequest $request): ?string
+    {
         $authorization = $request->getHeaderLine('Authorization');
-
-        if ($authorization === '') {
-            return null;
-        }
-
         if (! preg_match('/^Bearer\s+(.+)$/i', $authorization, $matches)) {
             return null;
         }
 
         $token = trim($matches[1]);
 
-        if ($token === '') {
-            return null;
-        }
+        return $token === '' ? null : $token;
+    }
 
-        return (new User())->where('api_token', $token)->first();
+    private function mfaError(
+        Response $response,
+        string $message,
+        string $code,
+        int $status = 403
+    ): ResponseInterface {
+        return $response->withStatus($status)->withJson([
+            'ret' => 0,
+            'msg' => $message,
+            'code' => $code,
+        ]);
     }
 
     private function getBodyParam(ServerRequest $request, string $key, mixed $default = null): mixed

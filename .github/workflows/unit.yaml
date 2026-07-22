@@ -77,7 +77,10 @@ jobs:
           
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader
-        
+
+      - name: Audit locked production dependencies
+        run: composer audit --locked --no-dev
+
       - name: Run tests with coverage
         run: vendor/bin/phpunit --coverage-clover coverage.xml
         env:

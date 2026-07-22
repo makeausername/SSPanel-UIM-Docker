@@ -68,6 +68,7 @@ jobs:
           targets=${changed_php:-src}
           vendor/bin/phpinsights analyse $targets \
             --no-interaction \
+            --config-path=phpinsights.php \
             --format=github-action \
             --min-quality=90 \
             --min-complexity=50 \

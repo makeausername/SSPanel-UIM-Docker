@@ -166,13 +166,13 @@
                             </div>
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">节点通讯密钥</label>
-                                <input type="text" class="form-control" id="password" value="{$node->password}"
+                                <input type="password" class="form-control" id="password" value="{$node_secret}"
                                        disabled="">
                                 <div class="row my-3">
                                     <div class="col">
                                         <button id="reset-password" class="btn btn-red">重置</button>
                                         <button id="copy-password" class="copy btn btn-primary"
-                                                data-clipboard-text="{$node->password}">
+                                                data-clipboard-text="{$node_secret}">
                                             复制
                                         </button>
                                     </div>

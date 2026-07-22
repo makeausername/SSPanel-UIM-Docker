@@ -10,9 +10,11 @@ use App\Models\MFADevice;
 use App\Models\User;
 use App\Services\Auth;
 use App\Services\Cache;
+use App\Services\ClientSessionService;
 use App\Services\Filter;
 use App\Services\FrontendI18n;
 use App\Services\OneTimeTokenService;
+use App\Services\View;
 use App\Utils\Hash;
 use App\Utils\ResponseHelper;
 use App\Utils\Tools;
@@ -171,6 +173,8 @@ final class InfoController extends BaseController
             return ResponseHelper::error($response, FrontendI18n::trans('response.update_failed'));
         }
 
+        (new ClientSessionService())->revokeAllForUser((int) $user->id);
+
         if (Config::obtain('enable_forced_replacement')) {
             $user->removeLink();
         }
@@ -206,6 +210,8 @@ final class InfoController extends BaseController
         if (! $user->save()) {
             return ResponseHelper::error($response, FrontendI18n::trans('response.reset_failed'));
         }
+
+        (new ClientSessionService())->revokeAllForUser((int) $user->id);
 
         return ResponseHelper::success($response, FrontendI18n::trans('response.reset_success'));
     }
@@ -280,7 +286,7 @@ final class InfoController extends BaseController
         $theme = $this->antiXss->xss_clean($request->getParam('theme'));
         $user = $this->user;
 
-        if ($theme === '') {
+        if (! is_string($theme) || ! View::isValidTheme($theme)) {
             return ResponseHelper::error($response, FrontendI18n::trans('response.theme_required'));
         }
 

@@ -10,7 +10,7 @@ use function date_default_timezone_set;
 use function strlen;
 use const BASE_PATH;
 
-class ToolsTest extends TestCase
+final class ToolsTest extends TestCase
 {
     /**
      * @covers App\Utils\Tools::getIpLocation
@@ -177,13 +177,13 @@ class ToolsTest extends TestCase
     {
         $_ENV['sub_token_len'] = 10;
         $token = Tools::genSubToken();
-        $this->assertEquals(10, strlen($token));
+        $this->assertEquals(32, strlen($token));
         $_ENV['sub_token_len'] = 0;
         $token = Tools::genSubToken();
-        $this->assertEquals(8, strlen($token));
+        $this->assertEquals(32, strlen($token));
         $_ENV['sub_token_len'] = -5;
         $token = Tools::genSubToken();
-        $this->assertEquals(8, strlen($token));
+        $this->assertEquals(32, strlen($token));
     }
 
     /**
@@ -355,7 +355,7 @@ class ToolsTest extends TestCase
     /**
      * @covers App\Utils\Tools::isJson
      */
-    public function testIsJson()
+    public function testIsJson(): void
     {
         $this->assertTrue(Tools::isJson('{}'));
         $this->assertFalse(Tools::isJson('[]'));

@@ -6,9 +6,16 @@ namespace App\Models;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
+use function hash_equals;
 use function is_array;
+use function is_string;
 use function json_decode;
 use function json_encode;
+use function preg_match;
+use function str_contains;
+use function str_ends_with;
+use function strtolower;
+use function trim;
 
 /**
  * @property int    $id
@@ -24,6 +31,8 @@ use function json_encode;
  */
 final class Config extends Model
 {
+    public const SECRET_MASK = '********';
+
     protected $connection = 'default';
     protected $table = 'config';
 
@@ -107,4 +116,48 @@ final class Config extends Model
             return false;
         }
     }
+
+    public static function getAdminClass(string $class): array
+    {
+        $configs = self::getClass($class);
+
+        foreach ($configs as $item => $value) {
+            if (self::isSecretItem((string) $item) && $value !== '' && $value !== null) {
+                $configs[$item] = self::SECRET_MASK;
+            }
+        }
+
+        return $configs;
+    }
+
+    public static function setFromAdmin(string $item, mixed $value): bool
+    {
+        if (self::isSecretItem($item)) {
+            $stringValue = is_string($value) ? trim($value) : '';
+            if ($stringValue === '' || hash_equals(self::SECRET_MASK, $stringValue)) {
+                return true;
+            }
+        }
+
+        return self::set($item, $value);
+    }
+
+    public static function isSecretItem(string $item): bool
+    {
+        $item = strtolower(trim($item));
+
+        if (preg_match('/(?:^|_)(?:secret|token|password|passwd)$/', $item) === 1) {
+            return true;
+        }
+
+        if (str_contains($item, 'private_key') || str_contains($item, 'access_key')) {
+            return true;
+        }
+
+        return str_ends_with($item, '_api_key')
+            || (str_ends_with($item, '_key')
+                && ! str_ends_with($item, '_public_key')
+                && ! str_ends_with($item, '_sitekey'));
+    }
+
 }

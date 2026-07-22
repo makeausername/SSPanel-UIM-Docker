@@ -8,7 +8,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Schema\Blueprint;
 use PHPUnit\Framework\TestCase;
 
-class NodeProfileServiceTest extends TestCase
+final class NodeProfileServiceTest extends TestCase
 {
     private Capsule $db;
 
@@ -37,6 +37,18 @@ class NodeProfileServiceTest extends TestCase
 
     public function testBuildDefaultConfigUsesAgentContractShape(): void
     {
+        $this->seedNode([
+            'id' => 1001,
+            'server' => 'node1.example.com',
+            'sort' => 15,
+            'custom_config' => json_encode([
+                'xnode' => [
+                    'port' => 8443,
+                    'sni' => 'www.example.com',
+                    'target' => 'www.example.com:443',
+                ],
+            ]),
+        ]);
         $config = (new NodeProfileService())->buildDefaultConfig(1001, 'node1.example.com');
 
         $this->assertSame(1, $config['schema_version']);
@@ -44,10 +56,40 @@ class NodeProfileServiceTest extends TestCase
         $this->assertSame('node1.example.com', $config['domain']);
         $this->assertSame('vless-reality-vision', $config['profile']['name']);
         $this->assertSame('reality', $config['profile']['security']);
-        $this->assertSame('www.cloudflare.com:443', $config['reality']['target']);
-        $this->assertSame(['www.cloudflare.com'], $config['reality']['server_names']);
+        $this->assertSame(8443, $config['profile']['port']);
+        $this->assertSame('www.example.com:443', $config['reality']['target']);
+        $this->assertSame(['www.example.com'], $config['reality']['server_names']);
         $this->assertSame(30, $config['report']['heartbeat_interval_sec']);
         $this->assertArrayHasKey('config_hash', $config);
+        $this->assertSame(64, strlen($config['config_hash']));
+    }
+
+    public function testSyncFromNodePersistsVersionedProfileOnlyWhenItChanges(): void
+    {
+        $this->seedNode([
+            'id' => 22,
+            'server' => 'node22.example.com',
+            'sort' => 15,
+            'custom_config' => '{"xnode":{"port":443,"sni":"one.example.com"}}',
+        ]);
+        $node = \App\Models\Node::find(22);
+        $service = new NodeProfileService();
+
+        $service->syncFromNode($node);
+        $first = $service->buildDefaultConfig(22, '');
+        $service->syncFromNode($node);
+        $unchanged = $service->buildDefaultConfig(22, '');
+
+        $this->assertSame(1, $first['version']);
+        $this->assertSame($first['config_hash'], $unchanged['config_hash']);
+
+        $node->custom_config = '{"xnode":{"port":8443,"sni":"two.example.com"}}';
+        $service->syncFromNode($node);
+        $changed = $service->buildDefaultConfig(22, '');
+
+        $this->assertSame(2, $changed['version']);
+        $this->assertSame(8443, $changed['profile']['port']);
+        $this->assertNotSame($first['config_hash'], $changed['config_hash']);
     }
 
     public function testBuildMockUsersUsesAgentContractShape(): void
@@ -277,9 +319,13 @@ class NodeProfileServiceTest extends TestCase
         $this->assertSame([], (new NodeProfileService())->buildUsersForNode(404));
     }
 
-    public function testBuildMockDetectRulesUsesAgentContractShape(): void
+    public function testBuildDetectRulesUsesAgentContractShapeAndPreservesEmptyState(): void
     {
-        $rules = (new NodeProfileService())->buildMockDetectRules();
+        $service = new NodeProfileService();
+        $this->assertSame([], $service->buildDetectRules());
+
+        Capsule::table('detect_list')->insert(['id' => 7, 'regex' => 'bittorrent']);
+        $rules = $service->buildDetectRules();
 
         $this->assertNotEmpty($rules);
 
@@ -297,6 +343,23 @@ class NodeProfileServiceTest extends TestCase
             $table->integer('id')->primary();
             $table->integer('node_class')->default(0);
             $table->integer('node_group')->default(0);
+            $table->string('server')->default('node.example.com');
+            $table->integer('sort')->default(15);
+            $table->text('custom_config')->default('{}');
+        });
+
+        Capsule::schema()->create('node_profiles', static function (Blueprint $table): void {
+            $table->increments('id');
+            $table->integer('node_id')->unique();
+            $table->text('profile_json')->nullable();
+            $table->integer('version')->default(1);
+            $table->integer('created_at');
+            $table->integer('updated_at')->nullable();
+        });
+
+        Capsule::schema()->create('detect_list', static function (Blueprint $table): void {
+            $table->integer('id')->primary();
+            $table->text('regex');
         });
 
         Capsule::schema()->create('user', static function (Blueprint $table): void {
@@ -320,6 +383,9 @@ class NodeProfileServiceTest extends TestCase
             'id' => 1001,
             'node_class' => 0,
             'node_group' => 0,
+            'server' => 'node.example.com',
+            'sort' => 15,
+            'custom_config' => '{}',
         ], $overrides));
     }
 

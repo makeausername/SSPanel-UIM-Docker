@@ -9,6 +9,10 @@ use Illuminate\Database\DatabaseManager;
 use Smarty\Smarty;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
+use function is_dir;
+use function is_string;
+use function preg_match;
+use function trim;
 use const BASE_PATH;
 
 final class View
@@ -71,13 +75,23 @@ final class View
 
     public static function getTheme($user): string
     {
-        if ($user->isLogin) {
-            $theme = $user->theme;
-        } else {
-            $theme = $_ENV['theme'];
+        $configuredTheme = is_string($_ENV['theme'] ?? null) ? trim($_ENV['theme']) : '';
+        $preferredTheme = $user->isLogin ? (string) $user->theme : $configuredTheme;
+
+        if (self::isValidTheme($preferredTheme)) {
+            return $preferredTheme;
         }
 
-        return $theme;
+        return self::isValidTheme($configuredTheme) ? $configuredTheme : 'tabler';
+    }
+
+    public static function isValidTheme(string $theme): bool
+    {
+        $theme = trim($theme);
+
+        return $theme !== ''
+            && preg_match('/^[A-Za-z0-9_-]+$/', $theme) === 1
+            && is_dir(BASE_PATH . '/resources/views/' . $theme);
     }
 
     public static function getConfig(): array

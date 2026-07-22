@@ -17,14 +17,14 @@ final class Cookie extends Base
         $user = (new User())->find($uid);
         $expire_in = $time + time();
 
-        CookieUtils::setWithDomain([
+        CookieUtils::set([
             'uid' => (string) $uid,
             'email' => $user->email,
             'key' => Hash::cookieHash($user->pass, $expire_in),
             'ip' => Hash::ipHash($_SERVER['REMOTE_ADDR'], $uid, $expire_in),
             'device' => Hash::deviceHash($_SERVER['HTTP_USER_AGENT'], $uid, $expire_in),
             'expire_in' => (string) $expire_in,
-        ], $expire_in, $_SERVER['HTTP_HOST']);
+        ], $expire_in);
     }
 
     public function getUser(): User
@@ -97,13 +97,13 @@ final class Cookie extends Base
 
     public function logout(): void
     {
-        CookieUtils::setWithDomain([
+        CookieUtils::set([
             'uid' => '',
             'email' => '',
             'key' => '',
             'ip' => '',
             'device' => '',
             'expire_in' => '',
-        ], 0, $_SERVER['HTTP_HOST']);
+        ], 0);
     }
 }

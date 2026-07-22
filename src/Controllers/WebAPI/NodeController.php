@@ -21,7 +21,12 @@ final class NodeController extends BaseController
      */
     public function getInfo(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $node_id = $args['id'];
+        $node_id = (int) $request->getAttribute('legacy_node_id', 0);
+
+        if ($node_id <= 0 || $node_id !== (int) $args['id']) {
+            return ResponseHelper::error($response, 'Invalid node.', 401);
+        }
+
         $node = (new Node())->find($node_id);
 
         if ($node === null) {

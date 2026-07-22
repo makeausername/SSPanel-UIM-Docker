@@ -8,6 +8,8 @@ use App\Models\Config;
 use App\Models\User;
 use App\Services\Cache;
 use App\Services\Captcha;
+use App\Services\ClientSessionService;
+use App\Services\FrontendI18n;
 use App\Services\OneTimeTokenService;
 use App\Services\Password;
 use App\Services\RateLimit;
@@ -48,30 +50,30 @@ final class PasswordController extends BaseController
             $ret = Captcha::verify($request->getParams());
 
             if (! $ret) {
-                return ResponseHelper::error($response, '系统无法接受你的验证结果，请刷新页面后重试');
+                return ResponseHelper::error($response, FrontendI18n::trans('response.auth.captcha_invalid'));
             }
         }
 
         $email = strtolower($this->antiXss->xss_clean($request->getParam('email')));
 
         if ($email === '') {
-            return ResponseHelper::error($response, '未填写邮箱');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.email_required'));
         }
 
         if (! (new RateLimit())->checkRateLimit('email_request_ip', $request->getServerParam('REMOTE_ADDR')) ||
             ! (new RateLimit())->checkRateLimit('email_request_address', $email)
         ) {
-            return ResponseHelper::error($response, '你的请求过于频繁，请稍后再试');
+            return ResponseHelper::error($response, FrontendI18n::trans('response.too_many_requests'));
         }
 
         $user = (new User())->where('email', $email)->first();
-        $msg = '如果你的账户存在于我们的数据库中，那么重置密码的链接将会发送到你账户所对应的邮箱';
+        $msg = FrontendI18n::trans('response.auth.password_reset_email');
 
         if ($user !== null) {
             try {
                 Password::sendResetEmail($email);
-            } catch (ClientExceptionInterface|RedisException) {
-                $msg = '邮件发送失败';
+            } catch (ClientExceptionInterface | RedisException) {
+                return ResponseHelper::success($response, $msg);
             }
         }
 
@@ -131,6 +133,59 @@ final class PasswordController extends BaseController
             ->write($this->view()->fetch('password/token.tpl'));
     }
 
+    public function handleToken(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        $token = $this->antiXss->xss_clean($request->getCookieParam('password_reset_token', ''));
+        $password = $request->getParam('password');
+        $confirm_password = $request->getParam('confirm_password');
+
+        if ($password !== $confirm_password) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.password_mismatch'));
+        }
+
+        if (strlen($password) < 8) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.password_too_short'));
+        }
+
+        $redis = (new Cache())->initRedis();
+
+        try {
+            $email = OneTimeTokenService::consume($redis, 'password_reset:' . $token);
+        } catch (RedisException) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.reset_link_invalid'))
+                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
+        }
+
+        if (! $email) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.reset_link_invalid'))
+                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
+        }
+
+        $user = (new User())->where('email', $email)->first();
+
+        if ($user === null) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.reset_link_invalid'))
+                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
+        }
+        // reset password
+        $hashPassword = Hash::passwordHash($password);
+        $user->pass = $hashPassword;
+
+        if (! $user->save()) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.reset_failed'))
+                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
+        }
+
+        (new ClientSessionService())->revokeAllForUser((int) $user->id);
+
+        if (Config::obtain('enable_forced_replacement')) {
+            $user->removeLink();
+        }
+
+        return ResponseHelper::success($response, FrontendI18n::trans('response.reset_success'))
+            ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
+    }
+
     private static function resetTokenCookie(string $token): string
     {
         $ttl = max(1, min((int) Config::obtain('email_password_reset_ttl'), 900));
@@ -154,56 +209,5 @@ final class PasswordController extends BaseController
         }
 
         return $cookie;
-    }
-
-    public function handleToken(ServerRequest $request, Response $response, array $args): ResponseInterface
-    {
-        $token = $this->antiXss->xss_clean($request->getCookieParam('password_reset_token', ''));
-        $password = $request->getParam('password');
-        $confirm_password = $request->getParam('confirm_password');
-
-        if ($password !== $confirm_password) {
-            return ResponseHelper::error($response, '两次输入不符合');
-        }
-
-        if (strlen($password) < 8) {
-            return ResponseHelper::error($response, '密码过短');
-        }
-
-        $redis = (new Cache())->initRedis();
-
-        try {
-            $email = OneTimeTokenService::consume($redis, 'password_reset:' . $token);
-        } catch (RedisException) {
-            return ResponseHelper::error($response, '链接无效')
-                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
-        }
-
-        if (! $email) {
-            return ResponseHelper::error($response, '链接无效')
-                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
-        }
-
-        $user = (new User())->where('email', $email)->first();
-
-        if ($user === null) {
-            return ResponseHelper::error($response, '链接无效')
-                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
-        }
-        // reset password
-        $hashPassword = Hash::passwordHash($password);
-        $user->pass = $hashPassword;
-
-        if (! $user->save()) {
-            return ResponseHelper::error($response, '重置失败，请重试')
-                ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
-        }
-
-        if (Config::obtain('enable_forced_replacement')) {
-            $user->removeLink();
-        }
-
-        return ResponseHelper::success($response, '重置成功')
-            ->withAddedHeader('Set-Cookie', self::clearResetTokenCookie());
     }
 }

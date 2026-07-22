@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use stdClass;
 
-class V2RayTest extends TestCase
+final class V2RayTest extends TestCase
 {
     private const PUBLIC_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
@@ -88,6 +88,12 @@ class V2RayTest extends TestCase
 
     public function testVerifiedRuntimeUsesSharedProfileFieldsAndCanonicalShortId(): void
     {
+        $this->seedNode([
+            'id' => 2001,
+            'name' => 'XNode Alpha',
+            'server' => 'node.example.com',
+            'sort' => 15,
+        ]);
         $this->seedRuntime(2001, [
             'short_ids_json' => '["fedcba9876543210","0123456789abcdef"]',
             'last_error' => '   ',
@@ -103,10 +109,8 @@ class V2RayTest extends TestCase
         $profile = (new NodeProfileService())->buildDefaultConfig(2001, 'node.example.com');
 
         $this->assertSame(
-            'vless://11111111-2222-3333-4444-555555555555@node.example.com:443?'
-            . 'encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome'
-            . '&pbk=' . self::PUBLIC_KEY . '&sid=0123456789abcdef&type=tcp'
-            . '&flow=xtls-rprx-vision#XNode%20Alpha',
+            'vless://11111111-2222-3333-4444-555555555555@node.example.com:443?encryption=none&security=reality&sni=www.cloudflare.com&fp=chrome&pbk='
+            . self::PUBLIC_KEY . '&sid=0123456789abcdef&type=tcp&flow=xtls-rprx-vision#XNode%20Alpha',
             $url
         );
         $this->assertSame(443, $profile['profile']['port']);
@@ -254,6 +258,15 @@ class V2RayTest extends TestCase
             $table->string('reality_hash', 64)->nullable();
             $table->integer('last_seen')->nullable();
             $table->text('last_error')->nullable();
+            $table->integer('created_at');
+            $table->integer('updated_at')->nullable();
+        });
+
+        Capsule::schema()->create('node_profiles', static function (Blueprint $table): void {
+            $table->increments('id');
+            $table->integer('node_id')->unique();
+            $table->text('profile_json')->nullable();
+            $table->integer('version')->default(1);
             $table->integer('created_at');
             $table->integer('updated_at')->nullable();
         });
