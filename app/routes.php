@@ -14,6 +14,9 @@ use App\Middleware\User;
 use Slim\Routing\RouteCollectorProxy;
 
 return static function (Slim\App $app): void {
+    // Container health check
+    $app->get('/healthz', App\Controllers\HealthController::class . ':index');
+
     // Home
     $app->get('/', App\Controllers\HomeController::class . ':index');
     $app->get('/tos', App\Controllers\HomeController::class . ':tos');

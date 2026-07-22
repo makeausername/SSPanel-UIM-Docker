@@ -532,6 +532,35 @@ wait_for_service_ready() {
     done
 }
 
+restart_service_bounded() {
+    local service="$1"
+    local operation_timeout_seconds="$2"
+    local shutdown_timeout_seconds="$3"
+    local output
+    local status
+
+    command -v timeout >/dev/null 2>&1 || die "Required command is unavailable: timeout"
+
+    if output="$(timeout --foreground --kill-after=5s \
+        "${operation_timeout_seconds}s" \
+        docker compose restart --no-deps --timeout "$shutdown_timeout_seconds" "$service" 2>&1)"; then
+        [ -z "$output" ] || printf '%s\n' "$output"
+        return 0
+    else
+        status=$?
+    fi
+
+    [ -z "$output" ] || printf '%s\n' "$output" >&2
+    docker compose ps "$service" >&2 || true
+    docker compose logs --tail=100 "$service" >&2 || true
+
+    if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+        die "Timed out restarting ${service} after ${operation_timeout_seconds} seconds."
+    fi
+
+    die "Failed to restart ${service}; docker compose exited with status ${status}."
+}
+
 guard_default_install() {
     if has_existing_installation; then
         if [ -f "${INSTALL_DIR}/.env" ] \
@@ -644,7 +673,7 @@ run_upgrade() {
     update_geoip_database
     docker compose up -d scheduler
     info "Restarting nginx after the app image and database migration are ready."
-    docker compose restart nginx
+    restart_service_bounded nginx 45 10
     wait_for_service_ready nginx 180
     wait_for_service_ready scheduler 300
     docker compose ps
