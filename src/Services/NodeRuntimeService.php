@@ -12,10 +12,13 @@ use App\Models\NodeReportReceipt;
 use App\Models\NodeRuntime;
 use App\Models\OnlineLog;
 use App\Models\User;
+use App\Models\XNodeAuditEvent;
+use App\Models\XNodeAuditRule;
 use App\Utils\Tools;
 use Illuminate\Database\QueryException;
 use function array_key_exists;
 use function date;
+use function hash;
 use function hash_equals;
 use function in_array;
 use function is_array;
@@ -318,6 +321,33 @@ final class NodeRuntimeService
                         continue;
                     }
 
+                    $eventId = $this->scalarString($item['event_id'] ?? null, 128);
+                    if ($eventId !== null) {
+                        $rule = (new XNodeAuditRule())->where('id', $listId)->where('enabled', 1)->first();
+                        if ($rule === null || ! (new XNodeAuditService())->appliesToNode($rule, $node)) {
+                            continue;
+                        }
+
+                        $eventKey = hash('sha256', (int) $node->id . '|' . $eventId);
+                        $inserted = (new XNodeAuditEvent())->newQuery()->insertOrIgnore([
+                            'event_key' => $eventKey,
+                            'node_id' => (int) $node->id,
+                            'user_id' => $userId,
+                            'rule_id' => $listId,
+                            'source_ip' => $this->normalizedIp($item['source_ip'] ?? ($item['ip'] ?? null)),
+                            'target_host' => $this->scalarString($item['target_host'] ?? ($item['target'] ?? null), 255),
+                            'target_port' => $this->portNumber($item['target_port'] ?? null),
+                            'protocol' => $this->scalarString($item['protocol'] ?? null, 32),
+                            'action' => (string) $rule->action,
+                            'observed_at' => $this->positiveInt($item['observed_at'] ?? null) ?? $now,
+                            'created_at' => $now,
+                            'processed' => 0,
+                        ]);
+
+                        $result['count'] += $inserted > 0 ? 1 : 0;
+                        continue;
+                    }
+
                     (new DetectLog())->insert([
                         'user_id' => $userId,
                         'list_id' => $listId,
@@ -368,6 +398,13 @@ final class NodeRuntimeService
             $this->assignString($runtime, $payload, 'core_version', 64);
             $this->assignNormalizedState($runtime, $payload);
             $this->assignString($runtime, $payload, 'config_hash', 128);
+            $this->assignString($runtime, $payload, 'audit_revision', 64);
+            $this->assignString($runtime, $payload, 'audit_hash', 128);
+            $this->assignString($runtime, $payload, 'audit_status', 32);
+            $this->assignString($runtime, $payload, 'audit_error', 2048);
+            if (array_key_exists('audit_applied_at', $payload)) {
+                $runtime->audit_applied_at = $this->optionalNonNegativeInt($payload['audit_applied_at']);
+            }
             $this->assignRuntimeLastError($runtime, $payload, $includeRuntimeFields);
 
             if ($includeRuntimeFields) {
@@ -597,6 +634,17 @@ final class NodeRuntimeService
         return null;
     }
 
+    private function scalarString(mixed $value, int $maxLength): ?string
+    {
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : substr($value, 0, $maxLength);
+    }
+
     private function positiveInt(mixed $value): ?int
     {
         if (! is_numeric($value)) {
@@ -606,6 +654,13 @@ final class NodeRuntimeService
         $value = (int) $value;
 
         return $value > 0 ? $value : null;
+    }
+
+    private function portNumber(mixed $value): ?int
+    {
+        $port = $this->positiveInt($value);
+
+        return $port !== null && $port <= 65535 ? $port : null;
     }
 
     private function optionalNonNegativeInt(mixed $value): ?int

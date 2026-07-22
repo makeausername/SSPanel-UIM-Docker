@@ -9,6 +9,7 @@ use App\Services\NodeEnrollmentService;
 use App\Services\NodeProfileService;
 use App\Services\NodeProbeService;
 use App\Services\NodeRuntimeService;
+use App\Services\XNodeAuditService;
 use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
@@ -95,6 +96,24 @@ final class NodeApiV1Controller extends BaseController
         $data = (new NodeProfileService())->buildMockDetectRules();
 
         return $this->success($request, $response, $data);
+    }
+
+    /**
+     * GET /node/api/v1/audit-rules
+     */
+    public function auditRules(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        $nodeId = $this->authenticatedNodeId($request);
+        $data = $nodeId === null
+            ? ['schema_version' => 2, 'revision' => '', 'rules_hash' => '', 'rules' => []]
+            : (new XNodeAuditService())->buildBundleForNode($nodeId);
+        $etag = '"' . $data['rules_hash'] . '"';
+
+        if (trim($request->getHeaderLine('If-None-Match')) === $etag) {
+            return $response->withStatus(304)->withHeader('ETag', $etag);
+        }
+
+        return $this->success($request, $response, $data)->withHeader('ETag', $etag);
     }
 
     /**

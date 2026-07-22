@@ -10,6 +10,7 @@ use App\Models\DetectLog;
 use App\Models\Node;
 use App\Models\NodeProbeState;
 use App\Models\User;
+use App\Models\XNodeAuditEvent;
 use App\Utils\Tools;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\Http\Client\ClientExceptionInterface;
@@ -176,10 +177,18 @@ final class Detect
 
         foreach ($new_logs as $log) {
             // 分类各个用户的记录数量
-            $user_logs[$log->user_id] = 0;
-            $user_logs[$log->user_id]++;
+            $user_logs[$log->user_id] = ($user_logs[$log->user_id] ?? 0) + 1;
             $log->status = 1;
             $log->save();
+        }
+
+        $auditEvents = (new XNodeAuditEvent())->where('processed', 0)->orderBy('id')->get();
+        foreach ($auditEvents as $event) {
+            if ((string) $event->action === 'block') {
+                $user_logs[$event->user_id] = ($user_logs[$event->user_id] ?? 0) + 1;
+            }
+            $event->processed = 1;
+            $event->save();
         }
 
         foreach ($user_logs as $userid => $value) {

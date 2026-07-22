@@ -43,7 +43,7 @@ final class NodeController extends BaseController
 {
     private const XNODE_INSTALLER_URL = 'https://raw.githubusercontent.com/makeausername/xnode-agent/'
         . '9f9cef203f0a37ed4c1301f6d96254824b40adc5/scripts/install.sh';
-    private const XNODE_INSTALL_VERSION = 'v0.1.6';
+    private const XNODE_INSTALL_VERSION = 'v0.1.7';
 
     private static array $details = [
         'field' => [
@@ -56,6 +56,7 @@ final class NodeController extends BaseController
             'xnode_status' => 'XNode',
             'xnode_last_seen' => '最近心跳',
             'xnode_agent' => 'Agent',
+            'xnode_audit' => '审计规则',
             'xnode_error' => '错误',
             'probe_status' => '可达性',
             'probe_checked_at' => '检测时间',
@@ -468,6 +469,11 @@ final class NodeController extends BaseController
             'last_seen' => $this->formatXNodeLastSeen((int) ($runtime->last_seen ?? 0)),
             'agent_version' => $this->formatXNodeSummaryValue($runtime->agent_version ?? null),
             'core_version' => $this->formatXNodeSummaryValue($runtime->core_version ?? null),
+            'audit_status' => $this->formatXNodeSummaryValue($runtime->audit_status ?? null),
+            'audit_revision' => $this->formatXNodeSummaryValue($runtime->audit_revision ?? null),
+            'audit_hash' => $this->formatXNodeSummaryValue($runtime->audit_hash ?? null),
+            'audit_applied_at' => $this->formatXNodeTimestamp((int) ($runtime->audit_applied_at ?? 0)),
+            'audit_error' => trim((string) ($runtime->audit_error ?? '')),
             'online_count' => (int) (new OnlineLog())
                 ->where('node_id', $nodeId)
                 ->where('last_time', '>', time() - 90)
@@ -565,6 +571,7 @@ final class NodeController extends BaseController
                 'xnode_status' => '-',
                 'xnode_last_seen' => '-',
                 'xnode_agent' => '-',
+                'xnode_audit' => '-',
                 'xnode_error' => '-',
             ];
         }
@@ -586,6 +593,7 @@ final class NodeController extends BaseController
             'xnode_status' => $status,
             'xnode_last_seen' => $this->formatXNodeLastSeen($lastSeen),
             'xnode_agent' => $this->formatXNodeTextValue($runtime->agent_version ?? null),
+            'xnode_audit' => $this->formatXNodeTextValue($runtime->audit_status ?? null),
             'xnode_error' => $this->formatXNodeTextValue($runtime->last_error ?? null),
         ];
     }
@@ -649,6 +657,7 @@ final class NodeController extends BaseController
             $node->xnode_status = $xnodeFields['xnode_status'];
             $node->xnode_last_seen = $xnodeFields['xnode_last_seen'];
             $node->xnode_agent = $xnodeFields['xnode_agent'];
+            $node->xnode_audit = $xnodeFields['xnode_audit'];
             $node->xnode_error = $xnodeFields['xnode_error'];
             $probeSummary = $probeSummaries[(int) $node->id] ?? NodeProbeService::summarizeNode((int) $node->id);
             $node->probe_status = $this->buildProbeStatusBadge(

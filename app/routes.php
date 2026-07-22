@@ -210,9 +210,9 @@ return static function (Slim\App $app): void {
         $group->post('/docs/ajax', App\Controllers\Admin\DocsController::class . ':ajax');
         // 审计规则
         $group->get('/detect', App\Controllers\Admin\DetectRuleController::class . ':index');
-        $group->get('/detect/create', App\Controllers\Admin\DetectRuleController::class . ':create');
         $group->post('/detect/add', App\Controllers\Admin\DetectRuleController::class . ':add');
         $group->delete('/detect/{id:[0-9]+}', App\Controllers\Admin\DetectRuleController::class . ':delete');
+        $group->put('/detect/{id:[0-9]+}/toggle', App\Controllers\Admin\DetectRuleController::class . ':toggle');
         $group->post('/detect/ajax', App\Controllers\Admin\DetectRuleController::class . ':ajax');
         // 审计触发日志
         $group->get('/detect/log', App\Controllers\Admin\DetectLogController::class . ':index');
@@ -374,6 +374,7 @@ return static function (Slim\App $app): void {
         $group->get('/config', App\Controllers\Api\NodeApiV1Controller::class . ':config')->add($nodeApiToken);
         $group->get('/users', App\Controllers\Api\NodeApiV1Controller::class . ':users')->add($nodeApiToken);
         $group->get('/detect-rules', App\Controllers\Api\NodeApiV1Controller::class . ':detectRules')->add($nodeApiToken);
+        $group->get('/audit-rules', App\Controllers\Api\NodeApiV1Controller::class . ':auditRules')->add($nodeApiToken);
         $group->post('/runtime', App\Controllers\Api\NodeApiV1Controller::class . ':runtime')->add($nodeApiToken);
         $group->post('/traffic', App\Controllers\Api\NodeApiV1Controller::class . ':traffic')->add($nodeApiToken);
         $group->post('/online', App\Controllers\Api\NodeApiV1Controller::class . ':online')->add($nodeApiToken);

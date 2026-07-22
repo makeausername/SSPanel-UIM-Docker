@@ -225,6 +225,18 @@
                                     <div class="datagrid-content">{$xnode_summary.core_version|escape}</div>
                                 </div>
                                 <div class="datagrid-item">
+                                    <div class="datagrid-title">审计状态</div>
+                                    <div class="datagrid-content">{$xnode_summary.audit_status|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">审计规则版本</div>
+                                    <div class="datagrid-content text-break">{$xnode_summary.audit_revision|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">审计应用时间</div>
+                                    <div class="datagrid-content">{$xnode_summary.audit_applied_at|escape}</div>
+                                </div>
+                                <div class="datagrid-item">
                                     <div class="datagrid-title">当前在线 IP</div>
                                     <div class="datagrid-content">{$xnode_summary.online_count|escape}</div>
                                 </div>
@@ -272,6 +284,12 @@
                                     <div class="datagrid-item">
                                         <div class="datagrid-title">Last Error</div>
                                         <div class="datagrid-content text-break">{$xnode_summary.last_error|escape}</div>
+                                    </div>
+                                {/if}
+                                {if $xnode_summary.audit_error !== ''}
+                                    <div class="datagrid-item">
+                                        <div class="datagrid-title">审计错误</div>
+                                        <div class="datagrid-content text-break">{$xnode_summary.audit_error|escape}</div>
                                     </div>
                                 {/if}
                             </div>
