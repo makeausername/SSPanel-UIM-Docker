@@ -17,7 +17,6 @@ use RuntimeException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use voku\helper\AntiXSS;
-
 use function bcadd;
 use function bccomp;
 use function bcsub;
@@ -27,9 +26,9 @@ use function is_numeric;
 use function json_decode;
 use function json_encode;
 use function strlen;
+use function strtoupper;
 use function time;
 use function trim;
-use function strtoupper;
 
 abstract class Base
 {
@@ -71,8 +70,7 @@ abstract class Base
         mixed $providerAmount = null,
         ?string $providerCurrency = null,
         ?string $providerTransactionId = null
-    ): void
-    {
+    ): void {
         DB::connection()->transaction(function () use (
             $trade_no,
             $providerAmount,
@@ -167,6 +165,11 @@ abstract class Base
         });
     }
 
+    public static function generateGuid(): string
+    {
+        return Tools::genRandomChar();
+    }
+
     protected function getPayableInvoiceForUser(mixed $invoiceId, User $user): ?Invoice
     {
         if (! is_numeric($invoiceId) || (int) $invoiceId <= 0) {
@@ -206,6 +209,28 @@ abstract class Base
     protected function getInvoiceReturnUrl(Invoice $invoice): string
     {
         return $_ENV['baseUrl'] . '/user/invoice/' . $invoice->id . '/view';
+    }
+
+    protected static function getCallbackUrl(): string
+    {
+        return $_ENV['baseUrl'] . '/payment/notify/' . get_called_class()::_name();
+    }
+
+    protected static function getUserReturnUrl(): string
+    {
+        return $_ENV['baseUrl'] . '/user/payment/return/' . get_called_class()::_name();
+    }
+
+    protected static function getActiveGateway(string $key): bool
+    {
+        $payment_gateways = (new Config())->where('item', 'payment_gateway')->first();
+        $active_gateways = json_decode($payment_gateways->value);
+
+        if (in_array($key, $active_gateways)) {
+            return true;
+        }
+
+        return false;
     }
 
     private static function money(mixed $amount): string
@@ -277,32 +302,5 @@ abstract class Base
             (float) $amount,
             $reason . ' invoice #' . $invoiceId
         );
-    }
-
-    public static function generateGuid(): string
-    {
-        return Tools::genRandomChar();
-    }
-
-    protected static function getCallbackUrl(): string
-    {
-        return $_ENV['baseUrl'] . '/payment/notify/' . get_called_class()::_name();
-    }
-
-    protected static function getUserReturnUrl(): string
-    {
-        return $_ENV['baseUrl'] . '/user/payment/return/' . get_called_class()::_name();
-    }
-
-    protected static function getActiveGateway(string $key): bool
-    {
-        $payment_gateways = (new Config())->where('item', 'payment_gateway')->first();
-        $active_gateways = json_decode($payment_gateways->value);
-
-        if (in_array($key, $active_gateways)) {
-            return true;
-        }
-
-        return false;
     }
 }

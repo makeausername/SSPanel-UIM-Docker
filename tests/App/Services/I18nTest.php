@@ -7,10 +7,14 @@ namespace App\Services;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Translation\Translator;
 
-require_once __DIR__ . '/../../../app/predefine.php';
-
 final class I18nTest extends TestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+        require_once __DIR__ . '/../../../app/predefine.php';
+    }
+
     /**
      * @covers App\Services\I18n::trans
      */

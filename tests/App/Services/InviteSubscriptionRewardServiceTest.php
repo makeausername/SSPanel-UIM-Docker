@@ -9,7 +9,6 @@ use App\Models\User;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Schema\Blueprint;
 use PHPUnit\Framework\TestCase;
-
 use function date;
 use function json_encode;
 use function strtotime;

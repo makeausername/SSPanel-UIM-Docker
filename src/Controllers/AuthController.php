@@ -33,7 +33,6 @@ use RedisException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Throwable;
-
 use function array_rand;
 use function date;
 use function explode;
@@ -137,15 +136,6 @@ final class AuthController extends BaseController
         $user->save();
 
         return $response->withHeader('HX-Redirect', $redir);
-    }
-
-    private function loginRateAllowed(string $type, string $value): bool
-    {
-        try {
-            return (new RateLimit())->checkRateLimit($type, $value);
-        } catch (Throwable) {
-            return false;
-        }
     }
 
     public function mfaPage(ServerRequest $request, Response $response, $next): ResponseInterface
@@ -410,7 +400,6 @@ final class AuthController extends BaseController
             if (! is_string($email_verify) || ! hash_equals(strtolower(trim($email_verify)), $email)) {
                 return ResponseHelper::error($response, '你的邮箱验证码不正确');
             }
-
         }
 
         return $this->registerHelper($response, $name, $email, $password, $invite_code, $imtype, $imvalue, 0, 0);
@@ -530,6 +519,15 @@ final class AuthController extends BaseController
             return $response->withJson(['ret' => 1, 'msg' => '登录成功', 'redir' => $redir]);
         }
         return $response->withJson($result);
+    }
+
+    private function loginRateAllowed(string $type, string $value): bool
+    {
+        try {
+            return (new RateLimit())->checkRateLimit($type, $value);
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private function redirectTarget(mixed $target): string

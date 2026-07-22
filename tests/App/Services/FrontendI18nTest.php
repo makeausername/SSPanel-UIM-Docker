@@ -6,10 +6,14 @@ namespace App\Services;
 
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/../../../app/predefine.php';
-
 final class FrontendI18nTest extends TestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+        require_once __DIR__ . '/../../../app/predefine.php';
+    }
+
     protected function setUp(): void
     {
         Locale::setCurrent(Locale::DEFAULT_LOCALE);

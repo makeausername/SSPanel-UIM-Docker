@@ -19,7 +19,6 @@ use GuzzleHttp\Exception\GuzzleException;
 use Telegram\Bot\Api;
 use Telegram\Bot\Exceptions\TelegramSDKException;
 use Telegram\Bot\Objects\CallbackQuery;
-
 use function array_chunk;
 use function array_merge;
 use function end;
@@ -28,7 +27,6 @@ use function implode;
 use function in_array;
 use function json_encode;
 use function time;
-
 use const PHP_EOL;
 
 final class Callback
