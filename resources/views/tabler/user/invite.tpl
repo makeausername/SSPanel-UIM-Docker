@@ -25,12 +25,19 @@
                                 <div class="card-body">
                                     <h3 class="card-title">{trans key='user.invite.rules'}</h3>
                                     <ul>
-                                        <li>{trans key='user.invite.reward_rule_prefix'} <code>{$invite_reward_rate}%</code>
-                                            {trans key='user.invite.reward_rule_suffix'}
-                                        </li>
-                                        <li>{trans key='user.invite.product_rule'}</li>
+                                        <li>{trans key='user.invite.reward_rule_30_days'}</li>
+                                        <li>{trans key='user.invite.reward_rule_60_days'}</li>
+                                        <li>{trans key='user.invite.reward_rule_once'}</li>
+                                        <li>{trans key='user.invite.reward_rule_accumulate'}</li>
                                     </ul>
-                                    <p>{trans key='user.invite.total_payback_prefix'} <code>{$paybacks_sum}</code> {trans key='user.invite.yuan'}</p>
+                                    <p>
+                                        {trans key='user.invite.applied_days'}:
+                                        <code>{$applied_days}</code> {trans key='user.invite.days'}
+                                    </p>
+                                    <p class="mb-0">
+                                        {trans key='user.invite.pending_days'}:
+                                        <code>{$pending_days}</code> {trans key='user.invite.days'}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -47,7 +54,9 @@
                                             {trans key='common.reset'}
                                         </button>
                                         <button data-clipboard-text="{$invite_url}"
-                                           class="copy btn btn-primary ms-auto">{trans key='common.copy'}</button>
+                                                class="copy btn btn-primary ms-auto">
+                                            {trans key='common.copy'}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -57,7 +66,7 @@
                 <div class="col-12 my-3">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">{trans key='user.invite.payback_records'}</h3>
+                            <h3 class="card-title">{trans key='user.invite.reward_records'}</h3>
                         </div>
                         <div class="table-responsive">
                             <table class="table card-table table-vcenter text-nowrap datatable">
@@ -66,18 +75,30 @@
                                     <th>{trans key='user.invite.record_id'}</th>
                                     <th>{trans key='user.invite.invited_user_id'}</th>
                                     <th>{trans key='user.invite.invited_username'}</th>
-                                    <th>{trans key='user.invite.payback_amount'}</th>
-                                    <th>{trans key='user.invite.payback_time'}</th>
+                                    <th>{trans key='user.invite.purchased_plan'}</th>
+                                    <th>{trans key='user.invite.reward_days'}</th>
+                                    <th>{trans key='user.invite.reward_status'}</th>
+                                    <th>{trans key='user.invite.reward_time'}</th>
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {foreach $paybacks as $payback}
+                                {foreach $rewards as $reward}
                                     <tr>
-                                        <td>{$payback->id}</td>
-                                        <td>{$payback->userid}</td>
-                                        <td>{$payback->user_name}</td>
-                                        <td>{$payback->ref_get} {trans key='user.invite.yuan'}</td>
-                                        <td>{$payback->datetime}</td>
+                                        <td>{$reward->id}</td>
+                                        <td>{$reward->invited_user_id}</td>
+                                        <td>{$reward->user_name}</td>
+                                        <td>{$reward->product_name}</td>
+                                        <td>{$reward->reward_days} {trans key='user.invite.days'}</td>
+                                        <td>
+                                            {if $reward->status === 'applied'}
+                                                {trans key='user.invite.status_applied'}
+                                            {elseif $reward->status === 'pending'}
+                                                {trans key='user.invite.status_pending'}
+                                            {else}
+                                                {trans key='user.invite.status_cancelled'}
+                                            {/if}
+                                        </td>
+                                        <td>{$reward->created_at}</td>
                                     </tr>
                                 {/foreach}
                                 </tbody>

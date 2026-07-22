@@ -7,10 +7,14 @@ namespace App\Services;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Translation\Translator;
 
-require_once __DIR__ . '/../../../app/predefine.php';
-
 final class I18nTest extends TestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+        require_once __DIR__ . '/../../../app/predefine.php';
+    }
+
     /**
      * @covers App\Services\I18n::trans
      */
@@ -24,6 +28,8 @@ final class I18nTest extends TestCase
         $translation = I18n::trans($key, $lang);
 
         $this->assertSame($expectedTranslation, $translation);
+        $this->assertSame('Fixed Invite Subscription Rewards', I18n::trans('bot.invite_reward_title', $lang));
+        $this->assertSame('固定邀请订阅奖励', I18n::trans('bot.invite_reward_title', 'zh_CN'));
         // non-existing locale
         $key = 'non_existent_key';
 

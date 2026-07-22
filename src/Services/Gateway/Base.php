@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Models\UserMoneyLog;
 use App\Services\DB;
 use App\Services\InvoiceAccountingService;
-use App\Services\Reward;
 use App\Utils\Tools;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
@@ -27,9 +26,9 @@ use function is_numeric;
 use function json_decode;
 use function json_encode;
 use function strlen;
+use function strtoupper;
 use function time;
 use function trim;
-use function strtoupper;
 
 abstract class Base
 {
@@ -71,14 +70,13 @@ abstract class Base
         mixed $providerAmount = null,
         ?string $providerCurrency = null,
         ?string $providerTransactionId = null
-    ): void
-    {
-        $reward = DB::connection()->transaction(function () use (
+    ): void {
+        DB::connection()->transaction(function () use (
             $trade_no,
             $providerAmount,
             $providerCurrency,
             $providerTransactionId
-        ): ?array {
+        ): void {
             $paylist = (new Paylist())
                 ->where('tradeno', $trade_no)
                 ->lockForUpdate()
@@ -111,7 +109,7 @@ abstract class Base
             InvoiceAccountingService::initialize($invoice);
 
             if ((int) $paylist->status === 1) {
-                return $this->rewardContext($invoice, $user);
+                return;
             }
 
             $paidAmount = self::money($paylist->total);
@@ -127,7 +125,7 @@ abstract class Base
                 $paylist->save();
                 $this->creditBalance($user, $paidAmount, (int) $invoice->id, 'Duplicate invoice payment');
 
-                return null;
+                return;
             }
 
             $invoiceDue = InvoiceAccountingService::remaining($invoice);
@@ -163,17 +161,13 @@ abstract class Base
                 );
             }
 
-            return $comparison >= 0 ? $this->rewardContext($invoice, $user) : null;
+            return;
         });
+    }
 
-        if ($reward !== null) {
-            Reward::issuePaybackReward(
-                $reward['user_id'],
-                $reward['ref_user_id'],
-                $reward['total'],
-                $reward['invoice_id']
-            );
-        }
+    public static function generateGuid(): string
+    {
+        return Tools::genRandomChar();
     }
 
     protected function getPayableInvoiceForUser(mixed $invoiceId, User $user): ?Invoice
@@ -215,6 +209,28 @@ abstract class Base
     protected function getInvoiceReturnUrl(Invoice $invoice): string
     {
         return $_ENV['baseUrl'] . '/user/invoice/' . $invoice->id . '/view';
+    }
+
+    protected static function getCallbackUrl(): string
+    {
+        return $_ENV['baseUrl'] . '/payment/notify/' . get_called_class()::_name();
+    }
+
+    protected static function getUserReturnUrl(): string
+    {
+        return $_ENV['baseUrl'] . '/user/payment/return/' . get_called_class()::_name();
+    }
+
+    protected static function getActiveGateway(string $key): bool
+    {
+        $payment_gateways = (new Config())->where('item', 'payment_gateway')->first();
+        $active_gateways = json_decode($payment_gateways->value);
+
+        if (in_array($key, $active_gateways)) {
+            return true;
+        }
+
+        return false;
     }
 
     private static function money(mixed $amount): string
@@ -269,27 +285,6 @@ abstract class Base
         }
     }
 
-    /**
-     * @return array{user_id:int,ref_user_id:int,total:float,invoice_id:int}|null
-     */
-    private function rewardContext(Invoice $invoice, User $user): ?array
-    {
-        if (
-            $invoice->status !== 'paid_gateway'
-            || (int) $user->ref_by <= 0
-            || Config::obtain('invite_mode') !== 'reward'
-        ) {
-            return null;
-        }
-
-        return [
-            'user_id' => (int) $user->id,
-            'ref_user_id' => (int) $user->ref_by,
-            'total' => (float) InvoiceAccountingService::money($invoice->original_price),
-            'invoice_id' => (int) $invoice->id,
-        ];
-    }
-
     private function creditBalance(User $user, string $amount, int $invoiceId, string $reason): void
     {
         if (bccomp($amount, '0.00', 2) <= 0) {
@@ -307,32 +302,5 @@ abstract class Base
             (float) $amount,
             $reason . ' invoice #' . $invoiceId
         );
-    }
-
-    public static function generateGuid(): string
-    {
-        return Tools::genRandomChar();
-    }
-
-    protected static function getCallbackUrl(): string
-    {
-        return $_ENV['baseUrl'] . '/payment/notify/' . get_called_class()::_name();
-    }
-
-    protected static function getUserReturnUrl(): string
-    {
-        return $_ENV['baseUrl'] . '/user/payment/return/' . get_called_class()::_name();
-    }
-
-    protected static function getActiveGateway(string $key): bool
-    {
-        $payment_gateways = (new Config())->where('item', 'payment_gateway')->first();
-        $active_gateways = json_decode($payment_gateways->value);
-
-        if (in_array($key, $active_gateways)) {
-            return true;
-        }
-
-        return false;
     }
 }

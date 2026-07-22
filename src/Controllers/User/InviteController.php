@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Controllers\User;
 
 use App\Controllers\BaseController;
-use App\Models\Config;
 use App\Models\InviteCode;
-use App\Models\Payback;
+use App\Models\InviteSubscriptionReward;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -27,29 +26,31 @@ final class InviteController extends BaseController
             $code = (new InviteCode())->add($this->user->id);
         }
 
-        $paybacks = (new Payback())->where('ref_by', $this->user->id)
+        $rewards = (new InviteSubscriptionReward())->where('inviter_user_id', $this->user->id)
             ->orderBy('id', 'desc')
             ->get();
 
-        foreach ($paybacks as $payback) {
-            $payback->datetime = Tools::toDateTime($payback->datetime);
+        foreach ($rewards as $reward) {
+            $reward->created_at = Tools::toDateTime($reward->create_time);
         }
 
-        $paybacks_sum = (new Payback())->where('ref_by', $this->user->id)->sum('ref_get');
-
-        if (! $paybacks_sum) {
-            $paybacks_sum = 0;
-        }
+        $appliedDays = (int) (new InviteSubscriptionReward())
+            ->where('inviter_user_id', $this->user->id)
+            ->where('status', 'applied')
+            ->sum('reward_days');
+        $pendingDays = (int) (new InviteSubscriptionReward())
+            ->where('inviter_user_id', $this->user->id)
+            ->where('status', 'pending')
+            ->sum('reward_days');
 
         $invite_url = $_ENV['baseUrl'] . '/auth/register?code=' . $code;
-        $invite_reward_rate = Config::obtain('invite_reward_rate') * 100;
 
         return $response->write(
             $this->view()
-                ->assign('paybacks', $paybacks)
+                ->assign('rewards', $rewards)
                 ->assign('invite_url', $invite_url)
-                ->assign('paybacks_sum', $paybacks_sum)
-                ->assign('invite_reward_rate', $invite_reward_rate)
+                ->assign('applied_days', $appliedDays)
+                ->assign('pending_days', $pendingDays)
                 ->fetch('user/invite.tpl')
         );
     }

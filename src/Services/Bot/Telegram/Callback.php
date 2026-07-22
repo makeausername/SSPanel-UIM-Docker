@@ -6,11 +6,12 @@ namespace App\Services\Bot\Telegram;
 
 use App\Models\Config;
 use App\Models\InviteCode;
+use App\Models\InviteSubscriptionReward;
 use App\Models\LoginIp;
 use App\Models\OnlineLog;
-use App\Models\Payback;
 use App\Models\SubscribeLog;
 use App\Models\User;
+use App\Services\I18n;
 use App\Services\Reward;
 use App\Services\Subscribe;
 use App\Utils\Tools;
@@ -24,7 +25,6 @@ use function end;
 use function explode;
 use function implode;
 use function in_array;
-use function is_null;
 use function json_encode;
 use function time;
 use const PHP_EOL;
@@ -275,7 +275,7 @@ final class Callback
             ],
             [
                 [
-                    'text' => '返利记录',
+                    'text' => I18n::trans('bot.invite_reward_records', $_ENV['locale']),
                     'callback_data' => 'user.center.rebate_log',
                 ],
                 [
@@ -378,13 +378,20 @@ final class Callback
                 break;
             case 'rebate_log':
                 // 返利记录
-                $paybacks = (new Payback())->where('ref_by', $this->user->id)->orderBy('datetime', 'desc')->take(10)->get();
-                $text = '<strong>以下是你最近 10 次返利记录：</strong>' . PHP_EOL . PHP_EOL;
+                $rewards = (new InviteSubscriptionReward())
+                    ->where('inviter_user_id', $this->user->id)
+                    ->orderBy('id', 'desc')
+                    ->take(10)
+                    ->get();
+                $locale = $_ENV['locale'];
+                $text = '<strong>' . I18n::trans('bot.invite_reward_recent', $locale) . '</strong>' .
+                    PHP_EOL . PHP_EOL;
 
-                foreach ($paybacks as $payback) {
-                    $text .= '<code>#' . $payback->id .
-                        '：' . ($payback->user() !== null ? $payback->user()->user_name : '已注销') . '：' .
-                        $payback->ref_get . ' 元</code>' . PHP_EOL;
+                foreach ($rewards as $reward) {
+                    $status = I18n::trans('bot.invite_reward_status_' . $reward->status, $locale);
+                    $text .= '<code>#' . $reward->id . ': ' . $reward->user_name . ' / ' .
+                        $reward->product_name . ' / +' . $reward->reward_days . ' ' .
+                        I18n::trans('bot.invite_reward_days', $locale) . ' / ' . $status . '</code>' . PHP_EOL;
                 }
 
                 $sendMessage = [
@@ -868,32 +875,37 @@ final class Callback
 
     public function getUserInviteKeyboard(): array
     {
-        $paybacks_sum = (new Payback())->where('ref_by', $this->user->id)->sum('ref_get');
-
-        if (is_null($paybacks_sum)) {
-            $paybacks_sum = 0;
-        }
+        $appliedDays = (int) (new InviteSubscriptionReward())
+            ->where('inviter_user_id', $this->user->id)
+            ->where('status', 'applied')
+            ->sum('reward_days');
+        $pendingDays = (int) (new InviteSubscriptionReward())
+            ->where('inviter_user_id', $this->user->id)
+            ->where('status', 'pending')
+            ->sum('reward_days');
+        $locale = $_ENV['locale'];
 
         $text = [
-            '<strong>你每邀请 <code>1</code> 位用户注册：</strong>',
+            '<strong>' . I18n::trans('bot.invite_reward_title', $locale) . '</strong>',
             '',
-            '- 你会获得 <code>' . Config::obtain('invite_reg_traffic_reward') . 'G</code> 流量奖励。',
-            '- 对方将获得 <code>' . Config::obtain('invite_reg_money_reward') . '元</code> 初始账户余额。',
-            '- 对方支付账单时你会获得对方账单金额的 <code>' . Config::obtain('invite_reward_rate') * 100 . '%</code> 的返利。',
+            '- ' . I18n::trans('bot.invite_reward_30_days', $locale),
+            '- ' . I18n::trans('bot.invite_reward_60_days', $locale),
+            '- ' . I18n::trans('bot.invite_reward_once', $locale),
             '',
-            '已获得返利：' . $paybacks_sum . ' 元。',
+            I18n::trans('bot.invite_reward_applied', $locale) . ': ' . $appliedDays,
+            I18n::trans('bot.invite_reward_pending', $locale) . ': ' . $pendingDays,
         ];
 
         $keyboard = [
             [
                 [
-                    'text' => '获取我的邀请链接',
+                    'text' => I18n::trans('bot.invite_get_link', $locale),
                     'callback_data' => 'user.invite.get',
                 ],
             ],
             [
                 [
-                    'text' => '回主菜单',
+                    'text' => I18n::trans('bot.back_to_menu', $locale),
                     'callback_data' => 'user.index',
                 ],
             ],

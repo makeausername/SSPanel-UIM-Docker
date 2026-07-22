@@ -26,10 +26,10 @@ final class OrderProcessingService
             ->pluck('user_id');
 
         foreach ($userIds as $userId) {
-            DB::connection()->transaction(static function () use ($userId): void {
+            $rewardInviterId = DB::connection()->transaction(static function () use ($userId): ?int {
                 $user = (new User())->where('id', $userId)->lockForUpdate()->first();
                 if ($user === null) {
-                    return;
+                    return null;
                 }
 
                 $activated = (new Order())->where('user_id', $userId)
@@ -41,7 +41,10 @@ final class OrderProcessingService
 
                 if ($activated !== null) {
                     $content = json_decode((string) $activated->product_content);
-                    if ($content !== null && $activated->update_time + $content->time * 86400 < time()) {
+                    if (
+                        $content !== null
+                        && InviteSubscriptionRewardService::effectiveExpiryTimestamp($activated, $content) < time()
+                    ) {
                         $activated->status = 'expired';
                         $activated->update_time = time();
                         $activated->save();
@@ -50,7 +53,7 @@ final class OrderProcessingService
                 }
 
                 if ($activated !== null) {
-                    return;
+                    return null;
                 }
 
                 $order = (new Order())->where('user_id', $userId)
@@ -60,12 +63,12 @@ final class OrderProcessingService
                     ->lockForUpdate()
                     ->first();
                 if ($order === null) {
-                    return;
+                    return null;
                 }
 
                 $content = json_decode((string) $order->product_content);
                 if ($content === null) {
-                    return;
+                    return null;
                 }
 
                 $user->u = 0;
@@ -85,7 +88,15 @@ final class OrderProcessingService
                 $order->status = 'activated';
                 $order->update_time = time();
                 $order->save();
+
+                return InviteSubscriptionRewardService::recordForActivatedOrder($order, $user, $content);
             });
+
+            InviteSubscriptionRewardService::applyPendingForInviter((int) $userId);
+
+            if ($rewardInviterId !== null && $rewardInviterId !== (int) $userId) {
+                InviteSubscriptionRewardService::applyPendingForInviter($rewardInviterId);
+            }
         }
     }
 

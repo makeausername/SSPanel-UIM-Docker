@@ -12,6 +12,7 @@ use App\Services\Auth;
 use App\Services\Cache;
 use App\Services\Captcha;
 use App\Services\Filter;
+use App\Services\InviteSubscriptionRewardService;
 use App\Services\Locale;
 use App\Services\Mail;
 use App\Services\MFA\FIDO;
@@ -19,7 +20,6 @@ use App\Services\MFA\TOTP;
 use App\Services\MFA\WebAuthn;
 use App\Services\OneTimeTokenService;
 use App\Services\RateLimit;
-use App\Services\Reward;
 use App\Services\UserAccessPolicy;
 use App\Utils\Cookie;
 use App\Utils\Hash;
@@ -32,6 +32,7 @@ use Ramsey\Uuid\Uuid;
 use RedisException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use Throwable;
 use function array_rand;
 use function date;
 use function explode;
@@ -41,7 +42,6 @@ use function strlen;
 use function strtolower;
 use function time;
 use function trim;
-use Throwable;
 
 final class AuthController extends BaseController
 {
@@ -136,15 +136,6 @@ final class AuthController extends BaseController
         $user->save();
 
         return $response->withHeader('HX-Redirect', $redir);
-    }
-
-    private function loginRateAllowed(string $type, string $value): bool
-    {
-        try {
-            return (new RateLimit())->checkRateLimit($type, $value);
-        } catch (Throwable) {
-            return false;
-        }
     }
 
     public function mfaPage(ServerRequest $request, Response $response, $next): ResponseInterface
@@ -318,7 +309,11 @@ final class AuthController extends BaseController
 
         if ($user->save() && ! $is_admin_reg) {
             if ($user->ref_by !== 0) {
-                Reward::issueRegReward($user->id, $user->ref_by);
+                InviteSubscriptionRewardService::bindReferral(
+                    (int) $user->id,
+                    (int) $user->ref_by,
+                    (string) $invite_code
+                );
             }
 
             Auth::login($user->id, 3600);
@@ -405,7 +400,6 @@ final class AuthController extends BaseController
             if (! is_string($email_verify) || ! hash_equals(strtolower(trim($email_verify)), $email)) {
                 return ResponseHelper::error($response, '你的邮箱验证码不正确');
             }
-
         }
 
         return $this->registerHelper($response, $name, $email, $password, $invite_code, $imtype, $imvalue, 0, 0);
@@ -525,6 +519,15 @@ final class AuthController extends BaseController
             return $response->withJson(['ret' => 1, 'msg' => '登录成功', 'redir' => $redir]);
         }
         return $response->withJson($result);
+    }
+
+    private function loginRateAllowed(string $type, string $value): bool
+    {
+        try {
+            return (new RateLimit())->checkRateLimit($type, $value);
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private function redirectTarget(mixed $target): string
