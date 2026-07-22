@@ -305,10 +305,12 @@ return [
         'view_invoice' => '查看账单',
     ],
     'rate' => [
+        'chart_unavailable' => '流量倍率图表加载失败，请刷新后重试。',
         'chart_title' => '流量倍率图表',
         'description' => '查看节点的每小时流量倍率',
         'hour' => '小时',
         'multiplier' => '倍率',
+        'no_data' => '暂无可用的流量倍率数据。',
         'title' => '流量倍率',
     ],
     'payment' => [

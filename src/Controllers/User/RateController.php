@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\User;
 
 use App\Controllers\BaseController;
+use App\Models\Node;
 use App\Services\DynamicRate;
 use App\Services\Subscribe;
 use App\Utils\ResponseHelper;
@@ -41,13 +42,28 @@ final class RateController extends BaseController
             ];
         }
 
+        $initial_node = $nodes->first();
+        $initial_chart = $initial_node === null
+            ? ['msg' => $node_list[0]['name'], 'data' => []]
+            : $this->buildRateData($initial_node);
+
         return $response->write(
             $this->view()
                 ->assign('node_list', $node_list)
+                ->assign(
+                    'initial_chart',
+                    json_encode(
+                        $initial_chart,
+                        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR
+                    )
+                )
                 ->fetch('user/rate.tpl')
         );
     }
 
+    /**
+     * @throws Exception
+     */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $nodes = Subscribe::getUserNodes($this->user);
@@ -57,6 +73,20 @@ final class RateController extends BaseController
             return ResponseHelper::error($response, '节点不存在');
         }
 
+        $event = json_encode([
+            'drawChart' => $this->buildRateData($node),
+        ], JSON_THROW_ON_ERROR);
+
+        return $response->withHeader('HX-Trigger', $event)->withJson([
+            'ret' => 1,
+        ]);
+    }
+
+    /**
+     * @return array{msg: string, data: array<int, float>}
+     */
+    private function buildRateData(Node $node): array
+    {
         if ($node->is_dynamic_rate) {
             $dynamic_rate_config = json_decode($node->dynamic_rate_config);
 
@@ -73,18 +103,12 @@ final class RateController extends BaseController
                 $dynamic_rate_type
             );
         } else {
-            $rates = array_fill(0, 24, $node->traffic_rate);
+            $rates = array_fill(0, 24, (float) $node->traffic_rate);
         }
 
-        $event = json_encode([
-            'drawChart' => [
-                'msg' => $node->name,
-                'data' => $rates,
-            ],
-        ]);
-
-        return $response->withHeader('HX-Trigger', $event)->withJson([
-            'ret' => 1,
-        ]);
+        return [
+            'msg' => (string) $node->name,
+            'data' => $rates,
+        ];
     }
 }
