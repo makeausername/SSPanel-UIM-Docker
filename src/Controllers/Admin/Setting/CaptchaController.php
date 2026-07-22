@@ -20,7 +20,7 @@ final class CaptchaController extends BaseController
     {
         parent::__construct();
         $this->update_field = Config::getItemListByClass('captcha');
-        $this->settings = Config::getClass('captcha');
+        $this->settings = Config::getAdminClass('captcha');
     }
 
     /**
@@ -39,7 +39,7 @@ final class CaptchaController extends BaseController
     public function save(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         foreach ($this->update_field as $item) {
-            if (! Config::set($item, $request->getParam($item))) {
+            if (! Config::setFromAdmin($item, $request->getParam($item))) {
                 return $response->withJson([
                     'ret' => 0,
                     'msg' => '保存 ' . $item . ' 时出错',

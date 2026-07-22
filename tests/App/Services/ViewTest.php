@@ -36,7 +36,9 @@ final class ViewTest extends TestCase
 
         $theme = $this->view->getTheme($this->user);
 
-        $this->assertEquals('not-tabler', $theme);
+        $this->assertEquals('tabler', $theme);
+        $this->assertFalse(View::isValidTheme('../tabler'));
+        $this->assertTrue(View::isValidTheme('tabler'));
     }
 
     /**

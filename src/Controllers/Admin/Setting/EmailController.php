@@ -22,7 +22,7 @@ final class EmailController extends BaseController
     {
         parent::__construct();
         $this->update_field = Config::getItemListByClass('email');
-        $this->settings = Config::getClass('email');
+        $this->settings = Config::getAdminClass('email');
     }
 
     /**
@@ -41,7 +41,7 @@ final class EmailController extends BaseController
     public function save(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         foreach ($this->update_field as $item) {
-            if (! Config::set($item, $request->getParam($item))) {
+            if (! Config::setFromAdmin($item, $request->getParam($item))) {
                 return $response->withJson([
                     'ret' => 0,
                     'msg' => '保存 ' . $item . ' 时出错',

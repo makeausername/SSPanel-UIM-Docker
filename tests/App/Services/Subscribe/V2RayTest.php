@@ -88,6 +88,12 @@ class V2RayTest extends TestCase
 
     public function testVerifiedRuntimeUsesSharedProfileFieldsAndCanonicalShortId(): void
     {
+        $this->seedNode([
+            'id' => 2001,
+            'name' => 'XNode Alpha',
+            'server' => 'node.example.com',
+            'sort' => 15,
+        ]);
         $this->seedRuntime(2001, [
             'short_ids_json' => '["fedcba9876543210","0123456789abcdef"]',
             'last_error' => '   ',
@@ -254,6 +260,15 @@ class V2RayTest extends TestCase
             $table->string('reality_hash', 64)->nullable();
             $table->integer('last_seen')->nullable();
             $table->text('last_error')->nullable();
+            $table->integer('created_at');
+            $table->integer('updated_at')->nullable();
+        });
+
+        Capsule::schema()->create('node_profiles', static function (Blueprint $table): void {
+            $table->increments('id');
+            $table->integer('node_id')->unique();
+            $table->text('profile_json')->nullable();
+            $table->integer('version')->default(1);
             $table->integer('created_at');
             $table->integer('updated_at')->nullable();
         });

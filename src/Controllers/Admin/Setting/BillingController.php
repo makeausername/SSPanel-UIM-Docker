@@ -26,7 +26,7 @@ final class BillingController extends BaseController
     {
         parent::__construct();
         $this->update_field = Config::getItemListByClass('billing');
-        $this->settings = Config::getClass('billing');
+        $this->settings = Config::getAdminClass('billing');
     }
 
     /**
@@ -66,7 +66,7 @@ final class BillingController extends BaseController
                 continue;
             }
 
-            if (! Config::set($item, $request->getParam($item))) {
+            if (! Config::setFromAdmin($item, $request->getParam($item))) {
                 return $response->withJson([
                     'ret' => 0,
                     'msg' => '保存 ' . $item . ' 时出错',
@@ -82,7 +82,7 @@ final class BillingController extends BaseController
 
     public function setStripeWebhook(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $stripe_api_key = $request->getParam('stripe_api_key');
+        $stripe_api_key = $this->secretFromRequest($request, 'stripe_api_key');
 
         Stripe::setApiKey($stripe_api_key);
 
@@ -109,7 +109,7 @@ final class BillingController extends BaseController
     public function setPaypalWebhook(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $paypal_client_id = $request->getParam('paypal_client_id');
-        $paypal_client_secret = $request->getParam('paypal_client_secret');
+        $paypal_client_secret = $this->secretFromRequest($request, 'paypal_client_secret');
 
         $gateway_config = [
             'mode' => 'live',
@@ -155,5 +155,14 @@ final class BillingController extends BaseController
     public function returnActiveGateways(): ?array
     {
         return Config::obtain('payment_gateway');
+    }
+
+    private function secretFromRequest(ServerRequest $request, string $item): string
+    {
+        $value = trim((string) $request->getParam($item));
+
+        return $value === '' || $value === Config::SECRET_MASK
+            ? (string) Config::obtain($item)
+            : $value;
     }
 }

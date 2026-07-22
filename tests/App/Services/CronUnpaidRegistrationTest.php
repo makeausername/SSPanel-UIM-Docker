@@ -121,6 +121,7 @@ final class CronUnpaidRegistrationTest extends TestCase
             'login_ip' => 'userid',
             'subscribe_log' => 'user_id',
             'mfa_devices' => 'userid',
+            'client_sessions' => 'user_id',
         ] as $tableName => $userColumn) {
             Capsule::schema()->create($tableName, static function (Blueprint $table) use ($userColumn): void {
                 $table->increments('id');

@@ -223,13 +223,15 @@
                                 </span>
                             </div>
                             <div class="form-group mb-3 row">
-                                <span class="col">两步认证</span>
-                                <span class="col-auto">
-                                    <label class="form-check form-check-single form-switch">
-                                        <input id="ga_enable" class="form-check-input" type="checkbox"
-                                               {if $edit_user->ga_enable}checked="" {/if}>
-                                    </label>
-                                </span>
+                                <label class="form-label col-3 col-form-label">管理员角色</label>
+                                <div class="col">
+                                    <select id="admin_role" class="form-select">
+                                        {foreach $admin_roles as $role}
+                                            <option value="{$role}"
+                                                    {if ($edit_user->admin_role|default:'administrator') === $role}selected{/if}>{$role}</option>
+                                        {/foreach}
+                                    </select>
+                                </div>
                             </div>
                             <div class="form-group mb-3 row">
                                 <span class="col">账户异常状态（Shadow Banned）</span>
@@ -250,15 +252,14 @@
                             <div class="form-group mb-3 col-12">
                                 <span class="form-label col-12 col-form-label">手动封禁理由</span>
                                 <span class="col-auto">
-                                    <textarea id="banned_reason" class="form-control"
-                                              value="{$edit_user->banned_reason}"></textarea>
+                                    <textarea id="banned_reason" class="form-control">{$edit_user->banned_reason}</textarea>
                                 </span>
                             </div>
                             <div class="form-group mb-3 col-12">
                                 <label class="form-label col-12 col-form-label">账户备注</label>
                                 <div class="col">
-                                    <textarea id="remark" class="form-control" value="{$edit_user->remark}"
-                                              placeholder="仅管理员可见"></textarea>
+                                    <textarea id="remark" class="form-control"
+                                              placeholder="仅管理员可见">{$edit_user->remark}</textarea>
                                 </div>
                             </div>
                         </div>
@@ -280,7 +281,7 @@
                 {$key}: $('#{$key}').val(),
                 {/foreach}
                 is_admin: $("#is_admin").is(":checked"),
-                ga_enable: $("#ga_enable").is(":checked"),
+                admin_role: $("#admin_role").val(),
                 is_shadow_banned: $("#is_shadow_banned").is(":checked"),
                 is_banned: $("#is_banned").is(":checked"),
             },

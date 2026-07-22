@@ -7,6 +7,7 @@ namespace App\Services\MFA;
 use App\Models\MFADevice;
 use App\Models\User;
 use App\Services\Cache;
+use App\Services\FrontendI18n;
 use Exception;
 use Vectorface\GoogleAuthenticator;
 
@@ -25,12 +26,12 @@ final class TOTP
     {
         try {
             $TOTPDevice = (new MFADevice())->where('userid', $user->id)
-                ->where('type', 'TOTP')
+                ->where('type', 'totp')
                 ->first();
             if ($TOTPDevice !== null) {
                 return [
                     'ret' => 0,
-                    'msg' => '您已经注册过TOTP设备，请勿重复注册',
+                    'msg' => FrontendI18n::trans('response.auth.totp_already_registered'),
                 ];
             }
             $ga = new GoogleAuthenticator();
@@ -43,10 +44,10 @@ final class TOTP
                 'token' => $token,
                 'url' => self::getGaUrl($user, $token),
             ];
-        } catch (Exception $e) {
+        } catch (Exception) {
             return [
                 'ret' => 0,
-                'msg' => '请求失败: ' . $e->getMessage(),
+                'msg' => FrontendI18n::trans('response.update_failed'),
             ];
         }
     }
@@ -61,11 +62,16 @@ final class TOTP
         $redis = (new Cache())->initRedis();
         $token = $redis->get('totp_register_' . session_id());
         if ($token === false) {
-            return ['ret' => 0, 'msg' => '注册请求已过期，请刷新页面重试'];
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.totp_request_expired')];
         }
         $ga = new GoogleAuthenticator();
         if (! $ga->verifyCode($token, $code)) {
-            return ['ret' => 0, 'msg' => '验证码错误'];
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.verification_code_invalid')];
+        }
+        if ((new MFADevice())->where('userid', $user->id)->where('type', 'totp')->exists()) {
+            $redis->del('totp_register_' . session_id());
+
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.totp_already_registered')];
         }
         $MFADevice = new MFADevice();
         $MFADevice->userid = $user->id;
@@ -76,7 +82,7 @@ final class TOTP
         $MFADevice->created_at = date('Y-m-d H:i:s');
         $MFADevice->save();
         $redis->del('totp_register_' . session_id());
-        return ['ret' => 1, 'msg' => '注册成功'];
+        return ['ret' => 1, 'msg' => FrontendI18n::trans('response.auth.registration_success')];
     }
 
     public static function AssertHandle(User $user, string $code): array
@@ -88,24 +94,24 @@ final class TOTP
             if ($TOTPDevice === null) {
                 return [
                     'ret' => 0,
-                    'msg' => '您还没有注册TOTP设备，请先注册',
+                    'msg' => FrontendI18n::trans('response.auth.totp_not_registered'),
                 ];
             }
             $ga = new GoogleAuthenticator();
             if (! $ga->verifyCode(json_decode($TOTPDevice->body, true)['token'], $code)) {
                 return [
                     'ret' => 0,
-                    'msg' => '验证码错误',
+                    'msg' => FrontendI18n::trans('response.auth.verification_code_invalid'),
                 ];
             }
             return [
                 'ret' => 1,
                 'msg' => '',
             ];
-        } catch (Exception $e) {
+        } catch (Exception) {
             return [
                 'ret' => 0,
-                'msg' => '请求失败: ' . $e->getMessage(),
+                'msg' => FrontendI18n::trans('response.update_failed'),
             ];
         }
     }

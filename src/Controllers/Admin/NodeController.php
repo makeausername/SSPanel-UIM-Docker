@@ -13,12 +13,16 @@ use App\Models\NodeToken;
 use App\Models\OnlineLog;
 use App\Services\FixedNodeTrafficRatePolicy;
 use App\Services\I18n;
+use App\Services\AdminPermissionService;
 use App\Services\NodeEnrollmentService;
+use App\Services\NodeProfileService;
 use App\Services\NodeProbeService;
 use App\Services\Notification;
 use App\Services\XNodeNodePolicy;
 use App\Utils\Tools;
 use GuzzleHttp\Exception\GuzzleException;
+use InvalidArgumentException;
+use JsonException;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
@@ -141,10 +145,28 @@ final class NodeController extends BaseController
             XNodeNodePolicy::apply($node);
         }
 
+        try {
+            (new NodeProfileService())->validateCustomConfig((string) $node->custom_config, (int) $node->sort);
+        } catch (InvalidArgumentException | JsonException $e) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点配置无效：' . $e->getMessage(),
+            ]);
+        }
+
         if (! $node->save()) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '添加失败',
+            ]);
+        }
+
+        try {
+            (new NodeProfileService())->syncFromNode($node);
+        } catch (InvalidArgumentException | JsonException $e) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点已创建，但 XNode 配置保存失败：' . $e->getMessage(),
             ]);
         }
 
@@ -197,6 +219,12 @@ final class NodeController extends BaseController
         return $response->write(
             $this->view()
                 ->assign('node', $node)
+                ->assign(
+                    'node_secret',
+                    AdminPermissionService::role($this->user) === 'read_only'
+                        ? Config::SECRET_MASK
+                        : (string) $node->password
+                )
                 ->assign('xnode_summary', $this->buildXNodeEditSummary($runtime, (int) $node->id, $nodeBandwidth))
                 ->assign('xnode_probe_summary', NodeProbeService::summarizeNode((int) $node->id))
                 ->assign('update_field', self::$update_field)
@@ -243,10 +271,28 @@ final class NodeController extends BaseController
             XNodeNodePolicy::apply($node);
         }
 
+        try {
+            (new NodeProfileService())->validateCustomConfig((string) $node->custom_config, (int) $node->sort);
+        } catch (InvalidArgumentException | JsonException $e) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点配置无效：' . $e->getMessage(),
+            ]);
+        }
+
         if (! $node->save()) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '修改失败',
+            ]);
+        }
+
+        try {
+            (new NodeProfileService())->syncFromNode($node);
+        } catch (InvalidArgumentException | JsonException $e) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点已更新，但 XNode 配置保存失败：' . $e->getMessage(),
             ]);
         }
 
@@ -440,6 +486,15 @@ final class NodeController extends BaseController
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '复制失败',
+            ]);
+        }
+
+        try {
+            (new NodeProfileService())->syncFromNode($new_node);
+        } catch (InvalidArgumentException | JsonException $e) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点已复制，但 XNode 配置保存失败：' . $e->getMessage(),
             ]);
         }
 

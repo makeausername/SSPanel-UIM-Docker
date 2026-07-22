@@ -255,6 +255,7 @@ final class User extends Model
         (new LoginIp())->where('userid', $uid)->delete();
         (new SubscribeLog())->where('user_id', $uid)->delete();
         (new MFADevice())->where('userid', $uid)->delete();
+        (new ClientSession())->where('user_id', $uid)->delete();
 
         return $this->delete();
     }

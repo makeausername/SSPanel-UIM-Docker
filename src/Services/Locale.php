@@ -198,6 +198,7 @@ final class Locale
         }
 
         return str_starts_with($path, '/auth/') ||
+            str_starts_with($path, '/client/api/') ||
             str_starts_with($path, '/oauth/') ||
             str_starts_with($path, '/password/') ||
             $path === '/user' ||

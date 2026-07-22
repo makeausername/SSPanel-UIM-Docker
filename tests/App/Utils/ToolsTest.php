@@ -177,13 +177,13 @@ class ToolsTest extends TestCase
     {
         $_ENV['sub_token_len'] = 10;
         $token = Tools::genSubToken();
-        $this->assertEquals(10, strlen($token));
+        $this->assertEquals(32, strlen($token));
         $_ENV['sub_token_len'] = 0;
         $token = Tools::genSubToken();
-        $this->assertEquals(8, strlen($token));
+        $this->assertEquals(32, strlen($token));
         $_ENV['sub_token_len'] = -5;
         $token = Tools::genSubToken();
-        $this->assertEquals(8, strlen($token));
+        $this->assertEquals(32, strlen($token));
     }
 
     /**

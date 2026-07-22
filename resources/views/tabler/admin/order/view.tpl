@@ -14,11 +14,11 @@
                 </div>
                 <div class="col-auto">
                     <div class="btn-list">
-                        <a href="/admin/user/{$order->user_id}/edit" targer="_blank" class="btn btn-primary">
+                        <a href="/admin/user/{$order->user_id}/edit" target="_blank" rel="noopener" class="btn btn-primary">
                             <i class="icon ti ti-user"></i>
                             查看关联用户
                         </a>
-                        <a href="/admin/invoice/{$invoice->id}/view" targer="_blank" class="btn btn-primary">
+                        <a href="/admin/invoice/{$invoice->id}/view" target="_blank" rel="noopener" class="btn btn-primary">
                             <i class="icon ti ti-file-dollar"></i>
                             查看关联账单
                         </a>

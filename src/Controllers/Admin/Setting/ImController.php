@@ -30,7 +30,7 @@ final class ImController extends BaseController
     {
         parent::__construct();
         $this->update_field = Config::getItemListByClass('im');
-        $this->settings = Config::getClass('im');
+        $this->settings = Config::getAdminClass('im');
     }
 
     /**
@@ -49,7 +49,7 @@ final class ImController extends BaseController
     public function save(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         foreach ($this->update_field as $item) {
-            if (! Config::set($item, $request->getParam($item))) {
+            if (! Config::setFromAdmin($item, $request->getParam($item))) {
                 return $response->withJson([
                     'ret' => 0,
                     'msg' => '保存 ' . $item . ' 时出错',
@@ -90,12 +90,19 @@ final class ImController extends BaseController
         $type = $args['type'];
 
         if ($type === 'telegram') {
-            $webhook_url = $_ENV['baseUrl'] . '/callback/telegram?token=' . Config::obtain('telegram_webhook_token');
+            $webhook_url = $_ENV['baseUrl'] . '/callback/telegram';
 
             try {
-                $telegram = new Api($request->getParam('bot_token'));
+                $botToken = (string) $request->getParam('bot_token');
+                if ($botToken === Config::SECRET_MASK || trim($botToken) === '') {
+                    $botToken = (string) Config::obtain('telegram_token');
+                }
+                $telegram = new Api($botToken);
                 $telegram->removeWebhook();
-                $telegram->setWebhook(['url' => $webhook_url]);
+                $telegram->setWebhook([
+                    'url' => $webhook_url,
+                    'secret_token' => (string) Config::obtain('telegram_webhook_token'),
+                ]);
 
                 return $response->withJson([
                     'ret' => 1,

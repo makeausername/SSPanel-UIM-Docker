@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Models\Config;
 use App\Models\User;
 use App\Services\Cache;
+use App\Services\FrontendI18n;
 use App\Services\OneTimeTokenService;
 use App\Utils\ResponseHelper;
 use App\Utils\Tools;
@@ -33,8 +34,6 @@ use function trim;
 
 final class OAuthController extends BaseController
 {
-    private static string $err_msg = 'OAuth 请求失败';
-
     /**
      * @throws SmartyException
      * @throws GuzzleException
@@ -89,7 +88,7 @@ final class OAuthController extends BaseController
 
         $expectedState = OneTimeTokenService::consume($redis, 'slack_state:' . $user->id);
         if ($expectedState === false || ! hash_equals($expectedState, (string) $state)) {
-            return ResponseHelper::error($response, self::$err_msg);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
         $client = new Client();
@@ -120,7 +119,7 @@ final class OAuthController extends BaseController
             || ! is_string($tokenResponse['access_token'] ?? null)
             || $tokenResponse['access_token'] === ''
         ) {
-            return ResponseHelper::error($response, self::$err_msg);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
         $identityResponse = $client->post('https://slack.com/api/openid.connect.userInfo', [
@@ -141,12 +140,15 @@ final class OAuthController extends BaseController
             || $slack_user_id === ''
             || ($configuredTeamId !== '' && ! hash_equals($configuredTeamId, $identityTeamId))
         ) {
-            return ResponseHelper::error($response, self::$err_msg);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
         if ((new User())->where('im_type', 1)->where('im_value', $slack_user_id)->first() !== null ||
             ($user->im_type === 1 && $user->im_value === $slack_user_id)) {
-            return ResponseHelper::error($response, 'Slack 账户已绑定');
+            return ResponseHelper::error($response, FrontendI18n::trans(
+                'response.auth.account_already_bound',
+                ['%provider%' => 'Slack']
+            ));
         }
 
         $user->im_type = 1;
@@ -191,7 +193,7 @@ final class OAuthController extends BaseController
 
         $expectedState = OneTimeTokenService::consume($redis, 'discord_state:' . $user->id);
         if ($expectedState === false || ! hash_equals($expectedState, (string) $state)) {
-            return ResponseHelper::error($response, self::$err_msg);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
         $client = new Client();
@@ -216,7 +218,7 @@ final class OAuthController extends BaseController
         ]);
 
         if ($code_response->getStatusCode() !== 200) {
-            return ResponseHelper::error($response, self::$err_msg);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
         $access_token = json_decode($code_response->getBody()->getContents())->access_token;
@@ -232,14 +234,17 @@ final class OAuthController extends BaseController
         ]);
 
         if ($user_response->getStatusCode() !== 200) {
-            return ResponseHelper::error($response, self::$err_msg);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
         $discord_user_id = json_decode($user_response->getBody()->getContents(), true)['id'];
 
         if ((new User())->where('im_type', 2)->where('im_value', $discord_user_id)->first() !== null ||
             ($user->im_type === 2 && $user->im_value === $discord_user_id)) {
-            return ResponseHelper::error($response, 'Discord 账户已绑定');
+            return ResponseHelper::error($response, FrontendI18n::trans(
+                'response.auth.account_already_bound',
+                ['%provider%' => 'Discord']
+            ));
         }
 
         $user->im_type = 2;
@@ -273,7 +278,7 @@ final class OAuthController extends BaseController
         $user_auth = json_decode((string) $request->getParam('user'), true);
 
         if (! is_array($user_auth) || ! isset($user_auth['hash'], $user_auth['auth_date'], $user_auth['id'])) {
-            return ResponseHelper::error($response, self::$err_msg);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
         $check_hash = (string) $user_auth['hash'];
@@ -282,7 +287,7 @@ final class OAuthController extends BaseController
 
         foreach ($user_auth as $key => $value) {
             if (! is_scalar($value)) {
-                return ResponseHelper::error($response, self::$err_msg);
+                return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
             }
             $data_check_arr[] = $key . '=' . $value;
         }
@@ -295,7 +300,7 @@ final class OAuthController extends BaseController
         $authDate = (int) $user_auth['auth_date'];
         $age = time() - $authDate;
         if (! hash_equals($hash, $check_hash) || $age < -30 || $age > 300) {
-            return ResponseHelper::error($response, self::$err_msg);
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
         $telegram_id = $this->antiXss->xss_clean($user_auth['id']);
@@ -303,7 +308,10 @@ final class OAuthController extends BaseController
 
         if ((new User())->where('im_type', 4)->where('im_value', $telegram_id)->first() !== null ||
             ($user->im_type === 4 && $user->im_value === $telegram_id)) {
-            return ResponseHelper::error($response, 'Telegram 账户已绑定');
+            return ResponseHelper::error($response, FrontendI18n::trans(
+                'response.auth.account_already_bound',
+                ['%provider%' => 'Telegram']
+            ));
         }
 
         $user->im_type = 4;
@@ -311,6 +319,6 @@ final class OAuthController extends BaseController
 
         $user->save();
 
-        return ResponseHelper::success($response, '绑定成功');
+        return ResponseHelper::success($response, FrontendI18n::trans('response.auth.bind_success'));
     }
 }

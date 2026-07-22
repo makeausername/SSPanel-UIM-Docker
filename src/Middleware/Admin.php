@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Middleware;
 
 use App\Services\Auth as AuthService;
+use App\Services\AdminPermissionService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -21,10 +22,14 @@ final class Admin implements MiddlewareInterface
             return AppFactory::determineResponseFactory()->createResponse(302)->withHeader('Location', '/auth/login');
         }
 
-        if (! $user->is_admin) {
+        if (! $user->is_admin || (int) $user->is_banned === 1) {
             return AppFactory::determineResponseFactory()->createResponse(302)->withHeader('Location', '/user');
         }
 
-        return $handler->handle($request);
+        if (! AdminPermissionService::allows($user, $request->getMethod(), $request->getUri()->getPath())) {
+            return AppFactory::determineResponseFactory()->createResponse(403);
+        }
+
+        return $handler->handle($request->withAttribute('admin_role', AdminPermissionService::role($user)));
     }
 }

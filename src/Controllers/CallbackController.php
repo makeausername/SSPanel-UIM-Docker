@@ -13,6 +13,7 @@ use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Smarty\Exception as SmartyException;
 use Telegram\Bot\Exceptions\TelegramSDKException;
+use function hash_equals;
 
 final class CallbackController extends BaseController
 {
@@ -35,9 +36,14 @@ final class CallbackController extends BaseController
      */
     public function telegram(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $token = $request->getQueryParam('token');
+        $token = $request->getHeaderLine('X-Telegram-Bot-Api-Secret-Token');
+        $expectedToken = (string) Config::obtain('telegram_webhook_token');
 
-        if (Config::obtain('telegram_token') !== '' && $token === Config::obtain('telegram_webhook_token')) {
+        if (
+            Config::obtain('telegram_token') !== ''
+            && $expectedToken !== ''
+            && hash_equals($expectedToken, $token)
+        ) {
             Telegram::process($request);
 
             return $response->withStatus(204);

@@ -4,6 +4,7 @@ namespace App\Services\MFA;
 
 use App\Models\MFADevice;
 use App\Models\User;
+use App\Services\FrontendI18n;
 use App\Services\Cache;
 use App\Utils\Tools;
 use Exception;
@@ -50,11 +51,11 @@ class FIDO
                 PublicKeyCredential::class,
                 'json'
             );
-        } catch (Exception $e) {
-            return ['ret' => 0, 'msg' => $e->getMessage()];
+        } catch (Exception) {
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.update_failed')];
         }
         if (! isset($publicKeyCredential->response) || ! $publicKeyCredential->response instanceof AuthenticatorAttestationResponse) {
-            return ['ret' => 0, 'msg' => '密钥类型错误'];
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.credential_type_invalid')];
         }
         $redis = (new Cache())->initRedis();
         $publicKeyCredentialCreationOptions = $serializer->deserialize(
@@ -71,7 +72,7 @@ class FIDO
                 Tools::getSiteDomain()
             );
         } catch (Exception) {
-            return ['ret' => 0, 'msg' => '验证失败'];
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.verification_failed')];
         }
         $jsonStr = WebAuthn::getSerializer()->serialize($publicKeyCredentialSource, 'json');
         $jsonObject = json_decode($jsonStr);
@@ -85,7 +86,7 @@ class FIDO
         $mfaCredential->type = 'fido';
         $mfaCredential->save();
         $redis->del('fido_register_' . session_id());
-        return ['ret' => 1, 'msg' => '注册成功'];
+        return ['ret' => 1, 'msg' => FrontendI18n::trans('response.auth.registration_success')];
     }
 
     public static function AssertRequest(User $user): array
@@ -117,8 +118,8 @@ class FIDO
             $redis = (new Cache())->initRedis();
             $redis->setex('fido_assertion_' . session_id(), 300, $jsonObject);
             return json_decode($jsonObject, true);
-        } catch (Exception $e) {
-            return ['ret' => 0, 'msg' => '请求失败: ' . $e->getMessage()];
+        } catch (Exception) {
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.update_failed')];
         }
     }
 
@@ -127,7 +128,7 @@ class FIDO
         $serializer = WebAuthn::getSerializer();
         $publicKeyCredential = $serializer->deserialize(json_encode($data), PublicKeyCredential::class, 'json');
         if (! $publicKeyCredential->response instanceof AuthenticatorAssertionResponse) {
-            return ['ret' => 0, 'msg' => '验证失败'];
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.verification_failed')];
         }
         $publicKeyCredentialSource = (new MFADevice())
             ->where('rawid', $data['id'])
@@ -135,7 +136,7 @@ class FIDO
             ->where('type', 'fido')
             ->first();
         if ($publicKeyCredentialSource === null) {
-            return ['ret' => 0, 'msg' => '设备未注册'];
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.device_not_registered')];
         }
         $redis = (new Cache())->initRedis();
         try {
@@ -153,13 +154,17 @@ class FIDO
                 Tools::getSiteDomain(),
                 $user->uuid,
             );
-        } catch (Exception $e) {
-            return ['ret' => 0, 'msg' => $e->getMessage()];
+        } catch (Exception) {
+            return ['ret' => 0, 'msg' => FrontendI18n::trans('response.auth.verification_failed')];
         }
         $publicKeyCredentialSource->body = $serializer->serialize($result, 'json');
         $publicKeyCredentialSource->used_at = date('Y-m-d H:i:s');
         $publicKeyCredentialSource->save();
         $redis->del('fido_assertion_' . session_id());
-        return ['ret' => 1, 'msg' => '验证成功', 'userid' => $user->id];
+        return [
+            'ret' => 1,
+            'msg' => FrontendI18n::trans('response.auth.verification_success'),
+            'userid' => $user->id,
+        ];
     }
 }

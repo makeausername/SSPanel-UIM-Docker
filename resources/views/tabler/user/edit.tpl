@@ -188,6 +188,17 @@
                                 </div>
                                 <div class="tab-pane" id="login_security" role="tabpanel">
                                     <div class="row row-deck row-cards">
+                                        <div class="col-12">
+                                            <div class="card">
+                                                <div class="card-body">
+                                                    <h3 class="card-title">{trans key='user.settings.mfa_identity_confirmation'}</h3>
+                                                    <p class="card-subtitle">{trans key='user.settings.mfa_identity_confirmation_description'}</p>
+                                                    <input id="mfa_current_password" type="password" class="form-control"
+                                                           placeholder="{trans key='user.settings.current_password'}"
+                                                           autocomplete="current-password">
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div class="col-sm-12 col-md-6">
                                             <div class="card">
                                                 <div class="card-body">
@@ -243,10 +254,9 @@
                                                 <div class="card-footer">
                                                     <div class="d-flex">
                                                         {if $totpDevices}
-                                                            <button class="btn btn-red ms-auto"
-                                                                    hx-delete="/user/totp"
-                                                                    hx-confirm="{trans key='user.settings.confirm_disable_totp'}"
-                                                                    hx-swap="none">
+                                                            <button class="btn btn-red ms-auto mfa-delete"
+                                                                    data-url="/user/totp"
+                                                                    data-confirm="{trans key='user.settings.confirm_disable_totp'}">
                                                                 {trans key='user.settings.disable'}
                                                             </button>
                                                         {else}
@@ -273,11 +283,9 @@
                                                                              {trans key='user.settings.added_at'} {$device->created_at}</p>
                                                                         <p class="card-text">
                                                                              {trans key='user.settings.last_used'} {if $device->used_at}{$device->used_at}{else}{trans key='user.settings.never_used'}{/if}</p>
-                                                                        <button class="btn btn-danger"
-                                                                                hx-delete="/user/webauthn/{$device->id}"
-                                                                                hx-swap="none"
-                                                                                 hx-confirm="{trans key='user.settings.confirm_delete_device'}"
-                                                                         >{trans key='common.delete'}
+                                                                        <button class="btn btn-danger mfa-delete"
+                                                                                data-url="/user/webauthn/{$device->id}"
+                                                                                data-confirm="{trans key='user.settings.confirm_delete_device'}">{trans key='common.delete'}
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -316,11 +324,9 @@
                                                                                  {trans key='user.settings.added_at'} {$device->created_at}</p>
                                                                             <p class="card-text">
                                                                                  {trans key='user.settings.last_used'} {if $device->used_at}{$device->used_at}{else}{trans key='user.settings.never_used'}{/if}</p>
-                                                                            <button class="btn btn-danger"
-                                                                                    hx-delete="/user/fido/{$device->id}"
-                                                                                    hx-swap="none"
-                                                                                     hx-confirm="{trans key='user.settings.confirm_delete_device'}"
-                                                                             >{trans key='common.delete'}
+                                                                            <button class="btn btn-danger mfa-delete"
+                                                                                    data-url="/user/fido/{$device->id}"
+                                                                                    data-confirm="{trans key='user.settings.confirm_delete_device'}">{trans key='common.delete'}
                                                                             </button>
                                                                         </div>
                                                                     </div>
@@ -630,8 +636,50 @@
 
     {include file='user/footer.tpl'}
     <script>
+        async function authorizeMfaManagement() {
+            const password = document.getElementById('mfa_current_password').value;
+            const response = await fetch('/user/mfa/reauth', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                {literal}
+                body: JSON.stringify({password: password}),
+                {/literal}
+            });
+            const result = await response.json();
+            if (result.ret !== 1) {
+                document.getElementById('fail-message').innerText = result.msg;
+                failDialog.show();
+                return false;
+            }
+
+            return true;
+        }
+
+        document.querySelectorAll('.mfa-delete').forEach(button => {
+            button.addEventListener('click', async () => {
+                if (!confirm(button.dataset.confirm) || !await authorizeMfaManagement()) {
+                    return;
+                }
+
+                const response = await fetch(button.dataset.url, {literal}{method: 'DELETE'}{/literal});
+                const result = await response.json();
+                if (result.ret === 1) {
+                    location.reload();
+                    return;
+                }
+
+                document.getElementById('fail-message').innerText = result.msg;
+                failDialog.show();
+            });
+        });
+
         {if not $totpDevices}
         document.querySelector('#enableTotp').addEventListener('click', async () => {
+            if (!await authorizeMfaManagement()) {
+                return;
+            }
             const resp = await fetch('/user/totp');
             const data = await resp.json();
             var modal = new tabler.bootstrap.Modal(document.getElementById('totpModal'), {
@@ -691,6 +739,9 @@
         {/if}
         const { startRegistration } = SimpleWebAuthnBrowser;
         document.getElementById('fidoReg').addEventListener('click', async () => {
+            if (!await authorizeMfaManagement()) {
+                return;
+            }
             const resp = await fetch('/user/fido');
             let attResp;
             const options = await resp.json();
@@ -723,6 +774,9 @@
             }
         });
         document.getElementById('webauthnReg').addEventListener('click', async () => {
+            if (!await authorizeMfaManagement()) {
+                return;
+            }
             const resp = await fetch('/user/webauthn');
             const options = await resp.json();
             let attResp;

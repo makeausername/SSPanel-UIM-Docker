@@ -72,7 +72,22 @@ final class NodeApiV1Controller extends BaseController
         $nodeId = $this->authenticatedNodeId($request) ?? $this->queryNodeId($request, 1001);
         $domain = $request->getQueryParam('domain', '');
 
-        $data = (new NodeProfileService())->buildDefaultConfig($nodeId, is_string($domain) ? trim($domain) : '');
+        try {
+            $data = (new NodeProfileService())->buildDefaultConfig(
+                $nodeId,
+                is_string($domain) ? trim($domain) : ''
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->validationError($request, $response, $e->getMessage(), 'invalid_node_profile', 422);
+        } catch (Throwable) {
+            return $this->validationError(
+                $request,
+                $response,
+                'Node profile is temporarily unavailable.',
+                'node_profile_unavailable',
+                503
+            );
+        }
 
         return $this->success($request, $response, $data);
     }
@@ -93,7 +108,17 @@ final class NodeApiV1Controller extends BaseController
      */
     public function detectRules(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $data = (new NodeProfileService())->buildMockDetectRules();
+        try {
+            $data = (new NodeProfileService())->buildDetectRules();
+        } catch (Throwable) {
+            return $this->validationError(
+                $request,
+                $response,
+                'Detect rules are temporarily unavailable.',
+                'detect_rules_unavailable',
+                503
+            );
+        }
 
         return $this->success($request, $response, $data);
     }

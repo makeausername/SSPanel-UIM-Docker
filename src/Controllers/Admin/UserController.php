@@ -9,6 +9,8 @@ use App\Controllers\BaseController;
 use App\Models\Config;
 use App\Models\User;
 use App\Models\UserMoneyLog;
+use App\Services\AdminPermissionService;
+use App\Services\ClientSessionService;
 use App\Services\DB;
 use App\Services\I18n;
 use App\Services\InvoiceAccountingService;
@@ -18,6 +20,7 @@ use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function in_array;
 
 final class UserController extends BaseController
 {
@@ -174,6 +177,7 @@ final class UserController extends BaseController
                 ->assign('edit_user', $user)
                 ->assign('ss_methods', Tools::getSsMethod())
                 ->assign('locales', I18n::getLocaleList())
+                ->assign('admin_roles', AdminPermissionService::ROLES)
                 ->fetch('admin/user/edit.tpl')
         );
     }
@@ -181,18 +185,61 @@ final class UserController extends BaseController
     public function update(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $id = (int) $args['id'];
-        $result = DB::connection()->transaction(static function () use ($id, $request): array {
+        $actor = $this->user;
+        $actorIsOwner = AdminPermissionService::isOwner($actor);
+        $requestedIsAdmin = $request->getParam('is_admin') === 'true';
+        $requestedRole = (string) $request->getParam('admin_role', 'administrator');
+        if (! in_array($requestedRole, AdminPermissionService::ROLES, true)) {
+            $requestedRole = 'administrator';
+        }
+
+        $result = DB::connection()->transaction(static function () use (
+            $id,
+            $request,
+            $actorIsOwner,
+            $requestedIsAdmin,
+            $requestedRole
+        ): array {
             $user = (new User())->where('id', $id)->lockForUpdate()->first();
 
             if ($user === null) {
                 return ['ret' => 0, 'msg' => '用户不存在'];
             }
 
-            if ($request->getParam('pass') !== '' && $request->getParam('pass') !== null) {
+            $passwordChanged = $request->getParam('pass') !== '' && $request->getParam('pass') !== null;
+            if ($passwordChanged) {
                 $user->pass = Hash::passwordHash($request->getParam('pass'));
 
                 if (Config::obtain('enable_forced_replacement')) {
                     $user->removeLink();
+                }
+            }
+
+            $currentIsAdmin = (int) $user->is_admin === 1;
+            $currentRole = AdminPermissionService::role($user);
+            $privilegeChanged = $currentIsAdmin !== $requestedIsAdmin
+                || ($requestedIsAdmin && $currentRole !== $requestedRole);
+
+            if ($privilegeChanged && ! $actorIsOwner) {
+                return ['ret' => 0, 'msg' => '只有所有者可以修改管理员权限'];
+            }
+
+            $requestedBanned = $request->getParam('is_banned') === 'true';
+            $removesActiveOwner = $currentIsAdmin
+                && $currentRole === 'owner'
+                && (! $requestedIsAdmin || $requestedRole !== 'owner' || $requestedBanned);
+            if ($removesActiveOwner) {
+                $otherOwners = (new User())
+                    ->where('id', '!=', $id)
+                    ->where('is_admin', 1)
+                    ->where('is_banned', 0)
+                    ->where('admin_role', 'owner')
+                    ->lockForUpdate()
+                    ->get()
+                    ->count();
+
+                if ($otherOwners === 0) {
+                    return ['ret' => 0, 'msg' => '不能停用最后一个有效所有者'];
                 }
             }
 
@@ -222,15 +269,19 @@ final class UserController extends BaseController
             $user->node_speedlimit = $request->getParam('node_speedlimit');
             $user->node_iplimit = $request->getParam('node_iplimit');
             $user->locale = $request->getParam('locale');
-            $user->is_admin = $request->getParam('is_admin') === 'true' ? 1 : 0;
-            $user->ga_enable = $request->getParam('ga_enable') === 'true' ? 1 : 0;
+            $user->is_admin = $requestedIsAdmin ? 1 : 0;
+            $user->admin_role = $requestedIsAdmin ? $requestedRole : null;
             $user->is_shadow_banned = $request->getParam('is_shadow_banned') === 'true' ? 1 : 0;
-            $user->is_banned = $request->getParam('is_banned') === 'true' ? 1 : 0;
+            $user->is_banned = $requestedBanned ? 1 : 0;
             $user->banned_reason = $request->getParam('banned_reason');
             $user->remark = $request->getParam('remark');
 
             if (! $user->save()) {
                 throw new \RuntimeException('User update failed.');
+            }
+
+            if ($passwordChanged || $requestedBanned) {
+                (new ClientSessionService())->revokeAllForUser($id);
             }
 
             if ($moneyChange !== null) {
@@ -252,20 +303,47 @@ final class UserController extends BaseController
 
     public function delete(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $id = $args['id'];
-        $user = (new User())->find((int) $id);
+        $id = (int) $args['id'];
+        $actorId = (int) $this->user->id;
+        $actorIsOwner = AdminPermissionService::isOwner($this->user);
 
-        if ($user === null || ! $user->kill()) {
-            return $response->withJson([
-                'ret' => 0,
-                'msg' => '删除失败',
-            ]);
-        }
+        $result = DB::connection()->transaction(static function () use ($id, $actorId, $actorIsOwner): array {
+            if ($actorId === $id) {
+                return ['ret' => 0, 'msg' => '不能删除当前登录的管理员'];
+            }
 
-        return $response->withJson([
-            'ret' => 1,
-            'msg' => '删除成功',
-        ]);
+            $user = (new User())->where('id', $id)->lockForUpdate()->first();
+            if ($user === null) {
+                return ['ret' => 0, 'msg' => '删除失败'];
+            }
+
+            if ((int) $user->is_admin === 1) {
+                if (! $actorIsOwner) {
+                    return ['ret' => 0, 'msg' => '只有所有者可以删除管理员'];
+                }
+
+                if (AdminPermissionService::role($user) === 'owner') {
+                    $otherOwners = (new User())
+                        ->where('id', '!=', $id)
+                        ->where('is_admin', 1)
+                        ->where('is_banned', 0)
+                        ->where('admin_role', 'owner')
+                        ->lockForUpdate()
+                        ->get()
+                        ->count();
+
+                    if ($otherOwners === 0) {
+                        return ['ret' => 0, 'msg' => '不能删除最后一个有效所有者'];
+                    }
+                }
+            }
+
+            return $user->kill()
+                ? ['ret' => 1, 'msg' => '删除成功']
+                : ['ret' => 0, 'msg' => '删除失败'];
+        });
+
+        return $response->withJson($result);
     }
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface

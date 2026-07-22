@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Middleware\Admin;
+use App\Middleware\AdminAudit;
 use App\Middleware\Guest;
 use App\Middleware\NodeApiToken;
 use App\Middleware\NodeEnrollRateLimit;
@@ -30,8 +31,10 @@ return static function (Slim\App $app): void {
     // Bot Callback
     $app->post('/callback/{type}', App\Controllers\CallbackController::class . ':index');
     // OAuth
-    $app->post('/oauth/{type}', App\Controllers\OAuthController::class . ':index')->add(new SameOriginCsrf());
-    $app->get('/oauth/{type}', App\Controllers\OAuthController::class . ':index');
+    $app->post('/oauth/{type}', App\Controllers\OAuthController::class . ':index')
+        ->add(new SameOriginCsrf())
+        ->add(new User());
+    $app->get('/oauth/{type}', App\Controllers\OAuthController::class . ':index')->add(new User());
     // 通用订阅
     $app->get('/sub/{token}/{subtype}', App\Controllers\SubController::class . ':index');
     // Windows Client API
@@ -92,6 +95,7 @@ return static function (Slim\App $app): void {
         // 发送验证邮件
         $group->post('/edit/send', App\Controllers\AuthController::class . ':sendVerify');
         // MFA
+        $group->post('/mfa/reauth', App\Controllers\User\MFAController::class . ':reauthenticate');
         $group->get('/totp', App\Controllers\User\MFAController::class . ':totpRegisterRequest');
         $group->post('/totp', App\Controllers\User\MFAController::class . ':totpRegisterHandle');
         $group->delete('/totp', App\Controllers\User\MFAController::class . ':totpDelete');
@@ -126,7 +130,7 @@ return static function (Slim\App $app): void {
         // Get Clients
         $group->get('/clients/{name}', App\Controllers\User\ClientController::class . ':getClients');
         // 登出
-        $group->get('/logout', App\Controllers\UserController::class . ':logout');
+        $group->post('/logout', App\Controllers\UserController::class . ':logout');
     })->add(new SameOriginCsrf())->add(new User());
 
     $app->group('/payment', static function (RouteCollectorProxy $group): void {
@@ -338,7 +342,7 @@ return static function (Slim\App $app): void {
         $group->get('/invoice/{id:[0-9]+}/view', App\Controllers\Admin\InvoiceController::class . ':detail');
         $group->post('/invoice/{id:[0-9]+}/mark_paid', App\Controllers\Admin\InvoiceController::class . ':markPaid');
         $group->post('/invoice/ajax', App\Controllers\Admin\InvoiceController::class . ':ajax');
-    })->add(new SameOriginCsrf())->add(new Admin());
+    })->add(new AdminAudit())->add(new SameOriginCsrf())->add(new Admin());
     // WebAPI
     $app->group('/mod_mu', static function (RouteCollectorProxy $group): void {
         // 节点
@@ -351,7 +355,7 @@ return static function (Slim\App $app): void {
         // 审计 & 杂七杂八的功能
         $group->get('/func/detect_rules', App\Controllers\WebAPI\FuncController::class . ':getDetectRules');
         $group->get('/func/ping', App\Controllers\WebAPI\FuncController::class . ':ping');
-    })->add(new NodeToken());
+    })->add(new RequestBodyLimit(2 * 1024 * 1024))->add(new NodeToken());
 
     // Admin REST API
     //$app->group('/admin/api/v1', function (RouteCollectorProxy $group): void {
