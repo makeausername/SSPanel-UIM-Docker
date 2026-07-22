@@ -56,7 +56,7 @@ services:
       - ./public:/var/www/html/public:ro
       - app_clients:/var/www/html/public/clients:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/index.php"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz"]
       interval: 10s
       timeout: 5s
       retries: 12
