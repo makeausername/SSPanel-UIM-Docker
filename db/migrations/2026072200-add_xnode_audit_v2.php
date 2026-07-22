@@ -131,6 +131,10 @@ return new class() implements MigrationInterface {
     {
         $autoIncrement = $driver === 'sqlite' ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'bigint(20) unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY';
         $text = $driver === 'sqlite' ? 'TEXT' : 'varchar(255)';
+        $bigint = $driver === 'sqlite' ? 'INTEGER' : 'bigint(20) unsigned';
+        $integer = $driver === 'sqlite' ? 'INTEGER' : 'int(11)';
+        $unsignedInteger = $driver === 'sqlite' ? 'INTEGER' : 'int(11) unsigned';
+        $boolean = $driver === 'sqlite' ? 'INTEGER' : 'tinyint(1)';
         $engine = $driver === 'sqlite' ? '' : ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
 
         $pdo->exec("CREATE TABLE IF NOT EXISTS `xnode_audit_rules` (
@@ -142,41 +146,41 @@ return new class() implements MigrationInterface {
             `network` varchar(16) NOT NULL DEFAULT 'any',
             `action` varchar(16) NOT NULL DEFAULT 'block',
             `severity` varchar(16) NOT NULL DEFAULT 'medium',
-            `enabled` tinyint(1) NOT NULL DEFAULT 1,
+            `enabled` {$boolean} NOT NULL DEFAULT 1,
             `source` varchar(32) NOT NULL DEFAULT 'admin',
             `scope_type` varchar(16) NOT NULL DEFAULT 'all',
-            `scope_value` int(11) DEFAULT NULL,
-            `priority` int(11) NOT NULL DEFAULT 100,
-            `revision` int(11) unsigned NOT NULL DEFAULT 1,
-            `managed` tinyint(1) NOT NULL DEFAULT 0,
-            `created_at` int(11) unsigned NOT NULL,
-            `updated_at` int(11) unsigned NOT NULL
+            `scope_value` {$integer} DEFAULT NULL,
+            `priority` {$integer} NOT NULL DEFAULT 100,
+            `revision` {$unsignedInteger} NOT NULL DEFAULT 1,
+            `managed` {$boolean} NOT NULL DEFAULT 0,
+            `created_at` {$unsignedInteger} NOT NULL,
+            `updated_at` {$unsignedInteger} NOT NULL
         ){$engine}");
         $this->createIndex($pdo, $driver, 'xnode_audit_rules', 'xnode_audit_rules_managed_key_unique', ['managed_key'], true);
         $this->createIndex($pdo, $driver, 'xnode_audit_rules', 'xnode_audit_rules_enabled_priority', ['enabled', 'priority'], false);
 
         $pdo->exec("CREATE TABLE IF NOT EXISTS `xnode_audit_rule_patterns` (
             `id` {$autoIncrement},
-            `rule_id` bigint(20) unsigned NOT NULL,
+            `rule_id` {$bigint} NOT NULL,
             `pattern` {$text} NOT NULL,
-            `created_at` int(11) unsigned NOT NULL
+            `created_at` {$unsignedInteger} NOT NULL
         ){$engine}");
         $this->createIndex($pdo, $driver, 'xnode_audit_rule_patterns', 'xnode_audit_rule_pattern_unique', ['rule_id', 'pattern'], true);
 
         $pdo->exec("CREATE TABLE IF NOT EXISTS `xnode_audit_events` (
             `id` {$autoIncrement},
             `event_key` varchar(128) NOT NULL,
-            `node_id` bigint(20) unsigned NOT NULL,
-            `user_id` bigint(20) unsigned NOT NULL,
-            `rule_id` bigint(20) unsigned NOT NULL,
+            `node_id` {$bigint} NOT NULL,
+            `user_id` {$bigint} NOT NULL,
+            `rule_id` {$bigint} NOT NULL,
             `source_ip` varchar(64) DEFAULT NULL,
             `target_host` {$text} DEFAULT NULL,
-            `target_port` int(11) unsigned DEFAULT NULL,
+            `target_port` {$unsignedInteger} DEFAULT NULL,
             `protocol` varchar(32) DEFAULT NULL,
             `action` varchar(16) NOT NULL DEFAULT 'block',
-            `observed_at` int(11) unsigned NOT NULL,
-            `created_at` int(11) unsigned NOT NULL,
-            `processed` tinyint(1) NOT NULL DEFAULT 0
+            `observed_at` {$unsignedInteger} NOT NULL,
+            `created_at` {$unsignedInteger} NOT NULL,
+            `processed` {$boolean} NOT NULL DEFAULT 0
         ){$engine}");
         $this->createIndex($pdo, $driver, 'xnode_audit_events', 'xnode_audit_event_key_unique', ['event_key'], true);
         $this->createIndex($pdo, $driver, 'xnode_audit_events', 'xnode_audit_events_user_processed', ['user_id', 'processed'], false);
@@ -189,12 +193,13 @@ return new class() implements MigrationInterface {
             return;
         }
 
+        $unsignedInteger = $driver === 'sqlite' ? 'INTEGER' : 'int(11) unsigned';
         $columns = [
             'audit_revision' => 'varchar(64) DEFAULT NULL',
             'audit_hash' => 'varchar(128) DEFAULT NULL',
             'audit_status' => 'varchar(32) DEFAULT NULL',
             'audit_error' => 'text DEFAULT NULL',
-            'audit_applied_at' => 'int(11) unsigned DEFAULT NULL',
+            'audit_applied_at' => "{$unsignedInteger} DEFAULT NULL",
         ];
 
         foreach ($columns as $name => $definition) {
