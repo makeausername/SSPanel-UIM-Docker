@@ -15,10 +15,26 @@ final class HealthControllerTest extends TestCase
         $request = $factory->createServerRequest('GET', '/healthz');
         $response = $factory->createResponse();
 
-        $result = (new HealthController())->index($request, $response, []);
+        $result = (new HealthController(static function (): void {
+        }))->index($request, $response, []);
 
         $this->assertSame(200, $result->getStatusCode());
         $this->assertSame('text/plain; charset=utf-8', $result->getHeaderLine('Content-Type'));
         $this->assertSame('ok', (string) $result->getBody());
+    }
+
+    public function testHealthEndpointReturnsUnavailableWhenADependencyFails(): void
+    {
+        $factory = new HttpFactory();
+        $request = $factory->createServerRequest('GET', '/healthz');
+        $response = $factory->createResponse();
+
+        $result = (new HealthController(static function (): void {
+            throw new \RuntimeException('dependency unavailable');
+        }))->index($request, $response, []);
+
+        $this->assertSame(503, $result->getStatusCode());
+        $this->assertSame('text/plain; charset=utf-8', $result->getHeaderLine('Content-Type'));
+        $this->assertSame('unavailable', (string) $result->getBody());
     }
 }

@@ -40,7 +40,11 @@ final class InvoiceRefundService
 
     public function refundLocked(Invoice $invoice, User $user): bool
     {
-        if (! in_array($invoice->status, ['paid_gateway', 'paid_balance', 'paid_admin'], true)) {
+        if (! in_array(
+            $invoice->status,
+            ['partially_paid', 'paid_gateway', 'paid_balance', 'paid_admin'],
+            true
+        )) {
             return false;
         }
 

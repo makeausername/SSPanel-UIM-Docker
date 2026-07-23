@@ -38,25 +38,25 @@
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">名称</label>
                                 <div class="col">
-                                    <input id="name" type="text" class="form-control" value="{$node->name}">
+                                    <input id="name" type="text" class="form-control" value="{$node->name|escape:'html'}">
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">连接地址</label>
                                 <div class="col">
-                                    <input id="server" type="text" class="form-control" value="{$node->server}">
+                                    <input id="server" type="text" class="form-control" value="{$node->server|escape:'html'}">
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">IPv4地址</label>
                                 <div class="col">
-                                    <input type="text" class="form-control" value="{$node->ipv4}" disabled>
+                                    <input type="text" class="form-control" value="{$node->ipv4|escape:'html'}" disabled>
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">IPv6地址</label>
                                 <div class="col">
-                                    <input type="text" class="form-control" value="{$node->ipv6}" disabled>
+                                    <input type="text" class="form-control" value="{$node->ipv6|escape:'html'}" disabled>
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
@@ -166,13 +166,13 @@
                             </div>
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">节点通讯密钥</label>
-                                <input type="password" class="form-control" id="password" value="{$node_secret}"
+                                <input type="password" class="form-control" id="password" value="{$node_secret|escape:'html'}"
                                        disabled="">
                                 <div class="row my-3">
                                     <div class="col">
                                         <button id="reset-password" class="btn btn-red">重置</button>
                                         <button id="copy-password" class="copy btn btn-primary"
-                                                data-clipboard-text="{$node_secret}">
+                                                data-clipboard-text="{$node_secret|escape:'html'}">
                                             复制
                                         </button>
                                     </div>
@@ -355,7 +355,7 @@
         modes: ['code', 'tree'],
     };
     const editor = new JSONEditor(container, options);
-    editor.set({$node->custom_config})
+    editor.set({$node_custom_config})
 
     const xnodeRealityTemplate = {
         xnode: {

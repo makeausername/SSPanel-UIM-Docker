@@ -43,7 +43,7 @@
                                                         </div>
                                                         <div class="col">
                                                             <h2 class="page-title" style="font-size: 16px;">
-                                                                {$server['name']}&nbsp;
+                                                                {$server['name']|escape:'html'}&nbsp;
                                                                 <span class="card-subtitle my-2"
                                                                       style="font-size: 10px;">  {$server['node_bandwidth']} /
                                                                     {$server['node_bandwidth_limit']}

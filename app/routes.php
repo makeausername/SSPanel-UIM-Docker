@@ -130,12 +130,12 @@ return static function (Slim\App $app): void {
         $group->get('/clients/{name}', App\Controllers\User\ClientController::class . ':getClients');
         // 登出
         $group->get('/logout', App\Controllers\UserController::class . ':logout');
-    })->add(new SameOriginCsrf())->add(new User());
+    })->add(new SameOriginCsrf())->add(new User())->add(new RequestBodyLimit(256 * 1024));
 
     $app->group('/payment', static function (RouteCollectorProxy $group): void {
         $group->get('/notify/{type}', App\Services\Payment::class . ':notify');
         $group->post('/notify/{type}', App\Services\Payment::class . ':notify');
-    });
+    })->add(new RequestBodyLimit(1024 * 1024));
     // Auth
     $app->group('/auth', static function (RouteCollectorProxy $group): void {
         $group->get('/login', App\Controllers\AuthController::class . ':login');

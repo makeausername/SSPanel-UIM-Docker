@@ -43,16 +43,27 @@ final class Payment
         return $result;
     }
 
-    public static function getPaymentByName($name): ?string
+    public static function getAllPaymentMapByName(): array
     {
-        $all = self::getPaymentMap();
+        $result = [];
 
-        return $all[$name];
+        foreach (self::getAllPaymentMap() as $payment) {
+            $result[$payment::_name()] = $payment;
+        }
+
+        return $result;
+    }
+
+    public static function getPaymentByName($name, bool $enabledOnly = true): ?string
+    {
+        $all = $enabledOnly ? self::getPaymentMap() : self::getAllPaymentMapByName();
+
+        return $all[$name] ?? null;
     }
 
     public static function notify($request, $response, $args): ResponseInterface
     {
-        $payment = self::getPaymentByName($args['type']);
+        $payment = self::getPaymentByName($args['type'], false);
 
         if ($payment !== null) {
             $instance = new $payment();
@@ -64,7 +75,7 @@ final class Payment
 
     public static function returnHTML($request, $response, $args): ResponseInterface
     {
-        $payment = self::getPaymentByName($args['type']);
+        $payment = self::getPaymentByName($args['type'], false);
 
         if ($payment !== null) {
             $instance = new $payment();
@@ -76,6 +87,16 @@ final class Payment
 
     public static function purchase($request, $response, $args): ResponseInterface
     {
+        $user = Auth::getUser();
+        if ($user->is_shadow_banned
+            || ! RateLimit::checkSafely('payment', (string) $user->id, true)
+        ) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => FrontendI18n::trans('response.payment.rate_limited'),
+            ])->withStatus(429);
+        }
+
         $payment = self::getPaymentByName($args['type']);
 
         if ($payment !== null) {

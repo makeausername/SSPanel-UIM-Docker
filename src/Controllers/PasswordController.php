@@ -60,8 +60,12 @@ final class PasswordController extends BaseController
             return ResponseHelper::error($response, FrontendI18n::trans('response.email_required'));
         }
 
-        if (! (new RateLimit())->checkRateLimit('email_request_ip', $request->getServerParam('REMOTE_ADDR')) ||
-            ! (new RateLimit())->checkRateLimit('email_request_address', $email)
+        if (! RateLimit::checkSafely(
+            'email_request_ip',
+            (string) $request->getServerParam('REMOTE_ADDR'),
+            true
+        ) ||
+            ! RateLimit::checkSafely('email_request_address', $email, true)
         ) {
             return ResponseHelper::error($response, FrontendI18n::trans('response.too_many_requests'));
         }

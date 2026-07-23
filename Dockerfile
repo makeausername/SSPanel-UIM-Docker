@@ -1,4 +1,4 @@
-FROM php:8.3-fpm
+FROM php:8.3.32-fpm-bookworm
 
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_HOME=/tmp/composer \
@@ -41,12 +41,12 @@ RUN set -eux; \
     if ! php -m | grep -qi '^sodium$'; then \
         docker-php-ext-install -j"$(nproc)" sodium; \
     fi; \
-    printf "\n" | pecl install redis; \
-    printf "\n" | pecl install yaml; \
+    printf "\n" | pecl install redis-6.3.0; \
+    printf "\n" | pecl install yaml-2.3.0; \
     docker-php-ext-enable redis yaml opcache; \
     rm -rf /tmp/pear ~/.pearrc /var/lib/apt/lists/*
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.10.2 /usr/bin/composer /usr/bin/composer
 
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/zz-sspanel.ini
 COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/zz-opcache.ini

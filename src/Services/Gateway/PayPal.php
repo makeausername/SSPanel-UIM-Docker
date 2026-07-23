@@ -143,11 +143,15 @@ final class PayPal extends Base
             ]);
         }
 
-        if ($verify_result['verification_status'] === 'SUCCESS' &&
-            $webhook_data['event_type'] === 'PAYMENT.CAPTURE.COMPLETED' &&
-            $webhook_data['resource']['status'] === 'COMPLETED'
+        if (($verify_result['verification_status'] ?? '') === 'SUCCESS' &&
+            ($webhook_data['event_type'] ?? '') === 'PAYMENT.CAPTURE.COMPLETED' &&
+            ($webhook_data['resource']['status'] ?? '') === 'COMPLETED'
         ) {
             $resource = $webhook_data['resource'];
+            if (! isset($resource['invoice_id'], $resource['amount']['value'])) {
+                return $response->withStatus(400);
+            }
+
             $this->postPayment(
                 (string) $resource['invoice_id'],
                 $resource['amount']['value'] ?? null,

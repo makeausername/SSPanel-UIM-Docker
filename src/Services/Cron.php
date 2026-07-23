@@ -136,9 +136,11 @@ final class Cron
 
         (new User())->where('is_admin', 0)
             ->where('is_inactive', 1)
-            ->where('last_check_in_time', '>', time() - 86400 * $checkin_days)
-            ->where('last_login_time', '>', time() - 86400 * $login_days)
-            ->where('last_use_time', '>', time() - 86400 * $use_days)
+            ->where(static function ($query) use ($checkin_days, $login_days, $use_days): void {
+                $query->where('last_check_in_time', '>', time() - 86400 * $checkin_days)
+                    ->orWhere('last_login_time', '>', time() - 86400 * $login_days)
+                    ->orWhere('last_use_time', '>', time() - 86400 * $use_days);
+            })
             ->update(['is_inactive' => 0]);
 
         echo Tools::toDateTime(time()) .
@@ -465,6 +467,7 @@ final class Cron
             $unit_text = '';
 
             if ($_ENV['notify_limit_mode'] === 'per' &&
+                (int) $user->transfer_enable > 0 &&
                 $user_traffic_left / $user->transfer_enable * 100 < $_ENV['notify_limit_value']
             ) {
                 $under_limit = true;

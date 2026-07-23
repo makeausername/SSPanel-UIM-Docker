@@ -21,11 +21,26 @@
                 }),
             })
                 .then((response) => response.json())
-                .then((order) => order.id);
+                .then((order) => {
+                    if (!order.id) {
+                        throw new Error(order.msg || 'Unable to create PayPal order');
+                    }
+
+                    return order.id;
+                });
         },
-        onApprove() {
-            window.setTimeout(location.href = '/user/invoice', {$config['jump_delay']});
-        }
+        onApprove(data, actions) {
+            return actions.order.capture().then(() => {
+                window.setTimeout(() => {
+                    window.location.assign('/user/invoice/{$invoice->id}/view');
+                }, Math.max(0, Number({$config['jump_delay']}) || 0));
+            });
+        },
+        onError(error) {
+            console.error('PayPal payment failed:', error);
+            document.getElementById('fail-message').textContent = error.message || 'PayPal payment failed';
+            failDialog.show();
+        },
     }).render('#paypal-button-container');
 
 </script>
