@@ -11,9 +11,9 @@
                 <div class="w-100">
                     <div class="row">
                         <div class="col">
-                            <a id="success-confirm" href="" class="btn w-100" data-bs-dismiss="modal">
+                            <button type="button" id="success-confirm" class="btn w-100" data-bs-dismiss="modal">
                                 好
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -35,9 +35,9 @@
                 <div class="w-100">
                     <div class="row">
                         <div class="col">
-                            <a href="" class="btn btn-danger w-100" data-bs-dismiss="modal">
+                            <button type="button" class="btn btn-danger w-100" data-bs-dismiss="modal">
                                 确认
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -84,6 +84,25 @@
 <script>
     let successDialog = new tabler.bootstrap.Modal(document.getElementById('success-dialog'));
     let failDialog = new tabler.bootstrap.Modal(document.getElementById('fail-dialog'));
+
+    function redirectAfterSuccess(target, delay) {
+        let redirected = false;
+        const redirect = function () {
+            if (redirected) {
+                return;
+            }
+
+            redirected = true;
+            window.location.assign(target);
+        };
+        const successConfirm = document.getElementById('success-confirm');
+
+        if (successConfirm) {
+            successConfirm.addEventListener('click', redirect, { once: true });
+        }
+
+        window.setTimeout(redirect, Math.max(0, Number(delay) || 0));
+    }
 
     htmx.on("htmx:afterRequest", function(evt) {
         if (evt.detail.xhr.getResponseHeader('HX-Refresh') === 'true' ||

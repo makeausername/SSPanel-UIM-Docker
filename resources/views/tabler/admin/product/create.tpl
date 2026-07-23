@@ -234,7 +234,7 @@
                     if (data.ret === 1) {
                         $("#success-message").text(data.msg);
                         $("#success-dialog").modal("show");
-                        window.setTimeout("location.href=top.document.referrer", {$config["jump_delay"]});
+                        redirectAfterSuccess('/admin/product', {$config["jump_delay"]});
                     } else {
                         $("#fail-message").text(data.msg);
                         $("#fail-dialog").modal("show");
