@@ -68,6 +68,20 @@ final class GatewayPaymentTest extends TestCase
         $this->assertSame('9.01', self::decimal($invoice->paid_amount));
     }
 
+    public function testDiscountedInvoiceUsesFinalAmountAsAccountingBasis(): void
+    {
+        $this->seedUser(1, '0.00');
+        $this->seedInvoice(100, 1, '8.00', '8.00');
+        $this->seedPaylist('trade-discounted', 1, 100, '8.00');
+
+        self::gateway()->postPayment('trade-discounted');
+
+        $invoice = Capsule::table('invoice')->find(100);
+        $this->assertSame('paid_gateway', $invoice->status);
+        $this->assertSame('8', self::decimal($invoice->original_price));
+        $this->assertSame('8', self::decimal($invoice->paid_amount));
+    }
+
     public function testGatewayRejectsProviderAmountMismatch(): void
     {
         $this->seedUser(1, '0.00');
@@ -188,12 +202,18 @@ final class GatewayPaymentTest extends TestCase
         Capsule::table('user')->insert(['id' => $id, 'money' => $money, 'ref_by' => 0]);
     }
 
-    private function seedInvoice(int $id, int $userId, string $price): void
+    private function seedInvoice(
+        int $id,
+        int $userId,
+        string $price,
+        ?string $originalPrice = null
+    ): void
     {
         Capsule::table('invoice')->insert([
             'id' => $id,
             'user_id' => $userId,
             'price' => $price,
+            'original_price' => $originalPrice,
             'status' => 'unpaid',
             'content' => '[]',
         ]);

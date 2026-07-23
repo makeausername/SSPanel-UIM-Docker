@@ -131,7 +131,7 @@ final class Smogate extends Base
         }
 
         $status = (string) ($params['trade_status'] ?? $params['status'] ?? '');
-        if ($status !== '' && ! in_array(strtoupper($status), ['SUCCESS', 'PAID', 'TRADE_SUCCESS'], true)) {
+        if (! in_array(strtoupper($status), ['SUCCESS', 'PAID', 'TRADE_SUCCESS'], true)) {
             return $response->withStatus(400)->write('FAIL');
         }
 

@@ -16,6 +16,7 @@ use App\Services\FrontendI18n;
 use App\Services\InvoiceAccountingService;
 use App\Services\MonthlyPlanService;
 use App\Services\OrderEligibilityService;
+use App\Services\PendingOrderService;
 use App\Utils\Cookie;
 use App\Utils\Tools;
 use Exception;
@@ -173,7 +174,7 @@ final class OrderController extends BaseController
             $user = (new User())->where('id', $this->user->id)->lockForUpdate()->first();
             $product = (new Product())->where('id', $product_id)->lockForUpdate()->first();
 
-            if ($user === null || $product === null || (int) $product->status !== 1 || (int) $product->stock === 0) {
+            if ($user === null || $product === null || (int) $product->status !== 1) {
                 return $response->withJson([
                     'ret' => 0,
                     'msg' => FrontendI18n::trans('response.order.product_unavailable'),
@@ -184,6 +185,31 @@ final class OrderController extends BaseController
                 return $response->withJson([
                     'ret' => 0,
                     'msg' => FrontendI18n::trans('response.order.product_unavailable'),
+                ]);
+            }
+
+            $existingInvoice = PendingOrderService::reusableProductInvoice(
+                (int) $user->id,
+                (int) $product->id
+            );
+            if ($existingInvoice !== null) {
+                return $response->withHeader(
+                    'HX-Redirect',
+                    '/user/invoice/' . $existingInvoice->id . '/view'
+                );
+            }
+
+            if ((int) $product->stock === 0) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => FrontendI18n::trans('response.order.product_unavailable'),
+                ]);
+            }
+
+            if (PendingOrderService::limitReached((int) $user->id)) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => FrontendI18n::trans('response.order.pending_limit'),
                 ]);
             }
 
@@ -306,7 +332,7 @@ final class OrderController extends BaseController
             $invoice->order_id = $order->id;
             $invoice->content = json_encode($invoice_content);
             $invoice->price = $buy_price;
-            $invoice->original_price = InvoiceAccountingService::money($product->price);
+            $invoice->original_price = $buy_price;
             $invoice->paid_amount = $isFree ? $buy_price : '0.00';
             $invoice->refunded_amount = '0.00';
             $invoice->status = $isFree ? 'paid_gateway' : 'unpaid';
@@ -345,9 +371,24 @@ final class OrderController extends BaseController
         }
 
         return DB::connection()->transaction(function () use ($amount, $response): ResponseInterface {
+            $user = (new User())->where('id', $this->user->id)->lockForUpdate()->first();
+            if ($user === null || $user->is_shadow_banned) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => FrontendI18n::trans('response.order.topup_invalid'),
+                ]);
+            }
+
+            if (PendingOrderService::limitReached((int) $user->id)) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => FrontendI18n::trans('response.order.pending_limit'),
+                ]);
+            }
+
             $now = time();
             $order = new Order();
-            $order->user_id = $this->user->id;
+            $order->user_id = $user->id;
             $order->product_id = 0;
             $order->product_type = 'topup';
             $order->product_name = '余额充值 / Balance top-up';
@@ -360,7 +401,7 @@ final class OrderController extends BaseController
             $order->save();
 
             $invoice = new Invoice();
-            $invoice->user_id = $this->user->id;
+            $invoice->user_id = $user->id;
             $invoice->order_id = $order->id;
             $invoice->content = json_encode([
                 [

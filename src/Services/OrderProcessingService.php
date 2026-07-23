@@ -222,7 +222,20 @@ final class OrderProcessingService
                     return;
                 }
 
-                if ($order->create_time + 86400 < time() && $invoice->status !== 'partially_paid') {
+                if ($invoice->status === 'partially_paid'
+                    && $order->create_time + PendingOrderService::PARTIAL_PAYMENT_TTL_SECONDS < time()
+                ) {
+                    $user = (new User())->where('id', $order->user_id)->lockForUpdate()->first();
+                    if ($user !== null) {
+                        self::cancelFailedActivation($order, $user);
+                    }
+
+                    return;
+                }
+
+                if ($order->create_time + PendingOrderService::RESERVATION_TTL_SECONDS < time()
+                    && $invoice->status !== 'partially_paid'
+                ) {
                     OrderReservationService::release($order);
                     $order->status = 'cancelled';
                     $order->update_time = time();
@@ -285,7 +298,7 @@ final class OrderProcessingService
         }
 
         $refundable = InvoiceAccountingService::refundable($invoice);
-        if (in_array($invoice->status, ['paid_gateway', 'paid_balance', 'paid_admin'], true)
+        if (in_array($invoice->status, ['partially_paid', 'paid_gateway', 'paid_balance', 'paid_admin'], true)
             && bccomp($refundable, '0.00', 2) > 0) {
             if (! (new InvoiceRefundService())->refundLocked($invoice, $user)) {
                 throw new \RuntimeException('Unable to refund a failed product activation.');

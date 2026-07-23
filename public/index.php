@@ -26,7 +26,14 @@ use Slim\Http\Factory\DecoratedResponseFactory;
 
 Boot::setTime();
 Boot::bootSentry();
-Boot::bootDb();
+try {
+    Boot::bootDb();
+} catch (\Throwable) {
+    http_response_code(503);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'Service unavailable';
+    exit(1);
+}
 
 $guzzle_factory = new HttpFactory();
 $response_factory = new DecoratedResponseFactory($guzzle_factory, $guzzle_factory);

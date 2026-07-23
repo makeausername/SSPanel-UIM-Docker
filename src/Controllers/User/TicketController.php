@@ -10,6 +10,7 @@ use App\Models\Ticket;
 use App\Services\FrontendI18n;
 use App\Services\Notification;
 use App\Services\RateLimit;
+use App\Services\TicketReplyService;
 use App\Utils\ResponseHelper;
 use App\Utils\Tools;
 use GuzzleHttp\Exception\GuzzleException;
@@ -19,15 +20,19 @@ use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Smarty\Exception;
 use Telegram\Bot\Exceptions\TelegramSDKException;
-use function array_merge;
-use function count;
 use function json_decode;
 use function json_encode;
+use function in_array;
+use function mb_strlen;
 use function nl2br;
+use function trim;
 use function time;
 
 final class TicketController extends BaseController
 {
+    private const MAX_TITLE_LENGTH = 120;
+    private const MAX_COMMENT_LENGTH = 5000;
+
     /**
      * @throws Exception
      */
@@ -59,16 +64,18 @@ final class TicketController extends BaseController
      */
     public function add(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $title = $request->getParam('title') ?? '';
-        $comment = $request->getParam('comment') ?? '';
-        $type = $request->getParam('type') ?? '';
+        $title = trim((string) ($request->getParam('title') ?? ''));
+        $comment = trim((string) ($request->getParam('comment') ?? ''));
+        $type = trim((string) ($request->getParam('type') ?? ''));
 
         if (! Config::obtain('enable_ticket') ||
             $this->user->is_shadow_banned ||
-            ! (new RateLimit())->checkRateLimit('ticket', (string) $this->user->id) ||
+            ! RateLimit::checkSafely('ticket', (string) $this->user->id, true) ||
             $title === '' ||
             $comment === '' ||
-            $type === ''
+            ! in_array($type, ['howto', 'billing', 'account', 'other'], true) ||
+            mb_strlen($title) > self::MAX_TITLE_LENGTH ||
+            mb_strlen($comment) > self::MAX_COMMENT_LENGTH
         ) {
             return ResponseHelper::error($response, FrontendI18n::trans('response.ticket_create_failed'));
         }
@@ -110,35 +117,29 @@ final class TicketController extends BaseController
     public function reply(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $id = $args['id'];
-        $comment = $request->getParam('comment') ?? '';
+        $comment = trim((string) ($request->getParam('comment') ?? ''));
 
         if (! Config::obtain('enable_ticket') ||
             $this->user->is_shadow_banned ||
-            $comment === ''
+            $comment === '' ||
+            mb_strlen($comment) > self::MAX_COMMENT_LENGTH ||
+            ! RateLimit::checkSafely('ticket_reply', (string) $this->user->id, true)
         ) {
             return ResponseHelper::error($response, FrontendI18n::trans('response.ticket_reply_failed'));
         }
 
-        $ticket = (new Ticket())->where('id', $id)->where('userid', $this->user->id)->first();
+        $ticket = (new TicketReplyService())->append(
+            (int) $id,
+            'user',
+            (string) $this->user->user_name,
+            $this->antiXss->xss_clean($comment),
+            'open_wait_admin',
+            (int) $this->user->id
+        );
 
         if ($ticket === null) {
             return ResponseHelper::error($response, FrontendI18n::trans('response.ticket_not_found'));
         }
-
-        $content_old = json_decode($ticket->content, true);
-        $content_new = [
-            [
-                'comment_id' => $content_old[count($content_old) - 1]['comment_id'] + 1,
-                'commenter_type' => 'user',
-                'commenter_name' => $this->user->user_name,
-                'comment' => $this->antiXss->xss_clean($comment),
-                'datetime' => time(),
-            ],
-        ];
-
-        $ticket->content = json_encode(array_merge($content_old, $content_new));
-        $ticket->status = 'open_wait_admin';
-        $ticket->save();
 
         if (Config::obtain('mail_ticket')) {
             Notification::notifyAdmin(

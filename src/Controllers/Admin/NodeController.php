@@ -34,6 +34,10 @@ use function htmlspecialchars;
 use function implode;
 use function in_array;
 use function is_string;
+use function json_decode;
+use function json_encode;
+use function mb_strlen;
+use function preg_match;
 use function round;
 use function rtrim;
 use function str_replace;
@@ -117,9 +121,17 @@ final class NodeController extends BaseController
      */
     public function add(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
+        $name = self::normalizeNodeName($request->getParam('name'));
+        if ($name === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点名称无效，名称不能为空、不能包含 HTML，并且最多 100 个字符',
+            ]);
+        }
+
         $node = new Node();
 
-        $node->name = $request->getParam('name');
+        $node->name = $name;
         $node->node_group = $request->getParam('node_group');
         $node->server = trim($request->getParam('server'));
         $node->traffic_rate = $request->getParam('traffic_rate') ?? 1;
@@ -175,7 +187,7 @@ final class NodeController extends BaseController
                 Notification::notifyUserGroup(
                     str_replace(
                         '%node_name%',
-                        $request->getParam('name'),
+                        $name,
                         I18n::trans('bot.node_added', $_ENV['locale'])
                     )
                 );
@@ -215,10 +227,19 @@ final class NodeController extends BaseController
 
         $node->node_bandwidth = Tools::autoBytes($node->node_bandwidth);
         $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
+        try {
+            $nodeCustomConfig = json_encode(
+                json_decode((string) $node->custom_config, true, 512, JSON_THROW_ON_ERROR),
+                JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException) {
+            $nodeCustomConfig = '{}';
+        }
 
         return $response->write(
             $this->view()
                 ->assign('node', $node)
+                ->assign('node_custom_config', $nodeCustomConfig)
                 ->assign(
                     'node_secret',
                     AdminPermissionService::role($this->user) === 'read_only'
@@ -246,7 +267,15 @@ final class NodeController extends BaseController
             ]);
         }
 
-        $node->name = $request->getParam('name');
+        $name = self::normalizeNodeName($request->getParam('name'));
+        if ($name === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '节点名称无效，名称不能为空、不能包含 HTML，并且最多 100 个字符',
+            ]);
+        }
+
+        $node->name = $name;
         $node->node_group = $request->getParam('node_group') ?? 0;
         $node->server = trim($request->getParam('server'));
         $node->traffic_rate = $request->getParam('traffic_rate') ?? 1;
@@ -301,7 +330,7 @@ final class NodeController extends BaseController
                 Notification::notifyUserGroup(
                     str_replace(
                         '%node_name%',
-                        $request->getParam('name'),
+                        $name,
                         I18n::trans('bot.node_updated', $_ENV['locale'])
                     )
                 );
@@ -541,6 +570,8 @@ final class NodeController extends BaseController
                 (string) $probeSummary['label']
             );
             $node->probe_checked_at = $this->formatXNodeTextValue($probeSummary['latest_checked_at'] ?? '-');
+            $node->name = $this->formatXNodeTextValue($node->name);
+            $node->server = $this->formatXNodeTextValue($node->server);
             $node->node_bandwidth = round(Tools::bToGB($node->node_bandwidth), 2);
             $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
         }
@@ -593,6 +624,23 @@ final class NodeController extends BaseController
         }
 
         return rtrim($scheme . '://' . $authority, '/');
+    }
+
+    private static function normalizeNodeName(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $name = trim($value);
+        if ($name === ''
+            || mb_strlen($name) > 100
+            || preg_match('/[<>\x00-\x1F\x7F]/u', $name) !== 0
+        ) {
+            return null;
+        }
+
+        return $name;
     }
 
     private function buildXNodeOneClickInstallCommand(

@@ -9,6 +9,7 @@ use RateLimit\Exception\LimitExceeded;
 use RateLimit\Rate;
 use RateLimit\RedisRateLimiter;
 use Redis;
+use Throwable;
 
 final class RateLimit
 {
@@ -39,6 +40,8 @@ final class RateLimit
             'email_request_ip' => $this->getEmailIpLimiter(),
             'email_request_address' => $this->getEmailAddressLimiter(),
             'ticket' => $this->getTicketLimiter(),
+            'ticket_reply' => $this->getTicketReplyLimiter(),
+            'payment' => $this->getPaymentLimiter(),
             default => null,
         };
 
@@ -53,6 +56,18 @@ final class RateLimit
         }
 
         return true;
+    }
+
+    public static function checkSafely(
+        string $limitType,
+        string $value,
+        bool $failOpenOnInfrastructureError = false
+    ): bool {
+        try {
+            return (new self())->checkRateLimit($limitType, $value);
+        } catch (Throwable) {
+            return $failOpenOnInfrastructureError;
+        }
     }
 
     public function getSubIpLimiter(): RedisRateLimiter
@@ -205,6 +220,24 @@ final class RateLimit
             Rate::custom(Config::obtain('ticket_limit'), 2592000),
             $this->redis,
             'sspanel_ticket:'
+        );
+    }
+
+    public function getTicketReplyLimiter(): RedisRateLimiter
+    {
+        return new RedisRateLimiter(
+            Rate::perMinute(5),
+            $this->redis,
+            'sspanel_ticket_reply:'
+        );
+    }
+
+    public function getPaymentLimiter(): RedisRateLimiter
+    {
+        return new RedisRateLimiter(
+            Rate::perMinute(10),
+            $this->redis,
+            'sspanel_payment:'
         );
     }
 }

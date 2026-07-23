@@ -53,7 +53,7 @@ EOL;
         $monthStart = mktime(0, 0, 0, (int) date('m'), 1, (int) date('Y'));
         $hourStart = mktime((int) date('H'), 0, 0, (int) date('m'), (int) date('d'), (int) date('Y'));
         $jobs = new CronService();
-        $runDailyJob = self::isDue('last_daily_job_time', $dailyScheduledAt, $now);
+        $runDailyJob = $now >= $dailyScheduledAt;
         $failures = [];
         $runJob = static function (string $name, callable $job) use (&$failures): bool {
             try {
@@ -69,9 +69,33 @@ EOL;
         };
         $dailyJobSucceeded = true;
         $monthlyBaselineReady = true;
+        $runDaily = static function (
+            string $name,
+            string $checkpoint,
+            callable $job
+        ) use ($dailyScheduledAt, $now, $runJob): bool {
+            if (! self::isDue($checkpoint, $dailyScheduledAt, $now)) {
+                return true;
+            }
+
+            if (! $runJob($name, $job)) {
+                return false;
+            }
+
+            return $runJob(
+                'checkpoint:' . $name,
+                static function () use ($checkpoint, $dailyScheduledAt): void {
+                    self::markRun($checkpoint, $dailyScheduledAt);
+                }
+            );
+        };
 
         // Reset the monthly baseline before activating add-ons bought on the reset day.
-        if ($runDailyJob && ! $runJob('resetUserBandwidth', [$jobs, 'resetUserBandwidth'])) {
+        if ($runDailyJob && ! $runDaily(
+            'resetUserBandwidth',
+            'last_daily_reset_user_bandwidth_time',
+            [$jobs, 'resetUserBandwidth']
+        )) {
             $dailyJobSucceeded = false;
             $monthlyBaselineReady = false;
         }
@@ -104,41 +128,65 @@ EOL;
 
         // Run daily job
         if ($runDailyJob) {
-            foreach (['cleanDb', 'resetNodeBandwidth', 'sendDailyTrafficReport'] as $jobName) {
-                if (! $runJob($jobName, [$jobs, $jobName])) {
+            foreach ([
+                'cleanDb' => 'last_daily_clean_db_time',
+                'resetNodeBandwidth' => 'last_daily_reset_node_bandwidth_time',
+                'sendDailyTrafficReport' => 'last_daily_traffic_report_time',
+            ] as $jobName => $checkpoint) {
+                if (! $runDaily($jobName, $checkpoint, [$jobs, $jobName])) {
                     $dailyJobSucceeded = false;
                 }
             }
 
             if (Config::obtain('enable_detect_inactive_user')
-                && ! $runJob('detectInactiveUser', [$jobs, 'detectInactiveUser'])
+                && ! $runDaily(
+                    'detectInactiveUser',
+                    'last_daily_detect_inactive_user_time',
+                    [$jobs, 'detectInactiveUser']
+                )
             ) {
                 $dailyJobSucceeded = false;
             }
 
             if (Config::obtain('remove_inactive_user_link_and_invite')
-                && ! $runJob('removeInactiveUserLinkAndInvite', [$jobs, 'removeInactiveUserLinkAndInvite'])
+                && ! $runDaily(
+                    'removeInactiveUserLinkAndInvite',
+                    'last_daily_remove_inactive_access_time',
+                    [$jobs, 'removeInactiveUserLinkAndInvite']
+                )
             ) {
                 $dailyJobSucceeded = false;
             }
 
             if (Config::obtain('im_bot_group_notify_diary')
-                && ! $runJob('sendDiaryNotification', [$jobs, 'sendDiaryNotification'])
+                && ! $runDaily(
+                    'sendDiaryNotification',
+                    'last_daily_diary_notification_time',
+                    [$jobs, 'sendDiaryNotification']
+                )
             ) {
                 $dailyJobSucceeded = false;
             }
 
-            if (! $runJob('resetTodayBandwidth', [$jobs, 'resetTodayBandwidth'])) {
+            if (! $runDaily(
+                'resetTodayBandwidth',
+                'last_daily_reset_today_bandwidth_time',
+                [$jobs, 'resetTodayBandwidth']
+            )) {
                 $dailyJobSucceeded = false;
             }
 
             if (Config::obtain('im_bot_group_notify_daily_job')
-                && ! $runJob('sendDailyJobNotification', [$jobs, 'sendDailyJobNotification'])
+                && ! $runDaily(
+                    'sendDailyJobNotification',
+                    'last_daily_job_notification_time',
+                    [$jobs, 'sendDailyJobNotification']
+                )
             ) {
                 $dailyJobSucceeded = false;
             }
 
-            if ($dailyJobSucceeded) {
+            if ($dailyJobSucceeded && self::isDue('last_daily_job_time', $dailyScheduledAt, $now)) {
                 $runJob(
                     'markDailyJobComplete',
                     static function () use ($dailyScheduledAt): void {

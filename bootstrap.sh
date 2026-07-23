@@ -666,6 +666,8 @@ run_upgrade() {
     create_upgrade_backup
     info "构建并启动现有服务；不会重新生成任何凭据。"
     docker compose build
+    info "进入短暂维护窗口，停止旧应用后再执行数据库迁移。"
+    docker compose stop caddy nginx app >/dev/null 2>&1 || true
     docker compose run --rm -T app php xcat Migration latest
     docker compose up -d app nginx caddy
     wait_for_service_ready app 180

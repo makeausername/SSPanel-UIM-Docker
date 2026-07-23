@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\AdminPermissionService;
 use App\Services\LLM;
 use App\Services\Notification;
+use App\Services\TicketReplyService;
 use App\Utils\ResponseHelper;
 use App\Utils\Tools;
 use GuzzleHttp\Exception\GuzzleException;
@@ -19,18 +20,19 @@ use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Smarty\Exception;
 use Telegram\Bot\Exceptions\TelegramSDKException;
-use function array_merge;
 use function count;
 use function htmlspecialchars;
 use function json_decode;
-use function json_encode;
+use function mb_strlen;
 use function nl2br;
-use function time;
+use function trim;
 use const ENT_QUOTES;
 use const ENT_SUBSTITUTE;
 
 final class TicketController extends BaseController
 {
+    private const MAX_COMMENT_LENGTH = 5000;
+
     private static array $details =
         [
             'field' => [
@@ -59,32 +61,23 @@ final class TicketController extends BaseController
     public function reply(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $id = $args['id'];
-        $comment = $request->getParam('comment') ?? '';
+        $comment = trim((string) ($request->getParam('comment') ?? ''));
 
-        if ($comment === '') {
+        if ($comment === '' || mb_strlen($comment) > self::MAX_COMMENT_LENGTH) {
             return ResponseHelper::error($response, '请输入评论内容');
         }
 
-        $ticket = (new Ticket())->where('id', $id)->first();
+        $ticket = (new TicketReplyService())->append(
+            (int) $id,
+            'admin',
+            'Admin',
+            $this->antiXss->xss_clean($comment),
+            'open_wait_user'
+        );
 
         if ($ticket === null) {
             return ResponseHelper::error($response, '工单不存在');
         }
-
-        $content_old = json_decode($ticket->content, true);
-        $content_new = [
-            [
-                'comment_id' => $content_old[count($content_old) - 1]['comment_id'] + 1,
-                'commenter_type' => 'admin',
-                'commenter_name' => 'Admin',
-                'comment' => $this->antiXss->xss_clean($comment),
-                'datetime' => time(),
-            ],
-        ];
-
-        $ticket->content = json_encode(array_merge($content_old, $content_new));
-        $ticket->status = 'open_wait_user';
-        $ticket->save();
         $ticketUser = (new User())->find($ticket->userid);
 
         if ($ticketUser === null) {
@@ -148,19 +141,17 @@ final class TicketController extends BaseController
 
         $llm_response = LLM::genTextResponseWithContext($context);
 
-        $content_new = [
-            [
-                'comment_id' => $content_old[count($content_old) - 1]['comment_id'] + 1,
-                'commenter_type' => 'llm',
-                'commenter_name' => 'AI Assistant',
-                'comment' => $this->antiXss->xss_clean($llm_response),
-                'datetime' => time(),
-            ],
-        ];
+        $ticket = (new TicketReplyService())->append(
+            (int) $id,
+            'llm',
+            'AI Assistant',
+            $this->antiXss->xss_clean((string) $llm_response),
+            'open_wait_user'
+        );
 
-        $ticket->content = json_encode(array_merge($content_old, $content_new));
-        $ticket->status = 'open_wait_user';
-        $ticket->save();
+        if ($ticket === null) {
+            return ResponseHelper::error($response, '工单不存在');
+        }
         $ticketUser = (new User())->find($ticket->userid);
 
         if ($ticketUser === null) {

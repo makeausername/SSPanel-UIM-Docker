@@ -22,6 +22,7 @@ HTTP_PORT="80"
 HTTPS_PORT="443"
 TZ="Asia/Shanghai"
 CADDY_SITE_ADDRESS=""
+CADDY_TRUSTED_PROXIES="private_ranges"
 COOKIE_SECURE="true"
 BASE_URL=""
 
@@ -588,6 +589,8 @@ load_existing_credentials() {
     HTTP_PORT="$(read_env_value HTTP_PORT)"
     HTTPS_PORT="$(read_env_value HTTPS_PORT)"
     CADDY_SITE_ADDRESS="$(read_env_value CADDY_SITE_ADDRESS)"
+    CADDY_TRUSTED_PROXIES="$(read_env_value CADDY_TRUSTED_PROXIES)"
+    CADDY_TRUSTED_PROXIES="${CADDY_TRUSTED_PROXIES:-private_ranges}"
     DB_DATABASE="$(read_env_value DB_DATABASE)"
     DB_USERNAME="$(read_env_value DB_USERNAME)"
     DB_PASSWORD="$(read_env_value DB_PASSWORD)"
@@ -627,6 +630,7 @@ HTTPS_ENABLED=$(dotenv_quote "$HTTPS_ENABLED")
 HTTP_PORT=$(dotenv_quote "$HTTP_PORT")
 HTTPS_PORT=$(dotenv_quote "$HTTPS_PORT")
 CADDY_SITE_ADDRESS=$(dotenv_quote "$CADDY_SITE_ADDRESS")
+CADDY_TRUSTED_PROXIES=$(dotenv_quote "$CADDY_TRUSTED_PROXIES")
 
 DB_DATABASE=$(dotenv_quote "$DB_DATABASE")
 DB_USERNAME=$(dotenv_quote "$DB_USERNAME")
@@ -693,7 +697,7 @@ EOF
 }
 
 export_compose_environment() {
-    export APP_DOMAIN APP_NAME HTTPS_ENABLED HTTP_PORT HTTPS_PORT CADDY_SITE_ADDRESS
+    export APP_DOMAIN APP_NAME HTTPS_ENABLED HTTP_PORT HTTPS_PORT CADDY_SITE_ADDRESS CADDY_TRUSTED_PROXIES
     export DB_DATABASE DB_USERNAME DB_PASSWORD DB_ROOT_PASSWORD REDIS_PASSWORD TZ
 }
 

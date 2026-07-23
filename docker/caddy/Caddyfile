@@ -1,11 +1,15 @@
-{$CADDY_SITE_ADDRESS} {
-    encode zstd gzip
+{
+	servers {
+		trusted_proxies static {$CADDY_TRUSTED_PROXIES:private_ranges}
+		client_ip_headers X-Forwarded-For X-Real-IP
+	}
+}
 
-    reverse_proxy nginx:80 {
-        header_up Host {host}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-        header_up X-Forwarded-Host {host}
-    }
+{$CADDY_SITE_ADDRESS} {
+	encode zstd gzip
+
+	reverse_proxy nginx:80 {
+		header_up X-Forwarded-For {client_ip}
+		header_up X-Real-IP {client_ip}
+	}
 }

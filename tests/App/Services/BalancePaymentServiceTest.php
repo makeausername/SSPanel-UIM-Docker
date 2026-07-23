@@ -60,6 +60,19 @@ final class BalancePaymentServiceTest extends TestCase
         $this->assertSame('partially_paid', Capsule::table('invoice')->find(100)->status);
     }
 
+    public function testPartialPaymentCanBeSafelyRefundedToBalance(): void
+    {
+        $this->seedUser('0.99');
+        $this->seedInvoice('1.50');
+        $service = new BalancePaymentService();
+
+        $this->assertSame('partial', $service->pay(1, 100)['status']);
+        $this->assertTrue((new InvoiceRefundService())->refund(100));
+
+        $this->assertSame('0.99', self::decimal(Capsule::table('user')->find(1)->money));
+        $this->assertSame('refunded_balance', Capsule::table('invoice')->find(100)->status);
+    }
+
     private function createSchema(): void
     {
         Capsule::schema()->create('user', static function (Blueprint $table): void {
