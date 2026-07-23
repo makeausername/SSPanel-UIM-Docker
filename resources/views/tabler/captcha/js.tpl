@@ -6,6 +6,11 @@
                 turnstile.render('#turnstile');
             }
         }
+
+        window.syncCaptchaForm = function () {
+            const response = document.querySelector('[name=cf-turnstile-response]');
+            document.getElementById('captcha_turnstile').value = response ? response.value : '';
+        };
     </script>
 {/if}
 {if $public_setting['captcha_provider'] === 'geetest'}
@@ -21,6 +26,10 @@
             geetest.appendTo("#geetest");
             geetest.onSuccess(function () {
                 geetest_result = geetest.getValidate();
+                document.getElementById('geetest_lot_number').value = geetest_result.lot_number;
+                document.getElementById('geetest_captcha_output').value = geetest_result.captcha_output;
+                document.getElementById('geetest_pass_token').value = geetest_result.pass_token;
+                document.getElementById('geetest_gen_time').value = geetest_result.gen_time;
             });
         });
 
@@ -29,6 +38,8 @@
                 geetest.reset();
             }
         }
+
+        window.syncCaptchaForm = function () {};
     </script>
 {/if}
 {if $public_setting['captcha_provider'] === 'hcaptcha'}
@@ -39,6 +50,10 @@
                 hcaptcha.reset();
             }
         }
+
+        window.syncCaptchaForm = function () {
+            document.getElementById('captcha_hcaptcha').value = window.hcaptcha ? hcaptcha.getResponse() : '';
+        };
     </script>
 {/if}
 {if $public_setting['captcha_provider'] === 'recaptcha_enterprise'}
@@ -55,9 +70,20 @@
                 grecaptcha.enterprise.reset();
             }
         }
+
+        window.syncCaptchaForm = function () {
+            const captcha = window.grecaptcha && window.grecaptcha.enterprise;
+            document.getElementById('captcha_recaptcha_enterprise').value = captcha ? captcha.getResponse() : '';
+        };
     </script>
 {/if}
 <script>
+    function prepareCaptchaForm() {
+        if (window.syncCaptchaForm) {
+            window.syncCaptchaForm();
+        }
+    }
+
     htmx.on("htmx:afterRequest", function (evt) {
         let res = JSON.parse(evt.detail.xhr.response);
         if (res.ret === 0) {

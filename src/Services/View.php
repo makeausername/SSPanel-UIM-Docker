@@ -50,6 +50,7 @@ final class View
         $smarty->assign('public_setting', Config::getPublicConfig());
         $smarty->assign('current_locale', Locale::current());
         $smarty->assign('frontend_locales', Locale::supportedLocales());
+        $smarty->assign('login_error', LoginFormFallback::pullError());
         $smarty->assign('user', $user);
 
         return $smarty;

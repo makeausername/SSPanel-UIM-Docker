@@ -157,6 +157,10 @@ return [
             'device_not_registered' => 'Device is not registered',
             'registration_success' => 'Registered successfully',
         ],
+        'security' => [
+            'csrf_rejected' => 'The security check failed. Refresh the page and try again.',
+            'return_home' => 'Return to the home page',
+        ],
         'device_delete_success' => 'Device deleted',
         'device_not_found' => 'Device not found',
         'email_in_use' => 'This email address is already in use',

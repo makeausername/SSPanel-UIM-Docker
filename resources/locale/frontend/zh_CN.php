@@ -157,6 +157,10 @@ return [
             'device_not_registered' => '设备未注册',
             'registration_success' => '注册成功',
         ],
+        'security' => [
+            'csrf_rejected' => '安全校验失败，请刷新页面后重试。',
+            'return_home' => '返回首页',
+        ],
         'device_delete_success' => '删除成功',
         'device_not_found' => '设备不存在',
         'email_in_use' => '邮箱已经被使用了',

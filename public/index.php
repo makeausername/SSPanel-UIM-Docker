@@ -16,6 +16,7 @@ require_once __DIR__ . '/../app/predefine.php';
 
 use App\Middleware\ErrorHandler;
 use App\Middleware\Locale as LocaleMiddleware;
+use App\Middleware\NativeLoginForm;
 use App\Middleware\SecurityHeaders;
 use App\Services\Boot;
 use GuzzleHttp\Psr7\HttpFactory;
@@ -32,6 +33,7 @@ $response_factory = new DecoratedResponseFactory($guzzle_factory, $guzzle_factor
 $app = AppFactory::create($response_factory);
 
 $app->add(new LocaleMiddleware());
+$app->add(new NativeLoginForm());
 $app->add(new ErrorHandler());
 $app->add(new SecurityHeaders());
 
