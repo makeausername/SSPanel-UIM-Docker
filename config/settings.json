@@ -1593,6 +1593,87 @@
         "mark": "上次执行每日任务的时间"
     },
     {
+        "item": "last_daily_reset_user_bandwidth_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次成功执行每日用户流量重置的时间"
+    },
+    {
+        "item": "last_daily_clean_db_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次成功执行每日数据库清理的时间"
+    },
+    {
+        "item": "last_daily_reset_node_bandwidth_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次成功执行每日节点流量重置的时间"
+    },
+    {
+        "item": "last_daily_traffic_report_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次成功发送每日流量报告的时间"
+    },
+    {
+        "item": "last_daily_detect_inactive_user_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次成功执行每日不活跃用户检查的时间"
+    },
+    {
+        "item": "last_daily_remove_inactive_access_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次成功清理不活跃用户访问权限的时间"
+    },
+    {
+        "item": "last_daily_diary_notification_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次成功发送每日摘要通知的时间"
+    },
+    {
+        "item": "last_daily_reset_today_bandwidth_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次成功重置用户今日流量的时间"
+    },
+    {
+        "item": "last_daily_job_notification_time",
+        "value": "0",
+        "class": "cron",
+        "is_public": 0,
+        "type": "int",
+        "default": "0",
+        "mark": "上次成功发送每日任务通知的时间"
+    },
+    {
         "item": "last_daily_finance_mail_time",
         "value": "0",
         "class": "cron",
