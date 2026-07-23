@@ -11,9 +11,9 @@
                 <div class="w-100">
                     <div class="row">
                         <div class="col">
-                            <a id="success-confirm" href="" class="btn w-100" data-bs-dismiss="modal">
+                            <button type="button" id="success-confirm" class="btn w-100" data-bs-dismiss="modal">
                                 {trans key='common.ok'}
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -35,9 +35,9 @@
                 <div class="w-100">
                     <div class="row">
                         <div class="col">
-                            <a href="" class="btn btn-danger w-100" data-bs-dismiss="modal">
+                            <button type="button" class="btn btn-danger w-100" data-bs-dismiss="modal">
                                 {trans key='common.confirm'}
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>
