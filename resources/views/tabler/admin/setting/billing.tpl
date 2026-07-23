@@ -297,6 +297,7 @@
                                                 <button class="btn btn-primary"
                                                         hx-post="/admin/setting/billing/set_paypal_webhook" hx-swap="none"
                                                         hx-vals='js:{
+                                                            paypal_mode: document.getElementById("paypal_mode").value,
                                                             paypal_client_id: document.getElementById("paypal_client_id").value,
                                                             paypal_client_secret: document.getElementById("paypal_client_secret").value,
                                                         }'>

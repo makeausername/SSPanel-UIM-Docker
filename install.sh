@@ -678,8 +678,8 @@ write_config_file() {
         esac
     done < "$APP_CONFIG_EXAMPLE" > "$temp_file"
 
-    chmod 0644 "$temp_file"
     mv -f -- "$temp_file" "$APP_CONFIG_FILE"
+    secure_app_config_permissions
 }
 
 write_appprofile_file() {
@@ -782,6 +782,14 @@ sync_geoip_defaults() {
     bash docker/geoip/sync-config.sh "$APP_CONFIG_EXAMPLE" "$APP_CONFIG_FILE" >/dev/null \
         || die "补齐 GeoIP 默认配置失败。"
     success "GeoIP 默认配置已就绪。"
+}
+
+secure_app_config_permissions() {
+    [ -f "$APP_CONFIG_FILE" ] || die "Missing application configuration: ${APP_CONFIG_FILE}"
+    chown 0:33 "$APP_CONFIG_FILE"
+    chmod 0640 "$APP_CONFIG_FILE"
+    [ "$(stat -c '%a' "$APP_CONFIG_FILE")" = "640" ] \
+        || die "Application configuration permissions are not 0640: ${APP_CONFIG_FILE}"
 }
 
 update_geoip_database() {
@@ -1111,6 +1119,7 @@ resume_installation() {
     show_step 2 "读取现有配置和恢复凭据"
     load_existing_credentials
     sync_geoip_defaults
+    secure_app_config_permissions
     [ -f "$APP_PROFILE_FILE" ] || write_appprofile_file
     [ -f "$COMPOSE_OVERRIDE_FILE" ] || write_compose_override
     write_recovery_credentials_file

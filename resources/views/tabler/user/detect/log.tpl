@@ -38,15 +38,22 @@
                                 <tbody>
                                 {foreach $logs as $log}
                                     <tr>
-                                        <td>#{$log->id}</td>
-                                        <td>{$log->node_id}</td>
-                                        <td>{$log->node_name}</td>
-                                        <td>{$log->list_id}</td>
-                                        <td>{$log->rule->name}</td>
-                                        <td>{$log->rule->text}</td>
-                                        <td>{$log->rule->regex}</td>
-                                        <td>{$log->rule->type}</td>
-                                        <td>{$log->datetime}</td>
+                                        <td>#{$log->id|escape:'html'}</td>
+                                        <td>{$log->node_id|escape:'html'}</td>
+                                        <td>{$log->node_name|escape:'html'}</td>
+                                        <td>{$log->list_id|escape:'html'}</td>
+                                        {if $log->rule !== null}
+                                            <td>{$log->rule->name|escape:'html'}</td>
+                                            <td>{$log->rule->text|escape:'html'}</td>
+                                            <td>{$log->rule->regex|escape:'html'}</td>
+                                            <td>{$log->rule->type|escape:'html'}</td>
+                                        {else}
+                                            <td>-</td>
+                                            <td>-</td>
+                                            <td>-</td>
+                                            <td>-</td>
+                                        {/if}
+                                        <td>{$log->datetime|escape:'html'}</td>
                                     </tr>
                                 {/foreach}
                                 </tbody>

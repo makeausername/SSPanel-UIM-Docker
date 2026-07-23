@@ -44,6 +44,34 @@ final class ProductionHardeningContractTest extends TestCase
         }
     }
 
+    public function testRichTextAndLegacyDetectLogTemplatesEscapeStoredContent(): void
+    {
+        $docTemplate = file_get_contents(
+            dirname(__DIR__, 3) . '/resources/views/tabler/admin/docs/edit.tpl'
+        );
+        $detectTemplate = file_get_contents(
+            dirname(__DIR__, 3) . '/resources/views/tabler/user/detect/log.tpl'
+        );
+        $detectController = file_get_contents(
+            dirname(__DIR__, 3) . '/src/Controllers/User/DetectLogController.php'
+        );
+
+        self::assertStringContainsString(
+            '{$doc->content|escape:\'html\'}',
+            (string) $docTemplate
+        );
+        self::assertStringNotContainsString(
+            '<textarea id="tinymce">{$doc->content}</textarea>',
+            (string) $docTemplate
+        );
+        self::assertStringContainsString(
+            '{$log->rule->regex|escape:\'html\'}',
+            (string) $detectTemplate
+        );
+        self::assertStringContainsString('{if $log->rule !== null}', (string) $detectTemplate);
+        self::assertStringContainsString('if ($rule !== null)', (string) $detectController);
+    }
+
     public function testNodeNamesAreValidatedAndEscapedAtUserFacingSinks(): void
     {
         $controller = file_get_contents(

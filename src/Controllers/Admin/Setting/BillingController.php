@@ -62,7 +62,7 @@ final class BillingController extends BaseController
         }
 
         foreach ($this->update_field as $item) {
-            if ($item === 'payment_gateway') {
+            if (in_array($item, ['payment_gateway', 'paypal_webhook_id'], true)) {
                 continue;
             }
 
@@ -108,11 +108,19 @@ final class BillingController extends BaseController
 
     public function setPaypalWebhook(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $paypal_client_id = $request->getParam('paypal_client_id');
+        $paypal_client_id = trim((string) $request->getParam('paypal_client_id'));
         $paypal_client_secret = $this->secretFromRequest($request, 'paypal_client_secret');
+        $paypal_mode = (string) $request->getParam('paypal_mode');
+        $paypal_mode = in_array($paypal_mode, ['live', 'sandbox'], true)
+            ? $paypal_mode
+            : (string) Config::obtain('paypal_mode');
 
         $gateway_config = [
-            'mode' => 'live',
+            'mode' => $paypal_mode,
+            'sandbox' => [
+                'client_id' => $paypal_client_id,
+                'client_secret' => $paypal_client_secret,
+            ],
             'live' => [
                 'client_id' => $paypal_client_id,
                 'client_secret' => $paypal_client_secret,
@@ -127,7 +135,39 @@ final class BillingController extends BaseController
         try {
             $pp = new PayPal($gateway_config);
             $pp->getAccessToken();
-            $pp->createWebHook($_ENV['baseUrl'] . '/payment/notify/paypal', ['PAYMENT.CAPTURE.COMPLETED']);
+            $webhook_url = rtrim((string) $_ENV['baseUrl'], '/') . '/payment/notify/paypal';
+            $webhook_id = '';
+            $webhooks = $pp->listWebHooks();
+
+            $matching_webhooks = is_array($webhooks) && is_array($webhooks['webhooks'] ?? null)
+                ? $webhooks['webhooks']
+                : [];
+
+            foreach ($matching_webhooks as $webhook) {
+                if (! is_array($webhook) || ($webhook['url'] ?? '') !== $webhook_url) {
+                    continue;
+                }
+
+                $event_names = array_column(
+                    is_array($webhook['event_types'] ?? null) ? $webhook['event_types'] : [],
+                    'name'
+                );
+                if (in_array('PAYMENT.CAPTURE.COMPLETED', $event_names, true)
+                    && isset($webhook['id'])
+                ) {
+                    $webhook_id = trim((string) $webhook['id']);
+                    break;
+                }
+            }
+
+            if ($webhook_id === '') {
+                $webhook = $pp->createWebHook($webhook_url, ['PAYMENT.CAPTURE.COMPLETED']);
+                $webhook_id = trim((string) ($webhook['id'] ?? ''));
+            }
+
+            if ($webhook_id === '' || ! Config::set('paypal_webhook_id', $webhook_id)) {
+                throw new \RuntimeException('PayPal webhook ID could not be persisted.');
+            }
         } catch (Throwable $e) {
             return $response->withJson([
                 'ret' => 0,

@@ -616,6 +616,16 @@ sync_geoip_defaults() {
     success "GeoIP 默认配置已就绪。"
 }
 
+secure_app_config_permissions() {
+    local config_file="config/.config.php"
+
+    [ -f "$config_file" ] || die "Missing application configuration: ${config_file}"
+    chown 0:33 "$config_file"
+    chmod 0640 "$config_file"
+    [ "$(stat -c '%a' "$config_file")" = "640" ] \
+        || die "Application configuration permissions are not 0640: ${config_file}"
+}
+
 update_geoip_database() {
     local output
 
@@ -656,6 +666,7 @@ run_upgrade() {
     update_repository
     cd "$INSTALL_DIR"
     sync_geoip_defaults
+    secure_app_config_permissions
 
     info "校验 Compose 配置。"
     docker compose config >/dev/null
@@ -672,12 +683,12 @@ run_upgrade() {
     docker compose up -d app nginx caddy
     wait_for_service_ready app 180
     docker compose exec -T app test -f vendor/autoload.php
-    update_geoip_database
     docker compose up -d scheduler
+    wait_for_service_ready scheduler 300
+    update_geoip_database
     info "Restarting nginx after the app image and database migration are ready."
     restart_service_bounded nginx 45 10
     wait_for_service_ready nginx 180
-    wait_for_service_ready scheduler 300
     docker compose ps
     success "升级完成。所有配置文件和 Docker volume 均已保留。"
 }

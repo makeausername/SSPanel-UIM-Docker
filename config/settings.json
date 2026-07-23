@@ -225,6 +225,15 @@
         "mark": "PayPal客戶密钥"
     },
     {
+        "item": "paypal_webhook_id",
+        "value": "",
+        "class": "billing",
+        "is_public": 0,
+        "type": "string",
+        "default": "",
+        "mark": "PayPal Webhook ID"
+    },
+    {
         "item": "paypal_currency",
         "value": "USD",
         "class": "billing",

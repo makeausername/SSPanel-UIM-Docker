@@ -30,8 +30,11 @@ final class DetectLogController extends BaseController
 
         foreach ($logs as $log) {
             $log->node_name = $log->nodeName();
-            $log->rule = $log->rule();
-            $log->rule->type = $log->rule()->type();
+            $rule = $log->rule();
+            if ($rule !== null) {
+                $rule->type = $rule->type();
+            }
+            $log->rule = $rule;
             $log->datetime = Tools::toDateTime($log->datetime);
         }
 

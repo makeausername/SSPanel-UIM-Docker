@@ -128,22 +128,34 @@ final class PayPal extends Base
         return $response->withJson($order);
     }
 
-    public function notify($request, $response, $args): ResponseInterface
+    public function notify(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $webhook_data = json_decode($request->getBody()->getContents(), true);
+        $verification_payload = is_array($webhook_data)
+            ? self::buildWebhookVerificationPayload(
+                $request,
+                $webhook_data,
+                (string) Config::obtain('paypal_webhook_id')
+            )
+            : null;
+
+        if ($verification_payload === null) {
+            return $response->withStatus(400);
+        }
 
         try {
             $pp = new PayPalClient($this->gateway_config);
             $pp->getAccessToken();
-            $verify_result = $pp->verifyWebHook($webhook_data);
+            $verify_result = $pp->verifyWebHook($verification_payload);
         } catch (Throwable) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => 'PayPal API Error',
-            ]);
+            ], 503);
         }
 
-        if (($verify_result['verification_status'] ?? '') === 'SUCCESS' &&
+        if (is_array($verify_result) &&
+            ($verify_result['verification_status'] ?? '') === 'SUCCESS' &&
             ($webhook_data['event_type'] ?? '') === 'PAYMENT.CAPTURE.COMPLETED' &&
             ($webhook_data['resource']['status'] ?? '') === 'COMPLETED'
         ) {
@@ -163,6 +175,39 @@ final class PayPal extends Base
         }
 
         return $response->withStatus(400);
+    }
+
+    public static function buildWebhookVerificationPayload(
+        ServerRequest $request,
+        array $webhookData,
+        string $webhookId
+    ): ?array {
+        $webhookId = trim($webhookId);
+        if ($webhookId === '') {
+            return null;
+        }
+
+        $headers = [
+            'auth_algo' => 'PayPal-Auth-Algo',
+            'cert_url' => 'PayPal-Cert-Url',
+            'transmission_id' => 'PayPal-Transmission-Id',
+            'transmission_sig' => 'PayPal-Transmission-Sig',
+            'transmission_time' => 'PayPal-Transmission-Time',
+        ];
+        $payload = [
+            'webhook_id' => $webhookId,
+            'webhook_event' => $webhookData,
+        ];
+
+        foreach ($headers as $field => $header) {
+            $value = trim($request->getHeaderLine($header));
+            if ($value === '') {
+                return null;
+            }
+            $payload[$field] = $value;
+        }
+
+        return $payload;
     }
 
     /**
