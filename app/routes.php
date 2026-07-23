@@ -130,7 +130,7 @@ return static function (Slim\App $app): void {
         // Get Clients
         $group->get('/clients/{name}', App\Controllers\User\ClientController::class . ':getClients');
         // 登出
-        $group->post('/logout', App\Controllers\UserController::class . ':logout');
+        $group->get('/logout', App\Controllers\UserController::class . ':logout');
     })->add(new SameOriginCsrf())->add(new User());
 
     $app->group('/payment', static function (RouteCollectorProxy $group): void {

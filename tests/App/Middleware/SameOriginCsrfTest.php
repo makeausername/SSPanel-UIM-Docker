@@ -59,7 +59,7 @@ final class SameOriginCsrfTest extends TestCase
     {
         $_ENV['baseUrl'] = 'https://configured.example.com';
         $request = (new HttpFactory())
-            ->createServerRequest('POST', 'http://nginx/user/logout')
+            ->createServerRequest('POST', 'http://nginx/user/checkin')
             ->withHeader('Origin', 'https://panel.example.com')
             ->withHeader('X-Forwarded-Proto', 'https, http')
             ->withHeader('X-Forwarded-Host', 'panel.example.com, nginx');
@@ -106,7 +106,7 @@ final class SameOriginCsrfTest extends TestCase
     {
         Locale::setCurrent('zh-CN');
         $request = (new HttpFactory())
-            ->createServerRequest('POST', 'https://panel.example.com/user/logout')
+            ->createServerRequest('POST', 'https://panel.example.com/user/checkin')
             ->withHeader('Origin', 'https://attacker.example')
             ->withHeader('Accept', 'text/html,application/xhtml+xml');
 

@@ -80,9 +80,7 @@
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
                         <div class="dropdown-divider"></div>
-                        <form method="post" action="/user/logout" class="m-0">
-                            <button type="submit" class="dropdown-item">{trans key='user.nav.logout'}</button>
-                        </form>
+                        <a href="/user/logout" class="dropdown-item">{trans key='user.nav.logout'}</a>
                     </div>
                 </div>
             </div>

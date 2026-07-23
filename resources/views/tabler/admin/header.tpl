@@ -57,9 +57,7 @@
                         </div>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                        <form method="post" action="/user/logout" class="m-0">
-                            <button type="submit" class="dropdown-item">登出</button>
-                        </form>
+                        <a href="/user/logout" class="dropdown-item">登出</a>
                     </div>
                 </div>
             </div>
