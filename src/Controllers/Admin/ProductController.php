@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\Product;
+use App\Services\AdminPermissionService;
 use App\Services\MonthlyPlanService;
 use App\Utils\Tools;
 use Exception;
@@ -14,9 +15,16 @@ use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use function is_array;
 use function is_object;
+use function htmlspecialchars;
 use function json_decode;
 use function json_encode;
+use function mb_strlen;
+use function preg_match;
+use function strip_tags;
 use function time;
+use function trim;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 
 final class ProductController extends BaseController
 {
@@ -119,7 +127,7 @@ final class ProductController extends BaseController
     {
         // base product
         $type = $request->getParam('type') ?? '';
-        $name = $request->getParam('name') ?? '';
+        $name = trim((string) ($request->getParam('name') ?? ''));
         $price = $request->getParam('price') ?? 0;
         $status = $request->getParam('status') ?? 1;
         $stock = $request->getParam('stock') ?? -1;
@@ -138,7 +146,7 @@ final class ProductController extends BaseController
 
         $product = new Product();
 
-        if ($price < 0) {
+        if (! self::isValidProductName($name) || $price < 0) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => self::$invalid_data_msg,
@@ -225,7 +233,7 @@ final class ProductController extends BaseController
         $product_id = $args['id'];
         // base product
         $type = $request->getParam('type') ?? '';
-        $name = $request->getParam('name') ?? '';
+        $name = trim((string) ($request->getParam('name') ?? ''));
         $price = $request->getParam('price') ?? 0;
         $status = $request->getParam('status') ?? 1;
         $stock = $request->getParam('stock') ?? -1;
@@ -253,7 +261,7 @@ final class ProductController extends BaseController
 
         $existing_content = json_decode($product->content, true);
 
-        if ($price < 0) {
+        if (! self::isValidProductName($name) || $price < 0) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => self::$invalid_data_msg,
@@ -378,6 +386,14 @@ final class ProductController extends BaseController
         ]);
     }
 
+    public static function isValidProductName(string $name): bool
+    {
+        return $name !== ''
+            && mb_strlen($name, 'UTF-8') <= 255
+            && strip_tags($name) === $name
+            && preg_match('/[\x00-\x1F\x7F]/u', $name) !== 1;
+    }
+
     public function copy(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $old_product_id = $args['id'];
@@ -409,14 +425,16 @@ final class ProductController extends BaseController
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $products = (new Product())->orderBy('id', 'desc')->get();
+        $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/product/1');
 
         foreach ($products as $product) {
-            $product->op = '<button class="btn btn-red" id="delete-product-' . $product->id . '"
+            $product->op = $canMutate ? '<button class="btn btn-red" id="delete-product-' . $product->id . '"
              onclick="deleteProduct(' . $product->id . ')">删除</button>
             <button class="btn btn-orange" id="copy-product-' . $product->id . '"
              onclick="copyProduct(' . $product->id . ')">复制</button>
-            <a class="btn btn-primary" href="/admin/product/' . $product->id . '/edit">编辑</a>';
+            <a class="btn btn-primary" href="/admin/product/' . $product->id . '/edit">编辑</a>' : '';
             $product->type = $product->type();
+            $product->name = htmlspecialchars((string) $product->name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $product->status = $product->status();
             $product->create_time = Tools::toDateTime($product->create_time);
             $product->update_time = Tools::toDateTime($product->update_time);

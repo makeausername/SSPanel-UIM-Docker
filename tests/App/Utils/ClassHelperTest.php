@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Utils;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
+#[CoversClass(ClassHelper::class)]
 final class ClassHelperTest extends TestCase
 {
     private ClassHelper $classHelper;
@@ -14,10 +16,6 @@ final class ClassHelperTest extends TestCase
     {
         $this->classHelper = new ClassHelper();
     }
-
-    /**
-     * @covers App\Utils\ClassHelper::getClassesByNamespace
-     */
     public function testGetClassesByNamespace(): void
     {
         $namespace = 'App\\Utils';
@@ -26,10 +24,6 @@ final class ClassHelperTest extends TestCase
         $this->assertIsArray($classes);
         $this->assertContains('\App\Utils\ClassHelper', $classes);
     }
-
-    /**
-     * @covers App\Utils\ClassHelper::getClasses
-     */
     public function testGetClasses(): void
     {
         $classes = $this->classHelper->getClasses();

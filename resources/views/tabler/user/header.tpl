@@ -74,8 +74,8 @@
                             <span class="avatar avatar-sm"
                                   style="background-image: url({$user->dice_bear})"></span>
                         <div class="d-none d-xl-block ps-2">
-                            <div>{$user->email}</div>
-                            <div class="mt-1 small text-secondary">{$user->user_name}</div>
+                            <div>{$user->email|escape:'html'}</div>
+                            <div class="mt-1 small text-secondary">{$user->user_name|escape:'html'}</div>
                         </div>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">

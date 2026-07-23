@@ -86,8 +86,8 @@
                                     <tr>
                                         <td>{$reward->id}</td>
                                         <td>{$reward->invited_user_id}</td>
-                                        <td>{$reward->user_name}</td>
-                                        <td>{$reward->product_name}</td>
+                                        <td>{$reward->user_name|escape:'html'}</td>
+                                        <td>{$reward->product_name|escape:'html'}</td>
                                         <td>{$reward->reward_days} {trans key='user.invite.days'}</td>
                                         <td>
                                             {if $reward->status === 'applied'}

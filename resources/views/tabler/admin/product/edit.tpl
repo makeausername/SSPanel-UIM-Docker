@@ -36,7 +36,7 @@
                                 <label class="form-label col-3 col-form-label required">名称</label>
                                 <div class="col">
                                     <input id="name" type="text" class="form-control"
-                                           value="{$product->name}">
+                                           value="{$product->name|escape:'html'}">
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">

@@ -44,7 +44,7 @@
                                                     <div class="card-body text-center">
                                                         <div id="product-{$tabp->id}-name"
                                                              class="text-uppercase text-secondary font-weight-medium">
-                                                            {$tabp->name}</div>
+                                                            {$tabp->name|escape:'html'}</div>
                                                         <div id="product-{$tabp->id}-price"
                                                              class="display-6 my-3">
                                                             <p class="fw-bold">{$tabp->price}</p>
@@ -175,7 +175,7 @@
                                                     <div class="card-body text-center">
                                                         <div id="product-{$bandwidth->id}-name"
                                                              class="text-uppercase text-secondary font-weight-medium">
-                                                            {$bandwidth->name}</div>
+                                                            {$bandwidth->name|escape:'html'}</div>
                                                         <div id="product-{$bandwidth->id}-price"
                                                              class="display-6 my-3">
                                                             <p class="fw-bold">{$bandwidth->price}</p>

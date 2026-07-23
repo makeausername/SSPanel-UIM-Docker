@@ -6,7 +6,6 @@ namespace App\Services;
 
 use App\Models\User;
 use function in_array;
-use function str_ends_with;
 use function str_starts_with;
 use function strtolower;
 use function strtoupper;
@@ -14,6 +13,30 @@ use function strtoupper;
 final class AdminPermissionService
 {
     public const ROLES = ['owner', 'administrator', 'support', 'finance', 'node', 'read_only'];
+
+    private const READ_POST_PATHS = [
+        '/admin/announcement/ajax',
+        '/admin/coupon/ajax',
+        '/admin/detect/ajax',
+        '/admin/detect/ban/ajax',
+        '/admin/detect/log/ajax',
+        '/admin/docs/ajax',
+        '/admin/gateway/ajax',
+        '/admin/giftcard/ajax',
+        '/admin/invoice/ajax',
+        '/admin/login/ajax',
+        '/admin/money/ajax',
+        '/admin/node/ajax',
+        '/admin/online/ajax',
+        '/admin/order/ajax',
+        '/admin/order/search',
+        '/admin/payback/ajax',
+        '/admin/product/ajax',
+        '/admin/subscribe/ajax',
+        '/admin/syslog/ajax',
+        '/admin/ticket/ajax',
+        '/admin/user/ajax',
+    ];
 
     public static function role(User $user): string
     {
@@ -29,6 +52,15 @@ final class AdminPermissionService
     public static function isOwner(User $user): bool
     {
         return self::role($user) === 'owner';
+    }
+
+    public static function canUpdateUser(User $actor, User $target): bool
+    {
+        if ((int) $target->is_admin !== 1) {
+            return true;
+        }
+
+        return self::isOwner($actor) || (int) $actor->id === (int) $target->id;
     }
 
     public static function allows(User $user, string $method, string $path): bool
@@ -86,6 +118,6 @@ final class AdminPermissionService
     private static function isReadOperation(string $method, string $path): bool
     {
         return in_array($method, ['GET', 'HEAD'], true)
-            || ($method === 'POST' && (str_ends_with($path, '/ajax') || str_ends_with($path, '/search')));
+            || ($method === 'POST' && in_array($path, self::READ_POST_PATHS, true));
     }
 }

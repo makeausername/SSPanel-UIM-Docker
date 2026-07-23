@@ -37,7 +37,7 @@
         </div>
     </div>
 
-    <script src="//{$config['jsdelivr_url']}/npm/jquery/dist/jquery.min.js"></script>
+    <script src="https://{$config['jsdelivr_url']}/npm/jquery/dist/jquery.min.js"></script>
 
     {include file='datatable_frontend.tpl'}
 

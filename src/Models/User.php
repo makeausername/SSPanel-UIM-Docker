@@ -79,6 +79,14 @@ final class User extends Model
     protected $connection = 'default';
     protected $table = 'user';
 
+    protected $hidden = [
+        'pass',
+        'passwd',
+        'uuid',
+        'api_token',
+        'ga_token',
+    ];
+
     /**
      * 强制类型转换
      *

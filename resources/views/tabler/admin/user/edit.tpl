@@ -35,14 +35,15 @@
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">邮箱</label>
                                 <div class="col">
-                                    <input id="email" type="email" class="form-control" value="{$edit_user->email}">
+                                    <input id="email" type="email" class="form-control"
+                                           value="{$edit_user->email|escape:'html'}">
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">用户名</label>
                                 <div class="col">
                                     <input id="user_name" type="text" class="form-control"
-                                           value="{$edit_user->user_name}">
+                                           value="{$edit_user->user_name|escape:'html'}">
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
@@ -252,14 +253,15 @@
                             <div class="form-group mb-3 col-12">
                                 <span class="form-label col-12 col-form-label">手动封禁理由</span>
                                 <span class="col-auto">
-                                    <textarea id="banned_reason" class="form-control">{$edit_user->banned_reason}</textarea>
+                                    <textarea id="banned_reason"
+                                              class="form-control">{$edit_user->banned_reason|escape:'html'}</textarea>
                                 </span>
                             </div>
                             <div class="form-group mb-3 col-12">
                                 <label class="form-label col-12 col-form-label">账户备注</label>
                                 <div class="col">
                                     <textarea id="remark" class="form-control"
-                                              placeholder="仅管理员可见">{$edit_user->remark}</textarea>
+                                              placeholder="仅管理员可见">{$edit_user->remark|escape:'html'}</textarea>
                                 </div>
                             </div>
                         </div>

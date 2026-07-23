@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Paylist;
 use App\Models\User;
+use App\Services\AdminPermissionService;
 use App\Services\DB;
 use App\Services\InvoiceRefundService;
 use App\Services\OrderReservationService;
@@ -18,8 +19,11 @@ use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use function in_array;
+use function htmlspecialchars;
 use function json_decode;
 use function time;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 
 final class OrderController extends BaseController
 {
@@ -186,12 +190,15 @@ final class OrderController extends BaseController
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $orders = (new Order())->orderBy('id', 'desc')->get();
+        $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/order/1');
 
         foreach ($orders as $order) {
-            $order->op = '<button class="btn btn-red" id="delete-order-' . $order->id . '"
-             onclick="deleteOrder(' . $order->id . ')">删除</button>';
+            $order->op = $canMutate
+                ? '<button class="btn btn-red" id="delete-order-' . $order->id . '"
+             onclick="deleteOrder(' . $order->id . ')">删除</button>'
+                : '';
 
-            if (in_array($order->status, ['pending_payment', 'pending_activation'])) {
+            if ($canMutate && in_array($order->status, ['pending_payment', 'pending_activation'])) {
                 $order->op .= '
                 <button class="btn btn-orange" id="cancel-order-' . $order->id . '"
                  onclick="cancelOrder(' . $order->id . ')">取消</button>';
@@ -200,6 +207,11 @@ final class OrderController extends BaseController
             $order->op .= '
             <a class="btn btn-primary" href="/admin/order/' . $order->id . '/view">查看</a>';
             $order->product_type = $order->productType();
+            $order->product_name = htmlspecialchars(
+                (string) $order->product_name,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
             $order->status = $order->status();
             $order->create_time = Tools::toDateTime($order->create_time);
             $order->update_time = Tools::toDateTime($order->update_time);

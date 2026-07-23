@@ -31,7 +31,7 @@
                         <div class="card-body">
                             <div class="mb-3">
                                 <form method="post">
-                                    <textarea id="tinymce">{$ann->content}</textarea>
+                                    <textarea id="tinymce">{$ann->content|escape:'html'}</textarea>
                                 </form>
                             </div>
                         </div>

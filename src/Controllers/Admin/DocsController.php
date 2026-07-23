@@ -6,13 +6,17 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\Docs;
+use App\Services\AdminPermissionService;
 use App\Services\LLM;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function htmlspecialchars;
 use function time;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 
 final class DocsController extends BaseController
 {
@@ -211,12 +215,14 @@ final class DocsController extends BaseController
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $docs = (new Docs())->orderBy('id')->get();
+        $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/docs/1');
 
         foreach ($docs as $doc) {
-            $doc->op = '<button class="btn btn-red" id="delete-doc-' . $doc->id . '" 
+            $doc->op = $canMutate ? '<button class="btn btn-red" id="delete-doc-' . $doc->id . '"
             onclick="deleteDoc(' . $doc->id . ')">删除</button>
-            <a class="btn btn-primary" href="/admin/docs/' . $doc->id . '/edit">编辑</a>';
+            <a class="btn btn-primary" href="/admin/docs/' . $doc->id . '/edit">编辑</a>' : '';
             $doc->status = $doc->status();
+            $doc->title = htmlspecialchars((string) $doc->title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
 
         return $response->withJson([

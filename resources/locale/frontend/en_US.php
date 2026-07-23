@@ -180,6 +180,7 @@ return [
         'old_password_wrong' => 'The current password is incorrect',
         'order' => [
             'class_insufficient' => 'Your account level is too low to purchase this product',
+            'class_mismatch' => 'This time package does not match your current account level',
             'current_month_addon_requires_plan' => 'Current-month traffic add-ons require an active annual plan',
             'group_not_allowed' => 'Your user group cannot purchase this product',
             'new_users_only' => 'This product is for new users only',

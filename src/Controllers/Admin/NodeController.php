@@ -510,6 +510,7 @@ final class NodeController extends BaseController
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $nodes = (new Node())->orderBy('id', 'desc')->get();
+        $canMutate = AdminPermissionService::allows($this->user, 'PUT', '/admin/node/1');
         $runtimeByNodeId = [];
         $nodeIds = $nodes->pluck('id')->toArray();
         $probeSummaries = NodeProbeService::summarizeNodes($nodeIds);
@@ -521,11 +522,11 @@ final class NodeController extends BaseController
         }
 
         foreach ($nodes as $node) {
-            $node->op = '<button class="btn btn-red" id="delete-node-' . $node->id . '"
+            $node->op = $canMutate ? '<button class="btn btn-red" id="delete-node-' . $node->id . '"
             onclick="deleteNode(' . $node->id . ')">删除</button>
             <button class="btn btn-orange" id="copy-node-' . $node->id . '"
             onclick="copyNode(' . $node->id . ')">复制</button>
-            <a class="btn btn-primary" href="/admin/node/' . $node->id . '/edit">编辑</a>';
+            <a class="btn btn-primary" href="/admin/node/' . $node->id . '/edit">编辑</a>' : '';
             $xnodeFields = $this->buildXNodeRuntimeListFields($runtimeByNodeId[(int) $node->id] ?? null);
             $node->type = $node->type();
             $node->sort = $node->sort();
@@ -543,6 +544,28 @@ final class NodeController extends BaseController
             $node->node_bandwidth = round(Tools::bToGB($node->node_bandwidth), 2);
             $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
         }
+
+        $nodes = $nodes->map(static fn (Node $node): array => $node->only([
+            'op',
+            'id',
+            'name',
+            'server',
+            'type',
+            'sort',
+            'xnode_status',
+            'xnode_last_seen',
+            'xnode_agent',
+            'xnode_audit',
+            'xnode_error',
+            'probe_status',
+            'probe_checked_at',
+            'traffic_rate',
+            'node_class',
+            'node_group',
+            'node_bandwidth_limit',
+            'node_bandwidth',
+            'bandwidthlimit_resetday',
+        ]))->values();
 
         return $response->withJson([
             'nodes' => $nodes,

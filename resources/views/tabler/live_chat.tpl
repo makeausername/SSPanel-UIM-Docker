@@ -1,7 +1,7 @@
 {if $public_setting['live_chat'] === 'crisp'}
     <script>
         window.$crisp = [];
-        window.CRISP_WEBSITE_ID = "{$public_setting["crisp_id"]}";
+        window.CRISP_WEBSITE_ID = "{$public_setting["crisp_id"]|escape:'javascript'}";
         (function () {
             d = document;
             s = d.createElement("script");
@@ -10,16 +10,16 @@
             d.getElementsByTagName("head")[0].appendChild(s);
         })();
         $crisp.push(["safe", true])
-        $crisp.push(["set", "user:nickname", "{$user->user_name}"],
-            ["set", "user:email", "{$user->email}"],
+        $crisp.push(["set", "user:nickname", "{$user->user_name|escape:'javascript'}"],
+            ["set", "user:email", "{$user->email|escape:'javascript'}"],
             ["set", "session:data",
                 [[
-                    ["user_id", "{$user->id}"],
-                    ["user_class", "{$user->class}"],
-                    ["reg_email", "{$user->email}"],
-                    ["class_expire_time", "{$user->class_expire}"],
-                    ["available_traffic", "{$user->unusedTraffic()}"],
-                    ["balance", "{$user->money}"]
+                    ["user_id", "{$user->id|escape:'javascript'}"],
+                    ["user_class", "{$user->class|escape:'javascript'}"],
+                    ["reg_email", "{$user->email|escape:'javascript'}"],
+                    ["class_expire_time", "{$user->class_expire|escape:'javascript'}"],
+                    ["available_traffic", "{$user->unusedTraffic()|escape:'javascript'}"],
+                    ["balance", "{$user->money|escape:'javascript'}"]
                 ]]
             ]);
     </script>
@@ -29,25 +29,25 @@
         window.__lc = window.__lc ||
         {
         };
-        window.__lc.license = "{$public_setting['livechat_license']}";
+        window.__lc.license = "{$public_setting['livechat_license']|escape:'javascript'}";
         window.__lc.params = [
             {
-                name: "{trans key='live_chat.user_id'}", value: '{$user->id}'
+                name: "{trans key='live_chat.user_id'}", value: '{$user->id|escape:'javascript'}'
             },
             {
-                name: "{trans key='live_chat.user_class'}", value: '{$user->class}'
+                name: "{trans key='live_chat.user_class'}", value: '{$user->class|escape:'javascript'}'
             },
             {
-                name: "{trans key='live_chat.registered_email'}", value: '{$user->email}'
+                name: "{trans key='live_chat.registered_email'}", value: '{$user->email|escape:'javascript'}'
             },
             {
-                name: "{trans key='live_chat.class_expire'}", value: '{$user->class_expire}'
+                name: "{trans key='live_chat.class_expire'}", value: '{$user->class_expire|escape:'javascript'}'
             },
             {
-                name: "{trans key='live_chat.unused_traffic'}", value: '{$user->unusedTraffic()}'
+                name: "{trans key='live_chat.unused_traffic'}", value: '{$user->unusedTraffic()|escape:'javascript'}'
             },
             {
-                name: "{trans key='live_chat.balance'}", value: '{$user->money}'
+                name: "{trans key='live_chat.balance'}", value: '{$user->money|escape:'javascript'}'
             }
         ];
 

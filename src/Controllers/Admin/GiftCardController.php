@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\GiftCard;
+use App\Services\AdminPermissionService;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -138,14 +139,28 @@ final class GiftCardController extends BaseController
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $giftcards = (new GiftCard())->orderBy('id', 'desc')->get();
+        $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/giftcard/1');
+        $canViewCodes = AdminPermissionService::role($this->user) !== 'read_only';
 
-        foreach ($giftcards as $giftcard) {
-            $giftcard->op = '<button class="btn btn-red" id="delete-gift-card-' . $giftcard->id . '" 
-        onclick="deleteGiftCard(' . $giftcard->id . ')">删除</button>';
+        $giftcards = $giftcards->map(static function (GiftCard $giftcard) use ($canMutate, $canViewCodes): array {
+            $giftcard->op = $canMutate ? '<button class="btn btn-red" id="delete-gift-card-' . $giftcard->id . '"
+        onclick="deleteGiftCard(' . $giftcard->id . ')">删除</button>' : '';
+            $giftcard->card = $canViewCodes ? $giftcard->card : '••••••••';
             $giftcard->status = $giftcard->status();
             $giftcard->create_time = Tools::toDateTime((int) $giftcard->create_time);
             $giftcard->use_time = Tools::toDateTime((int) $giftcard->use_time);
-        }
+
+            return $giftcard->only([
+                'op',
+                'id',
+                'card',
+                'balance',
+                'create_time',
+                'status',
+                'use_time',
+                'use_user',
+            ]);
+        })->values();
 
         return $response->withJson([
             'giftcards' => $giftcards,

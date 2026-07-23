@@ -18,7 +18,7 @@
     <script>
         let geetest_result = '';
         initGeetest4({
-            captchaId: '{$captcha['geetest_id']}',
+            captchaId: '{$captcha['geetest_id']|escape:'javascript'}',
             product: 'float',
             language: "zho",
             riskType: 'slide'
@@ -61,7 +61,7 @@
     <script>
         var initReCAPTCHA = function () {
             grecaptcha.enterprise.render('recaptcha', {
-                'sitekey': '{$captcha['recaptcha_enterprise_key_id']}',
+                'sitekey': '{$captcha['recaptcha_enterprise_key_id']|escape:'javascript'}',
             });
         };
 

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\User;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
+#[CoversClass(View::class)]
 final class ViewTest extends TestCase
 {
     private View $view;
@@ -18,10 +20,6 @@ final class ViewTest extends TestCase
         $this->user = new User();
         Locale::setCurrent(Locale::DEFAULT_LOCALE);
     }
-
-    /**
-     * @covers App\Services\View::getTheme
-     */
     public function testGetTheme(): void
     {
         $this->user->isLogin = true;
@@ -40,10 +38,6 @@ final class ViewTest extends TestCase
         $this->assertFalse(View::isValidTheme('../tabler'));
         $this->assertTrue(View::isValidTheme('tabler'));
     }
-
-    /**
-     * @covers App\Services\View::getConfig
-     */
     public function testGetConfig(): void
     {
         $_ENV['appName'] = 'Test App';

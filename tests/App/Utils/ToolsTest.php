@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace App\Utils;
 
 use App\Services\GeoIP2;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use function date_default_timezone_set;
 use function strlen;
 use const BASE_PATH;
 
+#[CoversClass(Tools::class)]
 final class ToolsTest extends TestCase
 {
-    /**
-     * @covers App\Utils\Tools::getIpLocation
-     */
     public function testGetIpLocation()
     {
         $_ENV['maxmind_license_key'] = '';
@@ -44,10 +43,6 @@ final class ToolsTest extends TestCase
         $this->assertNull($geoip->getCity('8.8.8.8'));
         $this->assertNotEmpty($geoip->getCountry('8.8.8.8'));
     }
-
-    /**
-     * @covers App\Utils\Tools::autoBytes
-     */
     public function testAutoBytes()
     {
         $size = 1024;
@@ -59,10 +54,6 @@ final class ToolsTest extends TestCase
         $this->assertIsString($bytes);
         $this->assertEquals('0B', $bytes);
     }
-
-    /**
-     * @covers App\Utils\Tools::autoBytesR
-     */
     public function testAutoBytesR()
     {
         $size = '1KB';
@@ -86,10 +77,6 @@ final class ToolsTest extends TestCase
         $this->assertIsInt($bytes);
         $this->assertEquals(-1, $bytes);
     }
-
-    /**
-     * @covers App\Utils\Tools::autoMbps
-     */
     public function testAutoMbps()
     {
         $bandwidth = 1;
@@ -105,10 +92,6 @@ final class ToolsTest extends TestCase
         $this->assertIsString($mbps);
         $this->assertEquals('∞', $mbps);
     }
-
-    /**
-     * @covers App\Utils\Tools::mbToB
-     */
     public function testMbToB()
     {
         $traffic = 1;
@@ -121,10 +104,6 @@ final class ToolsTest extends TestCase
         $this->assertIsInt($result);
         $this->assertEquals(0, $result);
     }
-
-    /**
-     * @covers App\Utils\Tools::gbToB
-     */
     public function testGbToB()
     {
         $traffic = 1;
@@ -137,10 +116,6 @@ final class ToolsTest extends TestCase
         $this->assertIsInt($result);
         $this->assertEquals(0, $result);
     }
-
-    /**
-     * @covers App\Utils\Tools::bToGB
-     */
     public function testBToGB()
     {
         $traffic = 1048576 * 1024;
@@ -153,10 +128,6 @@ final class ToolsTest extends TestCase
         $this->assertIsFloat($result);
         $this->assertEquals(0, $result);
     }
-
-    /**
-     * @covers App\Utils\Tools::bToMB
-     */
     public function testBToMB()
     {
         $traffic = 1048576;
@@ -169,10 +140,6 @@ final class ToolsTest extends TestCase
         $this->assertIsFloat($result);
         $this->assertEquals(0, $result);
     }
-
-    /**
-     * @covers App\Utils\Tools::genSubToken
-     */
     public function testGenSubToken()
     {
         $_ENV['sub_token_len'] = 10;
@@ -185,10 +152,6 @@ final class ToolsTest extends TestCase
         $token = Tools::genSubToken();
         $this->assertEquals(32, strlen($token));
     }
-
-    /**
-     * @covers App\Utils\Tools::genRandomChar
-     */
     public function testGenRandomChar()
     {
         $randomString = Tools::genRandomChar();
@@ -207,10 +170,6 @@ final class ToolsTest extends TestCase
         $this->assertIsString($randomString);
         $this->assertEquals(2, strlen($randomString));
     }
-
-    /**
-     * @covers App\Utils\Tools::genSs2022UserPk
-     */
     public function testGenSs2022UserPk()
     {
         $passwd = 'password';
@@ -226,10 +185,6 @@ final class ToolsTest extends TestCase
         $pk = Tools::genSs2022UserPk($passwd, $method);
         $this->assertFalse($pk);
     }
-
-    /**
-     * @covers App\Utils\Tools::toDateTime
-     */
     public function testToDateTime()
     {
         date_default_timezone_set('ROC'); // Use Asia/Shanghai or PRC will cause this test to fail
@@ -242,10 +197,6 @@ final class ToolsTest extends TestCase
         $this->assertIsString($result);
         $this->assertEquals('1912-01-01 00:00:00', $result);
     }
-
-    /**
-     * @covers App\Utils\Tools::getDir
-     */
     public function testGetDir()
     {
         // Scenario 1: Valid directory
@@ -258,19 +209,11 @@ final class ToolsTest extends TestCase
         $result2 = Tools::getDir($dir2);
         $this->assertEqualsCanonicalizing(['.gitkeep'], $result2);
     }
-
-    /**
-     * @covers App\Utils\Tools::isParamValidate
-     */
     public function testIsParamValidate()
     {
         $this->assertTrue(Tools::isParamValidate('default', 'aes-128-gcm'));
         $this->assertFalse(Tools::isParamValidate('default', 'rc4-md5'));
     }
-
-    /**
-     * @covers App\Utils\Tools::getSsMethod
-     */
     public function testGetSsMethod()
     {
         // Scenario 1: ss_obfs
@@ -313,48 +256,28 @@ final class ToolsTest extends TestCase
         $result4 = Tools::getSsMethod();
         $this->assertEquals($expected4, $result4);
     }
-
-    /**
-     * @covers App\Utils\Tools::isEmail
-     */
     public function testIsEmail()
     {
         $this->assertTrue(Tools::isEmail('test@example.com'));
         $this->assertFalse(Tools::isEmail('test@example'));
     }
-
-    /**
-     * @covers App\Utils\Tools::isIPv4
-     */
     public function testIsIPv4()
     {
         $this->assertTrue(Tools::isIPv4('192.168.0.1'));
         $this->assertFalse(Tools::isIPv4('2001:0db8:85a3:0000:0000:8a2e:0370:7334'));
         $this->assertFalse(Tools::isIPv4('UwU'));
     }
-
-    /**
-     * @covers App\Utils\Tools::isIPv6
-     */
     public function testIsIPv6()
     {
         $this->assertTrue(Tools::isIPv6('2001:0db8:85a3:0000:0000:8a2e:0370:7334'));
         $this->assertFalse(Tools::isIPv6('192.168.0.1'));
         $this->assertFalse(Tools::isIPv6('hmm'));
     }
-
-    /**
-     * @covers App\Utils\Tools::isInt
-     */
     public function testIsInt()
     {
         $this->assertTrue(Tools::isInt(123));
         $this->assertFalse(Tools::isInt('abc'));
     }
-
-    /**
-     * @covers App\Utils\Tools::isJson
-     */
     public function testIsJson(): void
     {
         $this->assertTrue(Tools::isJson('{}'));

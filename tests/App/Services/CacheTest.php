@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
+#[CoversClass(Cache::class)]
 class CacheTest extends TestCase
 {
-    /**
-     * @covers App\Services\Cache::getRedisConfig
-     */
     public function testGetRedisConfig()
     {
         // Scenario 1: All parameters are set

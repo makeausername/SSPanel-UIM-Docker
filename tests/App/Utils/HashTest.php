@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Utils;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use function strlen;
 
+#[CoversClass(Hash::class)]
 class HashTest extends TestCase
 {
-    /**
-     * @covers App\Utils\Hash::cookieHash
-     */
     public function testCookieHash()
     {
         $_ENV['key'] = 'cookie_key';
@@ -22,10 +21,6 @@ class HashTest extends TestCase
         $this->assertEquals(45, strlen($result));
         $this->assertEquals('e91053c4a7d6cc7fa5eb900b1ad96df484483ceace12a', $result);
     }
-
-    /**
-     * @covers App\Utils\Hash::ipHash
-     */
     public function testIpHash()
     {
         $_ENV['key'] = 'cookie_key';
@@ -37,10 +32,6 @@ class HashTest extends TestCase
         $this->assertEquals(45, strlen($result));
         $this->assertEquals('522b51095b778f9f107153f75be554be1f8a8f2c1f4b4', $result);
     }
-
-    /**
-     * @covers App\Utils\Hash::deviceHash
-     */
     public function testDeviceHash()
     {
         $_ENV['key'] = 'cookie_key';
@@ -53,12 +44,6 @@ class HashTest extends TestCase
         $this->assertEquals('1fd5a37cc8769c01a49f6eb9c167dc6ee6cc842913dba', $result);
     }
 
-    /**
-     * @covers App\Utils\Hash::checkPassword
-     * @covers App\Utils\Hash::passwordHash
-     * @covers App\Utils\Hash::sha256WithSalt
-     * @covers App\Utils\Hash::sha3WithSalt
-     */
     public function testPasswordFunctions()
     {
         $_ENV['salt'] = 'password_salt';

@@ -1,6 +1,6 @@
 {include file='user/header.tpl'}
 
-<script src="//{$config['jsdelivr_url']}/npm/jquery/dist/jquery.min.js"></script>
+<script src="https://{$config['jsdelivr_url']}/npm/jquery/dist/jquery.min.js"></script>
 <script src="https://unpkg.com/@simplewebauthn/browser@13.3.0/dist/bundle/index.umd.min.js"></script>
 
 <div class="page-wrapper">
@@ -61,7 +61,7 @@
                                             <div class="card">
                                                 <div class="card-body">
                                                     <h3 class="card-title">{trans key='user.settings.login_email'}</h3>
-                                                    <p>{trans key='user.settings.current_email'}<code id="email">{$user->email}</code></p>
+                                                    <p>{trans key='user.settings.current_email'}<code id="email">{$user->email|escape:'html'}</code></p>
                                                     <div class="mb-3">
                                                         <input id="new-email" type="email" class="form-control"
                                                                placeholder="{trans key='user.settings.new_email'}"
@@ -109,7 +109,7 @@
                                             <div class="card">
                                                 <div class="card-body">
                                                     <h3 class="card-title">{trans key='user.settings.username'}</h3>
-                                                    <p>{trans key='user.settings.current_username'}<code id="username">{$user->user_name}</code></p>
+                                                    <p>{trans key='user.settings.current_username'}<code id="username">{$user->user_name|escape:'html'}</code></p>
                                                     <div class="mb-3">
                                                         <input id="new-username" type="text" class="form-control"
                                                                placeholder="{trans key='user.settings.new_username'}" autocomplete="off">

@@ -15,6 +15,7 @@ use App\Services\DB;
 use App\Services\FrontendI18n;
 use App\Services\InvoiceAccountingService;
 use App\Services\MonthlyPlanService;
+use App\Services\OrderEligibilityService;
 use App\Utils\Cookie;
 use App\Utils\Tools;
 use Exception;
@@ -22,6 +23,7 @@ use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use function bccomp;
+use function htmlspecialchars;
 use function in_array;
 use function is_numeric;
 use function is_object;
@@ -29,6 +31,8 @@ use function json_decode;
 use function json_encode;
 use function property_exists;
 use function time;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 
 final class OrderController extends BaseController
 {
@@ -188,6 +192,14 @@ final class OrderController extends BaseController
                 return $response->withJson([
                     'ret' => 0,
                     'msg' => FrontendI18n::trans('response.order.product_config_invalid'),
+                ]);
+            }
+
+            if ((string) $product->type === 'time'
+                && ! OrderEligibilityService::canPurchaseTimeProduct($user, $product_content)) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => FrontendI18n::trans('response.order.class_mismatch'),
                 ]);
             }
 
@@ -391,6 +403,11 @@ final class OrderController extends BaseController
             }
 
             $order->product_type = self::productType((string) $order->product_type);
+            $order->product_name = htmlspecialchars(
+                (string) $order->product_name,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
             $order->status = self::orderStatus((string) $order->status);
             $order->create_time = Tools::toDateTime($order->create_time);
             $order->update_time = Tools::toDateTime($order->update_time);

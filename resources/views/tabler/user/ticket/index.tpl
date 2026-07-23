@@ -48,7 +48,7 @@
                                             #{$ticket->id}
                                         </h3>
                                         <p class="text-secondary text-truncate" style="height: 100px;">
-                                            {$ticket->title}
+                                            {$ticket->title|escape:'html'}
                                         </p>
                                     </div>
                                     <div class="card-footer">

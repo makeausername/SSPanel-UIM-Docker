@@ -31,7 +31,7 @@
                                 </tr>
                                 <tr>
                                     <td>{trans key='shop.product.name'}</td>
-                                    <td class="text-end">{$product->name}</td>
+                                    <td class="text-end">{$product->name|escape:'html'}</td>
                                 </tr>
                                 <tr>
                                     <td>{trans key='shop.product.type'}</td>

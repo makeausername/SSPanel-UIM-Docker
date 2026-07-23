@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Translation\Translator;
 
+#[CoversClass(I18n::class)]
 final class I18nTest extends TestCase
 {
     public static function setUpBeforeClass(): void
@@ -15,9 +17,6 @@ final class I18nTest extends TestCase
         require_once __DIR__ . '/../../../app/predefine.php';
     }
 
-    /**
-     * @covers App\Services\I18n::trans
-     */
     public function testTrans(): void
     {
         // exsisting locale
@@ -38,9 +37,6 @@ final class I18nTest extends TestCase
         $this->assertSame($key, $translation);
     }
 
-    /**
-     * @covers App\Services\I18n::getLocaleList
-     */
     public function testGetLocaleList(): void
     {
         $expectedLocales = ['en_US', 'ja_JP', 'zh_CN', 'zh_TW'];
@@ -50,9 +46,6 @@ final class I18nTest extends TestCase
         $this->assertSame($expectedLocales, $locales);
     }
 
-    /**
-     * @covers App\Services\I18n::getTranslator
-     */
     public function testGetTranslatorr(): void
     {
         $lang = 'en_US';

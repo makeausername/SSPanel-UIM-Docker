@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace App\Utils;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\MockObject\Exception;
 use PHPUnit\Framework\TestCase;
 use GuzzleHttp\Psr7\HttpFactory;
 use Slim\Http\Factory\DecoratedResponseFactory;
 use Psr\Http\Message\ServerRequestInterface;
 
+#[CoversClass(ResponseHelper::class)]
 class ResponseHelperTest extends TestCase
 {
-    /**
-     * @covers App\Utils\ResponseHelper::success
-     */
     public function testSuccess()
     {
         $guzzleFactory = new HttpFactory();
@@ -28,10 +27,6 @@ class ResponseHelperTest extends TestCase
         $this->assertEquals(200, $result->getStatusCode());
         $this->assertEquals('{"ret":1,"msg":"Success message"}', (string) $result->getBody());
     }
-
-    /**
-     * @covers App\Utils\ResponseHelper::successWithData
-     */
     public function testSuccessWithData()
     {
         $guzzleFactory = new HttpFactory();
@@ -46,10 +41,6 @@ class ResponseHelperTest extends TestCase
         $this->assertEquals(200, $result->getStatusCode());
         $this->assertEquals('{"ret":1,"msg":"Success message","data":{"foo":"bar"}}', (string) $result->getBody());
     }
-
-    /**
-     * @covers App\Utils\ResponseHelper::error
-     */
     public function testError()
     {
         $guzzleFactory = new HttpFactory();
@@ -63,10 +54,6 @@ class ResponseHelperTest extends TestCase
         $this->assertEquals(200, $result->getStatusCode());
         $this->assertEquals('{"ret":0,"msg":"Error message"}', (string) $result->getBody());
     }
-
-    /**
-     * @covers App\Utils\ResponseHelper::errorWithData
-     */
     public function testErrorWithData()
     {
         $guzzleFactory = new HttpFactory();
@@ -83,7 +70,6 @@ class ResponseHelperTest extends TestCase
     }
 
     /**
-     * @covers App\Utils\ResponseHelper::successWithDataEtag
      * @throws Exception
      */
     public function testSuccessWithDataEtag()
