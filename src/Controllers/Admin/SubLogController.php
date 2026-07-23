@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\SubscribeLog;
+use App\Services\DataTableRequest;
 use App\Utils\Tools;
 use Exception;
 use MaxMind\Db\Reader\InvalidDatabaseException;
@@ -49,35 +50,30 @@ final class SubLogController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $length = $request->getParam('length');
-        $page = $request->getParam('start') / $length + 1;
-        $draw = $request->getParam('draw');
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'user_id', 'type', 'request_ip', 'request_time', 'request_user_agent'],
+            'id'
+        );
 
         $sub_log = SubscribeLog::query();
 
-        $search = $request->getParam('search')['value'];
-
-        if ($search !== '') {
-            $sub_log->where('user_id', '=', $search)
-                ->orWhere('type', 'LIKE', "%{$search}%")
-                ->orWhere('request_ip', 'LIKE', "%{$search}%")
-                ->orWhere('request_user_agent', 'LIKE', "%{$search}%");
+        if ($table->search !== '') {
+            $sub_log->where('user_id', '=', $table->search)
+                ->orWhere('type', 'LIKE', "%{$table->search}%")
+                ->orWhere('request_ip', 'LIKE', "%{$table->search}%")
+                ->orWhere('request_user_agent', 'LIKE', "%{$table->search}%");
         }
 
-        $order = $request->getParam('order')[0]['dir'];
-
-        if ($request->getParam('order')[0]['column'] !== '0') {
-            $order_by = $request->getParam('columns')[$request->getParam('order')[0]['column']]['data'];
-
-            $sub_log->orderBy($order_by, $order)->orderBy('id', 'desc');
-        } else {
-            $sub_log->orderBy('id', $order);
+        $sub_log->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $sub_log->orderBy('id', 'desc');
         }
 
         $filtered = $sub_log->count();
         $total = (new SubscribeLog())->count();
 
-        $subscribes = $sub_log->paginate($length, '*', '', $page);
+        $subscribes = $sub_log->paginate($table->length, '*', '', $table->page);
 
         foreach ($subscribes as $subscribe) {
             $subscribe->request_time = Tools::toDateTime($subscribe->request_time);
@@ -85,7 +81,7 @@ final class SubLogController extends BaseController
         }
 
         return $response->withJson([
-            'draw' => $draw,
+            'draw' => $table->draw,
             'recordsTotal' => $total,
             'recordsFiltered' => $filtered,
             'subscribes' => $subscribes,

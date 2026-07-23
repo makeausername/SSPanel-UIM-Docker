@@ -876,7 +876,7 @@ ensure_admin_for_resume() {
 }
 
 verify_containers() {
-    local timeout_seconds=60
+    local timeout_seconds=300
     local started_at
     local service
     local container_id
@@ -948,6 +948,81 @@ verify_containers() {
         fi
         sleep 3
     done
+}
+
+latest_migration_version() {
+    local migration_file
+    local migration_name
+    local migration_version
+    local latest=0
+
+    for migration_file in db/migrations/[0-9]*-*.php; do
+        [ -f "$migration_file" ] || continue
+        migration_name="${migration_file##*/}"
+        migration_version="${migration_name%%-*}"
+        [[ "$migration_version" =~ ^[0-9]+$ ]] || continue
+        if (( 10#$migration_version > 10#$latest )); then
+            latest="$migration_version"
+        fi
+    done
+
+    [ "$latest" != "0" ] || return 1
+    printf '%s' "$latest"
+}
+
+verify_production_readiness() {
+    local latest_db_version
+    local current_db_version
+    local admin_count
+    local internal_health
+    local service
+
+    info "执行生产就绪检查。"
+
+    [ "$(stat -c '%a' "$ENV_FILE")" = "600" ] \
+        || die "生产就绪检查失败：.env 权限不是 0600。"
+    [ "$(stat -c '%a' "$APP_CONFIG_FILE")" = "640" ] \
+        || die "生产就绪检查失败：应用配置权限不是 0640。"
+    [ "$(stat -c '%u:%g' "$APP_CONFIG_FILE")" = "0:33" ] \
+        || die "生产就绪检查失败：应用配置所有者必须为 root:www-data。"
+
+    for service in app scheduler; do
+        docker compose exec -T "$service" gosu www-data test -r /var/www/html/config/.config.php \
+            || die "生产就绪检查失败：${service} 无法读取应用配置。"
+        docker compose exec -T "$service" gosu www-data test -r /var/www/html/config/appprofile.php \
+            || die "生产就绪检查失败：${service} 无法读取应用配置模板。"
+    done
+
+    docker compose exec -T app php -r '
+        require "/var/www/html/config/.config.php";
+        $ready = ($_ENV["debug"] ?? null) === false
+            && ($_ENV["cookie_secure"] ?? null) === true
+            && str_starts_with((string) ($_ENV["baseUrl"] ?? ""), "https://")
+            && preg_match("/\A[0-9a-f]{64}\z/D", (string) ($_ENV["key"] ?? "")) === 1
+            && preg_match("/\A[0-9a-f]{64}\z/D", (string) ($_ENV["muKey"] ?? "")) === 1
+            && ($_ENV["db_host"] ?? null) === "mariadb"
+            && ($_ENV["redis_host"] ?? null) === "redis";
+        exit($ready ? 0 : 1);
+    ' || die "生产就绪检查失败：应用运行时安全配置无效。"
+
+    latest_db_version="$(latest_migration_version)" \
+        || die "生产就绪检查失败：无法确定最新数据库迁移版本。"
+    current_db_version="$(run_mariadb_root_sql "SELECT value FROM config WHERE item = 'db_version' LIMIT 1;" | tr -d '[:space:]')" \
+        || die "生产就绪检查失败：无法读取数据库迁移版本。"
+    [ "$current_db_version" = "$latest_db_version" ] \
+        || die "生产就绪检查失败：数据库版本 ${current_db_version:-unknown}，预期 ${latest_db_version}。"
+
+    admin_count="$(run_mariadb_root_sql "SELECT COUNT(*) FROM \`user\` WHERE is_admin = 1;" | tr -d '[:space:]')" \
+        || die "生产就绪检查失败：无法检查管理员账号。"
+    [[ "$admin_count" =~ ^[0-9]+$ ]] && [ "$admin_count" -gt 0 ] \
+        || die "生产就绪检查失败：没有可用的管理员账号。"
+
+    internal_health="$(docker compose exec -T nginx wget -q -O - http://127.0.0.1/healthz | tr -d '\r\n')" \
+        || die "生产就绪检查失败：应用内部健康检查无法访问。"
+    [ "$internal_health" = "ok" ] \
+        || die "生产就绪检查失败：应用、MariaDB 或 Redis 尚未就绪。"
+
+    success "生产就绪检查通过：安全配置、数据库、Redis、迁移和管理员账号均可用。"
 }
 
 verify_https() {
@@ -1147,7 +1222,8 @@ resume_installation() {
     show_step 7 "验证 Docker 服务"
     verify_containers
 
-    show_step 8 "验证 HTTPS 并完成恢复"
+    show_step 8 "验证生产就绪状态、HTTPS 并完成恢复"
+    verify_production_readiness
     verify_https || die "HTTPS 验证失败，恢复安装不会被标记为成功。"
     finalize_credentials_file
     write_install_lock
@@ -1213,6 +1289,7 @@ main() {
 
     show_step 8 "验证站点"
     verify_containers
+    verify_production_readiness
     verify_https || die "HTTPS 验证失败，安装不会被标记为成功。"
     finalize_credentials_file
     write_install_lock

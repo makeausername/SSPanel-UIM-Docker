@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\SysLog;
+use App\Services\DataTableRequest;
 use App\Utils\Tools;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
@@ -73,32 +74,29 @@ final class SysLogController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $length = $request->getParam('length');
-        $page = $request->getParam('start') / $length + 1;
-        $draw = $request->getParam('draw');
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'user_id', 'ip', 'message', 'level', 'channel', 'datetime'],
+            'id'
+        );
         $syslog = SysLog::query();
-        $search = $request->getParam('search')['value'];
 
-        if ($search !== '') {
-            $syslog->where('user_id', '=', $search)
-                ->orWhere('ip', 'LIKE', "%{$search}%")
-                ->orWhere('message', 'LIKE', "%{$search}%")
-                ->orWhere('level', 'LIKE', "%{$search}%")
-                ->orWhere('channel', 'LIKE', "%{$search}%");
+        if ($table->search !== '') {
+            $syslog->where('user_id', '=', $table->search)
+                ->orWhere('ip', 'LIKE', "%{$table->search}%")
+                ->orWhere('message', 'LIKE', "%{$table->search}%")
+                ->orWhere('level', 'LIKE', "%{$table->search}%")
+                ->orWhere('channel', 'LIKE', "%{$table->search}%");
         }
 
-        $order = $request->getParam('order')[0]['dir'];
-
-        if ($request->getParam('order')[0]['column'] !== '0') {
-            $order_by = $request->getParam('columns')[$request->getParam('order')[0]['column']]['data'];
-            $syslog->orderBy($order_by, $order)->orderBy('id', 'desc');
-        } else {
-            $syslog->orderBy('id', $order);
+        $syslog->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $syslog->orderBy('id', 'desc');
         }
 
         $filtered = $syslog->count();
         $total = (new SysLog())->count();
-        $syslogs = $syslog->paginate($length, '*', '', $page);
+        $syslogs = $syslog->paginate($table->length, '*', '', $table->page);
 
         foreach ($syslogs as $log) {
             $log->op =
@@ -111,7 +109,7 @@ final class SysLogController extends BaseController
         }
 
         return $response->withJson([
-            'draw' => $draw,
+            'draw' => $table->draw,
             'recordsTotal' => $total,
             'recordsFiltered' => $filtered,
             'syslogs' => $syslogs,

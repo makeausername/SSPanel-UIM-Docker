@@ -21,6 +21,7 @@ use App\Services\MFA\TOTP;
 use App\Services\MFA\WebAuthn;
 use App\Services\OneTimeTokenService;
 use App\Services\RateLimit;
+use App\Services\RegistrationGroupSelector;
 use App\Services\UserAccessPolicy;
 use App\Utils\Cookie;
 use App\Utils\Hash;
@@ -34,9 +35,7 @@ use RedisException;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Throwable;
-use function array_rand;
 use function date;
-use function explode;
 use function hash_equals;
 use function is_string;
 use function strlen;
@@ -300,13 +299,7 @@ final class AuthController extends BaseController
         $user->reg_ip = $_SERVER['REMOTE_ADDR'];
         $user->theme = $_ENV['theme'];
         $user->locale = $_ENV['locale'];
-        $random_group = Config::obtain('random_group');
-
-        if ($random_group === '') {
-            $user->node_group = 0;
-        } else {
-            $user->node_group = $random_group[array_rand(explode(',', $random_group))];
-        }
+        $user->node_group = RegistrationGroupSelector::select(Config::obtain('random_group'));
 
         $user->last_login_time = time();
 
