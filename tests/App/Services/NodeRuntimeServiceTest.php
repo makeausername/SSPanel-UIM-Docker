@@ -257,6 +257,13 @@ final class NodeRuntimeServiceTest extends TestCase
     {
         $this->seedNode(['id' => 1]);
         $this->seedUser(['id' => 10]);
+        Capsule::table('detect_list')->insert([
+            'id' => 7,
+            'name' => 'legacy rule',
+            'text' => 'legacy description',
+            'regex' => 'example\\.com',
+            'type' => 1,
+        ]);
 
         $payload = [
             'report_id' => 'detect-report-1',
@@ -287,6 +294,24 @@ final class NodeRuntimeServiceTest extends TestCase
         $this->assertSame(7, (int) $logs[0]->list_id);
         $this->assertSame(1, (int) $logs[0]->node_id);
         $this->assertGreaterThan(0, (int) $logs[0]->datetime);
+    }
+
+    public function testLegacyDetectLogReportSkipsMissingRule(): void
+    {
+        $this->seedNode(['id' => 1]);
+        $this->seedUser(['id' => 10]);
+
+        $result = (new NodeRuntimeService())->acceptDetectLog([
+            'report_id' => 'detect-missing-rule',
+            'data' => [[
+                'user_id' => 10,
+                'rule_id' => 999,
+            ]],
+        ], 1);
+
+        $this->assertTrue($result['accepted']);
+        $this->assertSame(0, $result['count']);
+        $this->assertSame(0, Capsule::table('detect_log')->count());
     }
 
     public function testAuditEventPreservesTargetAndDeduplicatesAcrossReportBatches(): void
@@ -573,6 +598,14 @@ final class NodeRuntimeServiceTest extends TestCase
             $table->integer('datetime')->default(0);
             $table->integer('node_id')->default(0);
             $table->integer('status')->default(0);
+        });
+
+        Capsule::schema()->create('detect_list', static function (Blueprint $table): void {
+            $table->integer('id')->primary();
+            $table->string('name');
+            $table->text('text');
+            $table->text('regex');
+            $table->integer('type');
         });
 
         Capsule::schema()->create('xnode_audit_rules', static function (Blueprint $table): void {

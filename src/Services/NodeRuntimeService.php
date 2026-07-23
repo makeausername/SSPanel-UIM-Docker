@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Config;
 use App\Models\DetectLog;
+use App\Models\DetectRule;
 use App\Models\HourlyUsage;
 use App\Models\Node;
 use App\Models\NodeReportReceipt;
@@ -345,6 +346,10 @@ final class NodeRuntimeService
                         ]);
 
                         $result['count'] += $inserted > 0 ? 1 : 0;
+                        continue;
+                    }
+
+                    if ((new DetectRule())->find($listId) === null) {
                         continue;
                     }
 

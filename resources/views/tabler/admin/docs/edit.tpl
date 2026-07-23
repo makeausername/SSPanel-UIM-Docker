@@ -38,7 +38,7 @@
                             </div>
                             <div class="mb-3">
                                 <form method="post">
-                                    <textarea id="tinymce">{$doc->content}</textarea>
+                                    <textarea id="tinymce">{$doc->content|escape:'html'}</textarea>
                                 </form>
                             </div>
                         </div>
