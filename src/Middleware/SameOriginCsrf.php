@@ -4,83 +4,65 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Services\CsrfRejectionResponse;
+use App\Services\PublicOriginResolver;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
-use Slim\Factory\AppFactory;
+use function array_filter;
+use function array_intersect;
 use function in_array;
-use function parse_url;
-use function rtrim;
+use function is_string;
 use function strtolower;
 use function strtoupper;
+use function trim;
 
 final class SameOriginCsrf implements MiddlewareInterface
 {
+    private PublicOriginResolver $originResolver;
+    private CsrfRejectionResponse $rejectionResponse;
+
+    public function __construct(
+        ?PublicOriginResolver $originResolver = null,
+        ?CsrfRejectionResponse $rejectionResponse = null
+    ) {
+        $this->originResolver = $originResolver ?? new PublicOriginResolver();
+        $this->rejectionResponse = $rejectionResponse ?? new CsrfRejectionResponse();
+    }
+
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
+        if ($this->isAllowed($request)) {
+            return $handler->handle($request);
+        }
+
+        return $this->rejectionResponse->create($request);
+    }
+
+    private function isAllowed(ServerRequestInterface $request): bool
+    {
         if (in_array(strtoupper($request->getMethod()), ['GET', 'HEAD', 'OPTIONS'], true)) {
-            return $handler->handle($request);
+            return true;
         }
 
-        $expectedOrigins = $this->expectedOrigins($request);
-        $origin = rtrim($request->getHeaderLine('Origin'), '/');
+        $originHeader = trim($request->getHeaderLine('Origin'));
+        $refererOrigin = $this->originResolver->fromUrl($request->getHeaderLine('Referer'));
+        $candidates = array_filter([
+            $this->originResolver->fromUrl($originHeader),
+            $refererOrigin,
+        ], is_string(...));
 
-        if ($origin !== '' && in_array(strtolower($origin), $expectedOrigins, true)) {
-            return $handler->handle($request);
-        }
-
-        $refererOrigin = $this->originFromUrl($request->getHeaderLine('Referer'));
-        if ($refererOrigin !== null && in_array($refererOrigin, $expectedOrigins, true)) {
-            return $handler->handle($request);
-        }
-
-        if ($origin === '' && $refererOrigin === null
-            && strtolower($request->getHeaderLine('Sec-Fetch-Site')) === 'same-origin') {
-            return $handler->handle($request);
-        }
-
-        $response = AppFactory::determineResponseFactory()->createResponse(403);
-        $response->getBody()->write((string) json_encode([
-            'ret' => 0,
-            'msg' => 'Cross-site request rejected',
-            'code' => 'CSRF_REJECTED',
-        ]));
-
-        return $response->withHeader('Content-Type', 'application/json');
+        return array_intersect($candidates, $this->originResolver->expectedOrigins($request)) !== []
+            || $this->hasSameOriginFetchMetadata($request, $originHeader, $refererOrigin);
     }
 
-    /** @return list<string> */
-    private function expectedOrigins(ServerRequestInterface $request): array
-    {
-        $origins = [];
-        $baseOrigin = $this->originFromUrl((string) ($_ENV['baseUrl'] ?? ''));
-        if ($baseOrigin !== null) {
-            $origins[] = $baseOrigin;
-        }
-
-        $uri = $request->getUri();
-        if ($uri->getHost() !== '') {
-            $port = $uri->getPort();
-            $origins[] = strtolower($uri->getScheme() . '://' . $uri->getHost() . ($port === null ? '' : ':' . $port));
-        }
-
-        return array_values(array_unique($origins));
-    }
-
-    private function originFromUrl(string $url): ?string
-    {
-        if ($url === '') {
-            return null;
-        }
-
-        $parts = parse_url($url);
-        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
-            return null;
-        }
-
-        return strtolower(
-            $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '')
-        );
+    private function hasSameOriginFetchMetadata(
+        ServerRequestInterface $request,
+        string $originHeader,
+        ?string $refererOrigin
+    ): bool {
+        return $originHeader === '' && $refererOrigin === null
+            && strtolower($request->getHeaderLine('Sec-Fetch-Site')) === 'same-origin';
     }
 }

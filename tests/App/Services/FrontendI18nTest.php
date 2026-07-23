@@ -40,6 +40,14 @@ final class FrontendI18nTest extends TestCase
             'Invite link reset successfully',
             FrontendI18n::trans('response.invite_reset_success', [], 'en-US')
         );
+        $this->assertSame(
+            'The security check failed. Refresh the page and try again.',
+            FrontendI18n::trans('response.security.csrf_rejected', [], 'en-US')
+        );
+        $this->assertSame(
+            '安全校验失败，请刷新页面后重试。',
+            FrontendI18n::trans('response.security.csrf_rejected', [], 'zh-CN')
+        );
     }
 
     public function testMissingTranslationReturnsKey(): void
