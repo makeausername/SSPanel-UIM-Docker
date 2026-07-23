@@ -56,7 +56,7 @@
                         </div>
                         <div class="datagrid-item">
                             <div class="datagrid-title">商品名称</div>
-                            <div class="datagrid-content">{$order->product_name}</div>
+                            <div class="datagrid-content">{$order->product_name|escape:'html'}</div>
                         </div>
                         <div class="datagrid-item">
                             <div class="datagrid-title">订单优惠码</div>
@@ -156,7 +156,7 @@
                                         <tbody>
                                         {foreach $invoice->content as $invoice_content}
                                             <tr>
-                                                <td>{$invoice_content->name}</td>
+                                                <td>{$invoice_content->name|escape:'html'}</td>
                                                 <td>{$invoice_content->price}</td>
                                             </tr>
                                         {/foreach}

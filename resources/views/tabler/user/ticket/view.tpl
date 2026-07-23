@@ -32,7 +32,7 @@
                 <div class="col-12">
                     <div class="card">
                         <div class="card-body">
-                            <div class="h1 my-2 mb-3">#{$ticket->id} {$ticket->title}</div>
+                            <div class="h1 my-2 mb-3">#{$ticket->id} {$ticket->title|escape:'html'}</div>
                         </div>
                     </div>
                 </div>
@@ -81,9 +81,9 @@
                                     <div class="row">
                                         <div class="col">
                                             <div>
-                                                {$comment->comment}
+                                                {$comment->comment|escape:'html'|nl2br}
                                             </div>
-                                            <div class="text-secondary my-1">{$comment->commenter_name}
+                                            <div class="text-secondary my-1">{$comment->commenter_name|escape:'html'}
                                                 {trans key='ticket.replied_at'} {$comment->datetime}</div>
                                         </div>
                                         <div class="col-auto">

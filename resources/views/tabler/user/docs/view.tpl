@@ -6,7 +6,7 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="page-title">
-                        {$doc->title}
+                        {$doc->title|escape:'html'}
                     </h2>
                 </div>
             </div>

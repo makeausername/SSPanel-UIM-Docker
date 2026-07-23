@@ -7,6 +7,7 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Services\AdminPermissionService;
 use App\Services\LLM;
 use App\Services\Notification;
 use App\Utils\ResponseHelper;
@@ -20,10 +21,13 @@ use Smarty\Exception;
 use Telegram\Bot\Exceptions\TelegramSDKException;
 use function array_merge;
 use function count;
+use function htmlspecialchars;
 use function json_decode;
 use function json_encode;
 use function nl2br;
 use function time;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 
 final class TicketController extends BaseController
 {
@@ -244,12 +248,15 @@ final class TicketController extends BaseController
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $tickets = (new Ticket())->orderBy('id', 'desc')->get();
+        $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/ticket/1');
 
         foreach ($tickets as $ticket) {
-            $ticket->op = '<button class="btn btn-red" id="delete-ticket" 
-            onclick="deleteTicket(' . $ticket->id . ')">删除</button>';
+            $ticket->op = $canMutate
+                ? '<button class="btn btn-red" id="delete-ticket"
+            onclick="deleteTicket(' . $ticket->id . ')">删除</button>'
+                : '';
 
-            if ($ticket->status !== 'closed') {
+            if ($canMutate && $ticket->status !== 'closed') {
                 $ticket->op .= '
                 <button class="btn btn-orange" id="close-ticket" 
                 onclick="closeTicket(' . $ticket->id . ')">关闭</button>';
@@ -259,6 +266,7 @@ final class TicketController extends BaseController
             <a class="btn btn-primary" href="/admin/ticket/' . $ticket->id . '/view">查看</a>';
             $ticket->status = $ticket->status();
             $ticket->type = $ticket->type();
+            $ticket->title = htmlspecialchars((string) $ticket->title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $ticket->datetime = Tools::toDateTime((int) $ticket->datetime);
         }
 

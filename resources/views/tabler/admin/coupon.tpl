@@ -1,11 +1,11 @@
 {include file='admin/header.tpl'}
 
-<link rel="stylesheet" href="//{$config['jsdelivr_url']}/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://{$config['jsdelivr_url']}/npm/flatpickr/dist/flatpickr.min.css">
 {if $user->is_dark_mode}
-    <link rel="stylesheet" href="//{$config['jsdelivr_url']}/npm/flatpickr/dist/themes/dark.min.css">
+    <link rel="stylesheet" href="https://{$config['jsdelivr_url']}/npm/flatpickr/dist/themes/dark.min.css">
 {/if}
-<script src="//{$config['jsdelivr_url']}/npm/flatpickr"></script>
-<script src="//{$config['jsdelivr_url']}/npm/flatpickr/dist/l10n/zh.js"></script>
+<script src="https://{$config['jsdelivr_url']}/npm/flatpickr"></script>
+<script src="https://{$config['jsdelivr_url']}/npm/flatpickr/dist/l10n/zh.js"></script>
 
 <div class="page-wrapper">
     <div class="container-xl">

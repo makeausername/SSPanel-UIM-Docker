@@ -33,6 +33,8 @@ final class AdminPermissionServiceTest extends TestCase
             ['node', 'POST', '/admin/order/search', false],
             ['read_only', 'GET', '/admin/setting', true],
             ['read_only', 'POST', '/admin/order/ajax', true],
+            ['read_only', 'POST', '/admin/future/ajax', false],
+            ['read_only', 'POST', '/admin/order/export', false],
             ['read_only', 'POST', '/admin/setting/site', false],
         ];
     }
@@ -48,5 +50,30 @@ final class AdminPermissionServiceTest extends TestCase
         $user->admin_role = 'corrupted-role';
         $this->assertSame('read_only', AdminPermissionService::role($user));
         $this->assertFalse(AdminPermissionService::allows($user, 'DELETE', '/admin/user/1'));
+    }
+
+    public function testOnlyOwnerCanUpdateAnotherAdminAccount(): void
+    {
+        $owner = new User();
+        $owner->id = 1;
+        $owner->admin_role = 'owner';
+
+        $administrator = new User();
+        $administrator->id = 2;
+        $administrator->admin_role = 'administrator';
+
+        $otherAdministrator = new User();
+        $otherAdministrator->id = 3;
+        $otherAdministrator->is_admin = 1;
+        $otherAdministrator->admin_role = 'administrator';
+
+        $ordinaryUser = new User();
+        $ordinaryUser->id = 4;
+        $ordinaryUser->is_admin = 0;
+
+        $this->assertTrue(AdminPermissionService::canUpdateUser($owner, $otherAdministrator));
+        $this->assertFalse(AdminPermissionService::canUpdateUser($administrator, $otherAdministrator));
+        $this->assertTrue(AdminPermissionService::canUpdateUser($administrator, $administrator));
+        $this->assertTrue(AdminPermissionService::canUpdateUser($administrator, $ordinaryUser));
     }
 }

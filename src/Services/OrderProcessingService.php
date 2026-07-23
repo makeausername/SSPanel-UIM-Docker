@@ -11,8 +11,13 @@ use App\Models\UserMoneyLog;
 use App\Utils\Tools;
 use DateTime;
 use function bcadd;
+use function bccomp;
+use function date;
 use function in_array;
+use function is_numeric;
+use function is_object;
 use function json_decode;
+use function strtotime;
 use function time;
 
 final class OrderProcessingService
@@ -42,7 +47,7 @@ final class OrderProcessingService
                 if ($activated !== null) {
                     $content = json_decode((string) $activated->product_content);
                     if (
-                        $content !== null
+                        is_object($content)
                         && InviteSubscriptionRewardService::effectiveExpiryTimestamp($activated, $content) < time()
                     ) {
                         $activated->status = 'expired';
@@ -67,7 +72,12 @@ final class OrderProcessingService
                 }
 
                 $content = json_decode((string) $order->product_content);
-                if ($content === null) {
+                if (! self::hasNumericFields(
+                    $content,
+                    ['bandwidth', 'class', 'class_time', 'node_group', 'speed_limit', 'ip_limit']
+                ) || (float) $content->bandwidth <= 0 || (int) $content->class_time <= 0) {
+                    self::cancelFailedActivation($order, $user);
+
                     return null;
                 }
 
@@ -102,21 +112,39 @@ final class OrderProcessingService
 
     public function processBandwidth(): void
     {
-        $this->processFirstPerUser('bandwidth', static function (User $user, object $content): void {
+        $this->processFirstPerUser('bandwidth', static function (User $user, object $content): bool {
+            if (! isset($content->bandwidth)
+                || ! is_numeric($content->bandwidth)
+                || (float) $content->bandwidth <= 0) {
+                return false;
+            }
+
             $user->transfer_enable += Tools::gbToB($content->bandwidth);
+
+            return true;
         });
     }
 
     public function processTime(): void
     {
         $this->processFirstPerUser('time', static function (User $user, object $content): bool {
-            if ($user->class !== (int) $content->class && $user->class > 0) {
+            if (! OrderEligibilityService::canPurchaseTimeProduct($user, $content)
+                || ! isset($content->class_time, $content->node_group, $content->speed_limit, $content->ip_limit)
+                || ! is_numeric($content->class_time)
+                || ! is_numeric($content->node_group)
+                || ! is_numeric($content->speed_limit)
+                || ! is_numeric($content->ip_limit)
+                || (int) $content->class_time <= 0) {
                 return false;
             }
 
             $user->class = $content->class;
-            $user->class_expire = (new DateTime((string) $user->class_expire))
-                ->modify('+' . $content->class_time . ' days')->format('Y-m-d H:i:s');
+            $currentExpiry = strtotime((string) $user->class_expire);
+            $baseTimestamp = max(time(), $currentExpiry === false ? 0 : $currentExpiry);
+            $user->class_expire = date(
+                'Y-m-d H:i:s',
+                strtotime('+' . (int) $content->class_time . ' days', $baseTimestamp)
+            );
             $user->node_group = $content->node_group;
             $user->node_speedlimit = $content->speed_limit;
             $user->node_iplimit = $content->ip_limit;
@@ -139,11 +167,17 @@ final class OrderProcessingService
 
                 $user = (new User())->where('id', $order->user_id)->lockForUpdate()->first();
                 $content = json_decode((string) $order->product_content);
-                if ($user === null || $content === null) {
+                if ($user === null) {
                     return;
                 }
 
-                $amount = InvoiceAccountingService::money($content->amount ?? 0);
+                if (! self::hasNumericFields($content, ['amount']) || (float) $content->amount <= 0) {
+                    self::cancelFailedActivation($order, $user);
+
+                    return;
+                }
+
+                $amount = InvoiceAccountingService::money($content->amount);
                 $before = InvoiceAccountingService::money($user->money);
                 $after = bcadd($before, $amount, 2);
                 $user->money = $after;
@@ -224,7 +258,8 @@ final class OrderProcessingService
                 }
 
                 $content = json_decode((string) $order->product_content);
-                if ($content === null || $apply($user, $content) === false) {
+                if (! is_object($content) || $apply($user, $content) === false) {
+                    self::cancelFailedActivation($order, $user);
                     return;
                 }
 
@@ -234,5 +269,50 @@ final class OrderProcessingService
                 $order->save();
             });
         }
+    }
+
+    private static function cancelFailedActivation(Order $order, User $user): void
+    {
+        $invoice = (new Invoice())->where('order_id', $order->id)->lockForUpdate()->first();
+
+        OrderReservationService::release($order);
+        $order->status = 'cancelled';
+        $order->update_time = time();
+        $order->save();
+
+        if ($invoice === null) {
+            return;
+        }
+
+        $refundable = InvoiceAccountingService::refundable($invoice);
+        if (in_array($invoice->status, ['paid_gateway', 'paid_balance', 'paid_admin'], true)
+            && bccomp($refundable, '0.00', 2) > 0) {
+            if (! (new InvoiceRefundService())->refundLocked($invoice, $user)) {
+                throw new \RuntimeException('Unable to refund a failed product activation.');
+            }
+
+            return;
+        }
+
+        if ($invoice->status !== 'refunded_balance') {
+            $invoice->status = 'cancelled';
+            $invoice->update_time = time();
+            $invoice->save();
+        }
+    }
+
+    private static function hasNumericFields(mixed $content, array $fields): bool
+    {
+        if (! is_object($content)) {
+            return false;
+        }
+
+        foreach ($fields as $field) {
+            if (! isset($content->{$field}) || ! is_numeric($content->{$field})) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

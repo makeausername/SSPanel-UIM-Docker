@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\UserCoupon;
+use App\Services\AdminPermissionService;
 use App\Services\InvoiceAccountingService;
 use App\Utils\Tools;
 use Exception;
@@ -270,17 +271,20 @@ final class CouponController extends BaseController
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $coupons = (new UserCoupon())->orderBy('id', 'desc')->get();
+        $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/coupon/1');
+        $canViewCodes = AdminPermissionService::role($this->user) !== 'read_only';
 
-        foreach ($coupons as $coupon) {
+        $coupons = $coupons->map(static function (UserCoupon $coupon) use ($canMutate, $canViewCodes): array {
             $content = json_decode($coupon->content);
             $limit = json_decode($coupon->limit);
 
-            $coupon->op = '<button class="btn btn-red" id="delete-coupon-' . $coupon->id . '"
+            $coupon->op = $canMutate ? '<button class="btn btn-red" id="delete-coupon-' . $coupon->id . '"
                 onclick="deleteCoupon(' . $coupon->id . ')">删除</button>' .
                 ((int) ($limit->disabled ?? 0) !== 1 ? '
                 <button class="btn btn-orange" id="disable-coupon-' .
-                    $coupon->id . '" onclick="disableCoupon(' . $coupon->id . ')">禁用</button>' : '');
+                    $coupon->id . '" onclick="disableCoupon(' . $coupon->id . ')">禁用</button>' : '') : '';
 
+            $coupon->code = $canViewCodes ? $coupon->code : '••••••••';
             $coupon->type = $coupon->type();
             $coupon->value = $content->value;
             $coupon->product_id = $limit->product_id;
@@ -291,7 +295,23 @@ final class CouponController extends BaseController
             $coupon->disabled = (int) ($limit->disabled ?? 0) === 1 ? '是' : '否';
             $coupon->create_time = Tools::toDateTime((int) $coupon->create_time);
             $coupon->expire_time = $coupon->expire_time === 0 ? '永久有效' : Tools::toDateTime((int) $coupon->expire_time);
-        }
+
+            return $coupon->only([
+                'op',
+                'id',
+                'code',
+                'type',
+                'value',
+                'product_id',
+                'use_time',
+                'total_use_time',
+                'new_user',
+                'disabled',
+                'use_count',
+                'create_time',
+                'expire_time',
+            ]);
+        })->values();
 
         return $response->withJson([
             'coupons' => $coupons,

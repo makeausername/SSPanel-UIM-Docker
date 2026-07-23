@@ -13,7 +13,7 @@
     <!-- JS files -->
     <script src="https://{$config['jsdelivr_url']}/npm/qrcode_js@1.0.0/qrcode.min.js"></script>
     <script src="https://{$config['jsdelivr_url']}/npm/clipboard@2.0.11/dist/clipboard.min.js"></script>
-    <script src="//{$config['jsdelivr_url']}/npm/jquery/dist/jquery.min.js"></script>
+    <script src="https://{$config['jsdelivr_url']}/npm/jquery/dist/jquery.min.js"></script>
     <script src="https://{$config['jsdelivr_url']}/npm/htmx.org@2.0.10/dist/htmx.min.js"
             integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
             crossorigin="anonymous"></script>
@@ -52,8 +52,8 @@
                             <span class="avatar avatar-sm"
                                   style="background-image: url({$user->dice_bear})"></span>
                         <div class="d-none d-xl-block ps-2">
-                            <div>{$user->email}</div>
-                            <div class="mt-1 small text-secondary">{$user->user_name}</div>
+                            <div>{$user->email|escape:'html'}</div>
+                            <div class="mt-1 small text-secondary">{$user->user_name|escape:'html'}</div>
                         </div>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">

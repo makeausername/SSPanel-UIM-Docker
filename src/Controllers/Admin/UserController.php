@@ -17,10 +17,17 @@ use App\Services\InvoiceAccountingService;
 use App\Utils\Hash;
 use App\Utils\Tools;
 use Exception;
+use Illuminate\Database\QueryException;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function htmlspecialchars;
+use function is_numeric;
 use function in_array;
+use function strlen;
+use function trim;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 
 final class UserController extends BaseController
 {
@@ -107,15 +114,15 @@ final class UserController extends BaseController
      */
     public function create(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $email = $request->getParam('email');
-        $ref_by = $request->getParam('ref_by');
-        $password = $request->getParam('password');
-        $balance = $request->getParam('balance');
+        $email = trim((string) $request->getParam('email'));
+        $refByRaw = trim((string) $request->getParam('ref_by'));
+        $password = (string) $request->getParam('password');
+        $balance = trim((string) $request->getParam('balance'));
 
-        if ($email === '') {
+        if (! Tools::isEmail($email)) {
             return $response->withJson([
                 'ret' => 0,
-                'msg' => '邮箱不能为空',
+                'msg' => '邮箱格式无效',
             ]);
         }
 
@@ -128,32 +135,87 @@ final class UserController extends BaseController
             ]);
         }
 
+        if ($password !== '' && strlen($password) < 8) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '密码长度不能少于 8 位',
+            ]);
+        }
+
+        if ($balance !== '' && $balance !== '-1' && (! is_numeric($balance) || (float) $balance < 0)) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '账户余额无效',
+            ]);
+        }
+
+        $refBy = 0;
+        if ($refByRaw !== '') {
+            if (! ctype_digit($refByRaw) || (int) $refByRaw <= 0) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => '邀请人用户 ID 无效',
+                ]);
+            }
+
+            $refBy = (int) $refByRaw;
+            if (! (new User())->where('id', $refBy)->exists()) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => '邀请人用户不存在',
+                ]);
+            }
+        }
+
         if ($password === '') {
             $password = Tools::genRandomChar(16);
         }
 
-        (new AuthController())->registerHelper(
-            $response,
-            'user',
-            $email,
-            $password,
-            '',
-            0,
-            '',
-            $balance,
-            1
-        );
-        $user = (new User())->where('email', $email)->first();
+        try {
+            $result = DB::connection()->transaction(static function () use (
+                $response,
+                $email,
+                $password,
+                $balance,
+                $refBy
+            ): array {
+                (new AuthController())->registerHelper(
+                    $response,
+                    'user',
+                    $email,
+                    $password,
+                    '',
+                    0,
+                    '',
+                    $balance === '' || $balance === '-1' ? 0 : $balance,
+                    1
+                );
 
-        if ($ref_by !== '') {
-            $user->ref_by = (int) $ref_by;
-            $user->save();
+                $user = (new User())->where('email', $email)->lockForUpdate()->first();
+                if ($user === null) {
+                    return ['ret' => 0, 'msg' => '用户创建失败，请检查配置后重试'];
+                }
+
+                if ($refBy > 0) {
+                    $user->ref_by = $refBy;
+                    if (! $user->save()) {
+                        throw new \RuntimeException('Unable to save admin-created user referrer.');
+                    }
+                }
+
+                return [
+                    'ret' => 1,
+                    'msg' => '添加成功，用户邮箱：' . $email . ' 密码：' . $password,
+                ];
+            });
+        } catch (QueryException) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '用户创建失败，请检查邮箱是否已存在',
+            ]);
         }
 
-        return $response->withJson([
-            'ret' => 1,
-            'msg' => '添加成功，用户邮箱：' . $email . ' 密码：'.$password,
-        ]);
+        return $response->withJson($result);
     }
 
     /**
@@ -186,6 +248,7 @@ final class UserController extends BaseController
     {
         $id = (int) $args['id'];
         $actor = $this->user;
+        $actorId = (int) $actor->id;
         $actorIsOwner = AdminPermissionService::isOwner($actor);
         $requestedIsAdmin = $request->getParam('is_admin') === 'true';
         $requestedRole = (string) $request->getParam('admin_role', 'administrator');
@@ -196,6 +259,7 @@ final class UserController extends BaseController
         $result = DB::connection()->transaction(static function () use (
             $id,
             $request,
+            $actorId,
             $actorIsOwner,
             $requestedIsAdmin,
             $requestedRole
@@ -204,6 +268,13 @@ final class UserController extends BaseController
 
             if ($user === null) {
                 return ['ret' => 0, 'msg' => '用户不存在'];
+            }
+
+            $actor = new User();
+            $actor->id = $actorId;
+            $actor->admin_role = $actorIsOwner ? 'owner' : 'administrator';
+            if (! AdminPermissionService::canUpdateUser($actor, $user)) {
+                return ['ret' => 0, 'msg' => '只有所有者可以修改其他管理员账号'];
             }
 
             $passwordChanged = $request->getParam('pass') !== '' && $request->getParam('pass') !== null;
@@ -350,16 +421,41 @@ final class UserController extends BaseController
     {
         $users = (new User())->orderBy('id', 'desc')->get();
 
-        foreach ($users as $user) {
-            $user->op = '<button class="btn btn-red" id="delete-user-' . $user->id . '" 
+        $canMutate = AdminPermissionService::allows($this->user, 'PUT', '/admin/user/1');
+
+        $users = $users->map(static function (User $user) use ($canMutate): array {
+            $user->op = $canMutate ? '<button class="btn btn-red" id="delete-user-' . $user->id . '"
             onclick="deleteUser(' . $user->id . ')">删除</button>
-            <a class="btn btn-primary" href="/admin/user/' . $user->id . '/edit">编辑</a>';
+            <a class="btn btn-primary" href="/admin/user/' . $user->id . '/edit">编辑</a>' : '';
             $user->transfer_enable = $user->enableTraffic();
             $user->transfer_used = $user->usedTraffic();
+            $user->user_name = htmlspecialchars(
+                (string) $user->user_name,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
+            $user->email = htmlspecialchars((string) $user->email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $user->is_admin = $user->is_admin === 1 ? '是' : '否';
             $user->is_banned = $user->is_banned === 1 ? '是' : '否';
             $user->is_inactive = $user->is_inactive === 1 ? '是' : '否';
-        }
+
+            return $user->only([
+                'op',
+                'id',
+                'user_name',
+                'email',
+                'money',
+                'ref_by',
+                'transfer_enable',
+                'transfer_used',
+                'class',
+                'is_admin',
+                'is_banned',
+                'is_inactive',
+                'reg_date',
+                'class_expire',
+            ]);
+        })->values();
 
         return $response->withJson([
             'users' => $users,

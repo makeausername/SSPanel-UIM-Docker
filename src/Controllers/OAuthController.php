@@ -29,6 +29,7 @@ use function is_array;
 use function is_scalar;
 use function is_string;
 use function json_decode;
+use function rawurlencode;
 use function time;
 use function trim;
 
@@ -36,7 +37,6 @@ final class OAuthController extends BaseController
 {
     /**
      * @throws SmartyException
-     * @throws GuzzleException
      * @throws RedisException
      */
     public function index(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -50,7 +50,6 @@ final class OAuthController extends BaseController
     }
 
     /**
-     * @throws GuzzleException
      * @throws RedisException
      * @throws Exception
      */
@@ -106,11 +105,16 @@ final class OAuthController extends BaseController
             'redirect_uri' => $_ENV['baseUrl'] . '/oauth/slack',
         ];
 
-        $code_response = $client->post($slack_api_url, [
-            'headers' => $code_headers,
-            'form_params' => $code_body,
-            'timeout' => 3,
-        ]);
+        try {
+            $code_response = $client->post($slack_api_url, [
+                'headers' => $code_headers,
+                'form_params' => $code_body,
+                'connect_timeout' => 3,
+                'timeout' => 3,
+            ]);
+        } catch (GuzzleException) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
+        }
 
         $tokenResponse = json_decode($code_response->getBody()->__toString(), true);
         if (
@@ -122,13 +126,18 @@ final class OAuthController extends BaseController
             return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
-        $identityResponse = $client->post('https://slack.com/api/openid.connect.userInfo', [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $tokenResponse['access_token'],
-                'Content-Type' => 'application/x-www-form-urlencoded',
-            ],
-            'timeout' => 3,
-        ]);
+        try {
+            $identityResponse = $client->post('https://slack.com/api/openid.connect.userInfo', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $tokenResponse['access_token'],
+                    'Content-Type' => 'application/x-www-form-urlencoded',
+                ],
+                'connect_timeout' => 3,
+                'timeout' => 3,
+            ]);
+        } catch (GuzzleException) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
+        }
         $identity = json_decode($identityResponse->getBody()->__toString(), true);
         $slack_user_id = is_array($identity) && ($identity['ok'] ?? false)
             ? ($identity['https://slack.com/user_id'] ?? $identity['sub'] ?? null)
@@ -153,13 +162,14 @@ final class OAuthController extends BaseController
 
         $user->im_type = 1;
         $user->im_value = $slack_user_id;
-        $user->save();
+        if (! $user->save()) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
+        }
 
         return $response->withRedirect($_ENV['baseUrl'] . '/user/edit');
     }
 
     /**
-     * @throws GuzzleException
      * @throws RedisException
      */
     public function discord(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -211,17 +221,26 @@ final class OAuthController extends BaseController
             'redirect_uri' => $_ENV['baseUrl'] . '/oauth/discord',
         ];
 
-        $code_response = $client->post($discord_api_url, [
-            'headers' => $code_headers,
-            'form_params' => $code_body,
-            'timeout' => 3,
-        ]);
+        try {
+            $code_response = $client->post($discord_api_url, [
+                'headers' => $code_headers,
+                'form_params' => $code_body,
+                'connect_timeout' => 3,
+                'timeout' => 3,
+            ]);
+        } catch (GuzzleException) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
+        }
 
         if ($code_response->getStatusCode() !== 200) {
             return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
-        $access_token = json_decode($code_response->getBody()->getContents())->access_token;
+        $tokenResponse = json_decode($code_response->getBody()->getContents(), true);
+        $access_token = is_array($tokenResponse) ? ($tokenResponse['access_token'] ?? null) : null;
+        if (! is_string($access_token) || $access_token === '') {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
+        }
         $discord_user_url = 'https://discord.com/api/users/@me';
 
         $user_headers = [
@@ -229,15 +248,26 @@ final class OAuthController extends BaseController
             'Authorization' => 'Bearer ' . $access_token,
         ];
 
-        $user_response = $client->get($discord_user_url, [
-            'headers' => $user_headers,
-        ]);
+        try {
+            $user_response = $client->get($discord_user_url, [
+                'headers' => $user_headers,
+                'connect_timeout' => 3,
+                'timeout' => 3,
+            ]);
+        } catch (GuzzleException) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
+        }
 
         if ($user_response->getStatusCode() !== 200) {
             return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
-        $discord_user_id = json_decode($user_response->getBody()->getContents(), true)['id'];
+        $identity = json_decode($user_response->getBody()->getContents(), true);
+        $discord_user_id = is_array($identity) ? ($identity['id'] ?? null) : null;
+        if (! is_scalar($discord_user_id) || trim((string) $discord_user_id) === '') {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
+        }
+        $discord_user_id = trim((string) $discord_user_id);
 
         if ((new User())->where('im_type', 2)->where('im_value', $discord_user_id)->first() !== null ||
             ($user->im_type === 2 && $user->im_value === $discord_user_id)) {
@@ -247,13 +277,11 @@ final class OAuthController extends BaseController
             ));
         }
 
-        $user->im_type = 2;
-        $user->im_value = $discord_user_id;
-        $user->save();
-
         if (Config::obtain('discord_guild_id') !== 0) {
-            $discord_guild_url = 'https://discord.com/api/guilds/' . Config::obtain('discord_guild_id') .
-                '/members/' . $user->im_value;
+            $discord_guild_url = self::discordGuildMemberUrl(
+                (string) Config::obtain('discord_guild_id'),
+                $discord_user_id
+            );
 
             $guild_headers = [
                 'Content-Type' => 'application/json',
@@ -264,13 +292,31 @@ final class OAuthController extends BaseController
                 'access_token' => $access_token,
             ];
 
-            $client->put($discord_guild_url, [
-                'headers' => $guild_headers,
-                'json' => $guild_body,
-            ]);
+            try {
+                $client->put($discord_guild_url, [
+                    'headers' => $guild_headers,
+                    'json' => $guild_body,
+                    'connect_timeout' => 3,
+                    'timeout' => 3,
+                ]);
+            } catch (GuzzleException) {
+                return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
+            }
+        }
+
+        $user->im_type = 2;
+        $user->im_value = $discord_user_id;
+        if (! $user->save()) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
         }
 
         return $response->withRedirect($_ENV['baseUrl'] . '/user/edit');
+    }
+
+    public static function discordGuildMemberUrl(string $guildId, string $discordUserId): string
+    {
+        return 'https://discord.com/api/guilds/' . rawurlencode($guildId)
+            . '/members/' . rawurlencode($discordUserId);
     }
 
     public function telegram(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -317,7 +363,9 @@ final class OAuthController extends BaseController
         $user->im_type = 4;
         $user->im_value = $telegram_id;
 
-        $user->save();
+        if (! $user->save()) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.oauth_failed'));
+        }
 
         return ResponseHelper::success($response, FrontendI18n::trans('response.auth.bind_success'));
     }

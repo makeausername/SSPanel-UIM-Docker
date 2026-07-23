@@ -15,10 +15,20 @@ final class SecurityHeadersTest extends TestCase
 {
     public function testEnforcesContentSecurityPolicy(): void
     {
+        $_ENV['jsdelivr_url'] = 'cdn.jsdelivr.net';
         $request = (new HttpFactory())->createServerRequest('GET', 'http://panel.example.com/user');
         $response = (new SecurityHeaders())->process($request, $this->handler());
 
-        $this->assertStringContainsString("object-src 'none'", $response->getHeaderLine('Content-Security-Policy'));
+        $policy = $response->getHeaderLine('Content-Security-Policy');
+        $this->assertStringContainsString("object-src 'none'", $policy);
+        $this->assertStringContainsString('https://cdn.jsdelivr.net', $policy);
+        $this->assertStringContainsString('https://unpkg.com', $policy);
+        $this->assertStringContainsString('https://cdn.datatables.net', $policy);
+        $this->assertStringContainsString('https://cdnjs.cloudflare.com', $policy);
+        $this->assertStringContainsString('https://www.paypal.com', $policy);
+        $this->assertStringContainsString('https://*.hcaptcha.com', $policy);
+        $this->assertStringContainsString('https://www.gstatic.com', $policy);
+        $this->assertStringNotContainsString("script-src 'self' 'unsafe-inline' https:;", $policy);
         $this->assertSame('', $response->getHeaderLine('Content-Security-Policy-Report-Only'));
         $this->assertSame('', $response->getHeaderLine('Strict-Transport-Security'));
     }

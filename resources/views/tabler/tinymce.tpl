@@ -1,8 +1,8 @@
-<script src="//cdnjs.cloudflare.com/ajax/libs/tinymce/7.2.0/tinymce.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/7.2.0/tinymce.min.js"></script>
 
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        tinyMCE.baseURL = '//cdnjs.cloudflare.com/ajax/libs/tinymce/7.2.0';
+        tinyMCE.baseURL = 'https://cdnjs.cloudflare.com/ajax/libs/tinymce/7.2.0';
         tinyMCE.suffix = '.min';
         tinyMCE.init({
             selector: '#tinymce',

@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
+#[CoversClass(DynamicRate::class)]
 class DynamicRateTest extends TestCase
 {
-    /**
-     * @covers App\Services\DynamicRate::getFullDayRates
-     */
     public function testGetFullDayRates(): void
     {
         $max_rate = 3;
@@ -28,10 +27,6 @@ class DynamicRateTest extends TestCase
 
         $this->assertSame($expected_rates, $rates);
     }
-
-    /**
-     * @covers App\Services\DynamicRate::getRateByTime
-     */
     public function testGetRateByTime(): void
     {
         $max_rate = 3;
@@ -46,10 +41,6 @@ class DynamicRateTest extends TestCase
 
         $this->assertSame($expected_rate, $rate);
     }
-
-    /**
-     * @covers App\Services\DynamicRate::validateData
-     */
     public function testValidateData(): void
     {
         $max_rate = 3;
@@ -78,10 +69,6 @@ class DynamicRateTest extends TestCase
 
         $this->assertFalse(DynamicRate::validateData($max_rate, $max_rate_time, $min_rate, $min_rate_time));
     }
-
-    /**
-     * @covers App\Services\DynamicRate::logistic
-     */
     public function testLogistic(): void
     {
         $max_rate = 3;
@@ -96,10 +83,6 @@ class DynamicRateTest extends TestCase
 
         $this->assertSame($expected_rate, $rate);
     }
-
-    /**
-     * @covers App\Services\DynamicRate::linear
-     */
     public function testLinear(): void
     {
         $max_rate = 3;

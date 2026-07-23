@@ -24,7 +24,7 @@
                             <div class="d-flex align-items-center">
                                 <div class="subheader">{trans key='user.profile.email'}</div>
                             </div>
-                            <div class="h1 mb-3">{$user->email}</div>
+                            <div class="h1 mb-3">{$user->email|escape:'html'}</div>
                         </div>
                     </div>
                 </div>
@@ -34,7 +34,7 @@
                             <div class="d-flex align-items-center">
                                 <div class="subheader">{trans key='user.profile.username'}</div>
                             </div>
-                            <div class="h1 mb-3">{$user->user_name}</div>
+                            <div class="h1 mb-3">{$user->user_name|escape:'html'}</div>
                         </div>
                     </div>
                 </div>

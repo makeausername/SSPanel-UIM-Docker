@@ -7,6 +7,7 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Models\XNodeAuditRule;
 use App\Models\XNodeAuditRulePattern;
+use App\Services\AdminPermissionService;
 use App\Services\DB;
 use App\Services\XNodeAuditService;
 use InvalidArgumentException;
@@ -159,6 +160,7 @@ final class DetectRuleController extends BaseController
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $rules = (new XNodeAuditRule())->orderBy('priority')->orderBy('id')->get();
+        $canMutate = AdminPermissionService::allows($this->user, 'PUT', '/admin/detect/1/toggle');
 
         foreach ($rules as $rule) {
             $patterns = (new XNodeAuditRulePattern())
@@ -167,7 +169,7 @@ final class DetectRuleController extends BaseController
                 ->pluck('pattern')
                 ->toArray();
 
-            $rule->op = $this->renderActions($rule);
+            $rule->op = $canMutate ? $this->renderActions($rule) : '';
             $rule->patterns = $this->renderPatterns($patterns);
             $rule->name = $this->renderRuleName($rule);
             $rule->description = $this->renderDescription($rule);

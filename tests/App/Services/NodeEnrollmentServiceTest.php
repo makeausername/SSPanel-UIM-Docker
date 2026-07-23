@@ -7,11 +7,13 @@ namespace App\Services;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Schema\Blueprint;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use function hash;
 use function strlen;
 
+#[CoversClass(NodeEnrollmentService::class)]
 class NodeEnrollmentServiceTest extends TestCase
 {
     private Capsule $db;
@@ -55,10 +57,6 @@ class NodeEnrollmentServiceTest extends TestCase
 
         parent::tearDown();
     }
-
-    /**
-     * @covers App\Services\NodeEnrollmentService::hashToken
-     */
     public function testHashTokenUsesSha256(): void
     {
         $service = new NodeEnrollmentService();
@@ -66,10 +64,6 @@ class NodeEnrollmentServiceTest extends TestCase
         $this->assertSame(hash('sha256', 'xn_example'), $service->hashToken('xn_example'));
         $this->assertNotSame('xn_example', $service->hashToken('xn_example'));
     }
-
-    /**
-     * @covers App\Services\NodeEnrollmentService::generateNodeToken
-     */
     public function testGenerateNodeTokenUsesExpectedPrefix(): void
     {
         $service = new NodeEnrollmentService();
@@ -78,10 +72,6 @@ class NodeEnrollmentServiceTest extends TestCase
         $this->assertStringStartsWith('xn_', $token);
         $this->assertGreaterThan(32, strlen($token));
     }
-
-    /**
-     * @covers App\Services\NodeEnrollmentService::createEnrollTokenForNode
-     */
     public function testCreateEnrollTokenRejectsInvalidNodeId(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -89,10 +79,6 @@ class NodeEnrollmentServiceTest extends TestCase
 
         NodeEnrollmentService::createEnrollTokenForNode(0);
     }
-
-    /**
-     * @covers App\Services\NodeEnrollmentService::createProbeToken
-     */
     public function testCreateProbeTokenStoresGlobalProbeTokenHash(): void
     {
         $token = NodeEnrollmentService::createProbeToken(120);

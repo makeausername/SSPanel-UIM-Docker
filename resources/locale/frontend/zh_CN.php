@@ -180,6 +180,7 @@ return [
         'old_password_wrong' => '旧密码错误',
         'order' => [
             'class_insufficient' => '你的账户等级不足，无法购买此商品',
+            'class_mismatch' => '此时间套餐与你当前的账户等级不匹配',
             'current_month_addon_requires_plan' => '当月流量加油包仅限有效年付套餐用户购买',
             'group_not_allowed' => '你所在的用户组无法购买此商品',
             'new_users_only' => '此商品仅限新用户购买',

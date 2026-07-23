@@ -1,4 +1,4 @@
-<script src="//{$config['jsdelivr_url']}/npm/jquery/dist/jquery.min.js"></script>
+<script src="https://{$config['jsdelivr_url']}/npm/jquery/dist/jquery.min.js"></script>
 
 <div class="card-inner">
     <h4>

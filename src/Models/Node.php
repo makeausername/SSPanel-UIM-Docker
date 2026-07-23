@@ -44,6 +44,10 @@ final class Node extends Model
     protected $connection = 'default';
     protected $table = 'node';
 
+    protected $hidden = [
+        'password',
+    ];
+
     protected $casts = [
         'traffic_rate' => 'float',
         'node_heartbeat' => 'int',

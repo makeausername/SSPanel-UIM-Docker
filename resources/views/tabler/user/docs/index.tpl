@@ -28,7 +28,7 @@
                                 <div class="list-group-item">
                                     <div class="row align-items-center">
                                         <div class="col text-truncate">
-                                            <div class="text-reset d-block">{$doc->title}</div>
+                                            <div class="text-reset d-block">{$doc->title|escape:'html'}</div>
                                             <div class="d-block text-secondary text-truncate mt-n1">
                                                 {$doc->date}
                                             </div>

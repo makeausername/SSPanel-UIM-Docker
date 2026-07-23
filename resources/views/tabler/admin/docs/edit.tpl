@@ -32,7 +32,8 @@
                             <div class="mb-3">
                                 <label class="form-label col-3 col-form-label">文档标题</label>
                                 <div class="col">
-                                    <input id="title" type="text" class="form-control" value="{$doc->title}">
+                                    <input id="title" type="text" class="form-control"
+                                           value="{$doc->title|escape:'html'}">
                                 </div>
                             </div>
                             <div class="mb-3">

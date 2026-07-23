@@ -310,22 +310,26 @@ final class AuthController extends BaseController
 
         $user->last_login_time = time();
 
-        if ($user->save() && ! $is_admin_reg) {
-            if ($user->ref_by !== 0) {
-                InviteSubscriptionRewardService::bindReferral(
-                    (int) $user->id,
-                    (int) $user->ref_by,
-                    (string) $invite_code
-                );
-            }
-
-            Auth::login($user->id, 3600);
-            (new LoginIp())->collectLoginIP($_SERVER['REMOTE_ADDR'], 0, $user->id);
-
-            return $response->withHeader('HX-Redirect', $redir);
+        if (! $user->save()) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.unknown_error'));
         }
 
-        return ResponseHelper::error($response, FrontendI18n::trans('response.auth.unknown_error'));
+        if ($is_admin_reg) {
+            return ResponseHelper::success($response, '');
+        }
+
+        if ($user->ref_by !== 0) {
+            InviteSubscriptionRewardService::bindReferral(
+                (int) $user->id,
+                (int) $user->ref_by,
+                (string) $invite_code
+            );
+        }
+
+        Auth::login($user->id, 3600);
+        (new LoginIp())->collectLoginIP($_SERVER['REMOTE_ADDR'], 0, $user->id);
+
+        return $response->withHeader('HX-Redirect', $redir);
     }
 
     /**

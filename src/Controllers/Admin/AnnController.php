@@ -9,6 +9,7 @@ use App\Models\Ann;
 use App\Models\Config;
 use App\Models\EmailQueue;
 use App\Models\User;
+use App\Services\AdminPermissionService;
 use App\Services\Notification;
 use App\Utils\Tools;
 use Exception;
@@ -18,10 +19,13 @@ use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Telegram\Bot\Exceptions\TelegramSDKException;
+use function htmlspecialchars;
 use function in_array;
 use function strip_tags;
 use function strlen;
 use function time;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 use const PHP_EOL;
 
 final class AnnController extends BaseController
@@ -245,13 +249,18 @@ final class AnnController extends BaseController
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $anns = (new Ann())->orderBy('id')->get();
+        $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/announcement/1');
 
         foreach ($anns as $ann) {
-            $ann->op = '<button class="btn btn-red" id="delete-announcement-' . $ann->id . '" 
+            $ann->op = $canMutate ? '<button class="btn btn-red" id="delete-announcement-' . $ann->id . '"
             onclick="deleteAnn(' . $ann->id . ')">删除</button>
-            <a class="btn btn-primary" href="/admin/announcement/' . $ann->id . '/edit">编辑</a>';
+            <a class="btn btn-primary" href="/admin/announcement/' . $ann->id . '/edit">编辑</a>' : '';
             $ann->status = $ann->status();
-            $ann->content = strlen($ann->content) > 40 ? mb_substr(strip_tags($ann->content), 0, 40, 'UTF-8') . '...' : $ann->content;
+            $plainContent = strip_tags((string) $ann->content);
+            $plainContent = strlen($plainContent) > 40
+                ? mb_substr($plainContent, 0, 40, 'UTF-8') . '...'
+                : $plainContent;
+            $ann->content = htmlspecialchars($plainContent, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
 
         return $response->withJson([
