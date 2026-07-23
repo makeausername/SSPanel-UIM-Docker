@@ -1,0 +1,26 @@
+name: Production Installation Smoke
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate installation scripts
+        run: |
+          bash -n bootstrap.sh install.sh tests/bootstrap-regression.sh tests/production-compose-smoke.sh
+          bash tests/bootstrap-regression.sh
+
+      - name: Build and validate production stack
+        run: bash tests/production-compose-smoke.sh

@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\OnlineLog;
+use App\Services\DataTableRequest;
 use App\Utils\Tools;
 use Exception;
 use MaxMind\Db\Reader\InvalidDatabaseException;
@@ -51,34 +52,31 @@ final class OnlineLogController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $length = $request->getParam('length');
-        $page = $request->getParam('start') / $length + 1;
-        $draw = $request->getParam('draw');
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'user_id', 'node_id', 'ip', 'first_time', 'last_time'],
+            'last_time'
+        );
 
         $online_log = OnlineLog::query()->where('last_time', '>', time() - 90);
 
-        $search = $request->getParam('search')['value'];
-
-        if ($search !== '') {
-            $online_log->where('user_id', '=', $search)
-                ->orWhere('ip', 'LIKE', "%{$search}%")
-                ->orWhere('node_id', '=', $search);
+        if ($table->search !== '') {
+            $online_log->where(static function ($query) use ($table): void {
+                $query->where('user_id', '=', $table->search)
+                    ->orWhere('ip', 'LIKE', "%{$table->search}%")
+                    ->orWhere('node_id', '=', $table->search);
+            });
         }
 
-        $order = $request->getParam('order')[0]['dir'];
-
-        if ($request->getParam('order')[0]['column'] !== '7') {
-            $order_by = $request->getParam('columns')[$request->getParam('order')[0]['column']]['data'];
-
-            $online_log->orderBy($order_by, $order)->orderBy('last_time', 'desc');
-        } else {
-            $online_log->orderBy('last_time', $order);
+        $online_log->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'last_time') {
+            $online_log->orderBy('last_time', 'desc');
         }
 
         $filtered = $online_log->count();
         $total = (new OnlineLog())->count();
 
-        $onlines = $online_log->paginate($length, '*', '', $page);
+        $onlines = $online_log->paginate($table->length, '*', '', $table->page);
 
         foreach ($onlines as $online) {
             $online->node_name = $online->nodeName();
@@ -89,7 +87,7 @@ final class OnlineLogController extends BaseController
         }
 
         return $response->withJson([
-            'draw' => $draw,
+            'draw' => $table->draw,
             'recordsTotal' => $total,
             'recordsFiltered' => $filtered,
             'onlines' => $onlines,

@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\LoginIp;
+use App\Services\DataTableRequest;
 use App\Utils\Tools;
 use Exception;
 use MaxMind\Db\Reader\InvalidDatabaseException;
@@ -48,33 +49,28 @@ final class LoginLogController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $length = $request->getParam('length');
-        $page = $request->getParam('start') / $length + 1;
-        $draw = $request->getParam('draw');
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'userid', 'ip', 'datetime', 'type'],
+            'id'
+        );
 
         $login_log = LoginIp::query();
 
-        $search = $request->getParam('search')['value'];
-
-        if ($search !== '') {
-            $login_log->where('userid', '=', $search)
-                ->orWhere('ip', 'LIKE', "%{$search}%");
+        if ($table->search !== '') {
+            $login_log->where('userid', '=', $table->search)
+                ->orWhere('ip', 'LIKE', "%{$table->search}%");
         }
 
-        $order = $request->getParam('order')[0]['dir'];
-
-        if ($request->getParam('order')[0]['column'] !== '0') {
-            $order_by = $request->getParam('columns')[$request->getParam('order')[0]['column']]['data'];
-
-            $login_log->orderBy($order_by, $order)->orderBy('id', 'desc');
-        } else {
-            $login_log->orderBy('id', $order);
+        $login_log->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $login_log->orderBy('id', 'desc');
         }
 
         $filtered = $login_log->count();
         $total = (new LoginIp())->count();
 
-        $logins = $login_log->paginate($length, '*', '', $page);
+        $logins = $login_log->paginate($table->length, '*', '', $table->page);
 
         foreach ($logins as $login) {
             $login->location = Tools::getIpLocation($login->ip);
@@ -83,7 +79,7 @@ final class LoginLogController extends BaseController
         }
 
         return $response->withJson([
-            'draw' => $draw,
+            'draw' => $table->draw,
             'recordsTotal' => $total,
             'recordsFiltered' => $filtered,
             'logins' => $logins,

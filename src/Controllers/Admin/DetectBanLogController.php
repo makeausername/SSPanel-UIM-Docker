@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\DetectBanLog;
+use App\Services\DataTableRequest;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -42,32 +43,27 @@ final class DetectBanLogController extends BaseController
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $length = $request->getParam('length');
-        $page = $request->getParam('start') / $length + 1;
-        $draw = $request->getParam('draw');
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'user_id', 'detect_number', 'ban_time', 'start_time', 'end_time', 'all_detect_number'],
+            'id'
+        );
 
         $detect_ban_log = DetectBanLog::query();
 
-        $search = $request->getParam('search')['value'];
-
-        if ($search !== '') {
-            $detect_ban_log->where('user_id', '=', $search);
+        if ($table->search !== '') {
+            $detect_ban_log->where('user_id', '=', $table->search);
         }
 
-        $order = $request->getParam('order')[0]['dir'];
-
-        if ($request->getParam('order')[0]['column'] !== '0') {
-            $order_field = self::$details['field'][$request->getParam('order')[0]['column']];
-
-            $detect_ban_log->orderBy($order_field, $order)->orderBy('id', 'desc');
-        } else {
-            $detect_ban_log->orderBy('id', $order);
+        $detect_ban_log->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $detect_ban_log->orderBy('id', 'desc');
         }
 
         $filtered = $detect_ban_log->count();
         $total = (new DetectBanLog())->count();
 
-        $bans = $detect_ban_log->paginate($length, '*', '', $page);
+        $bans = $detect_ban_log->paginate($table->length, '*', '', $table->page);
 
         foreach ($bans as $ban) {
             $ban->start_time = Tools::toDateTime((int) $ban->start_time);
@@ -76,7 +72,7 @@ final class DetectBanLogController extends BaseController
         }
 
         return $response->withJson([
-            'draw' => $draw,
+            'draw' => $table->draw,
             'recordsTotal' => $total,
             'recordsFiltered' => $filtered,
             'bans' => $bans,
