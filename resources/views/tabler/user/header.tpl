@@ -10,6 +10,7 @@
     <title>{$config['appName']}</title>
     <!-- CSS files -->
     <link href="https://{$config['jsdelivr_url']}/npm/@tabler/core@1.4.0/dist/css/tabler.min.css" rel="stylesheet"/>
+    <link href="https://{$config['jsdelivr_url']}/npm/@tabler/core@1.4.0/dist/css/tabler-flags.min.css" rel="stylesheet"/>
     <link href="https://{$config['jsdelivr_url']}/npm/@tabler/icons-webfont@3.45.0/dist/tabler-icons.min.css" rel="stylesheet"/>
     <!-- JS files -->
     <script src="/assets/js/fuck.min.js"></script>

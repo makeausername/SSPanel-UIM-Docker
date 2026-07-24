@@ -15,6 +15,7 @@ use App\Services\AdminPermissionService;
 use App\Services\DataTableRequest;
 use App\Services\FixedNodeTrafficRatePolicy;
 use App\Services\I18n;
+use App\Services\NodeCountryService;
 use App\Services\NodeEnrollmentService;
 use App\Services\NodeProbeService;
 use App\Services\NodeProfileService;
@@ -80,6 +81,7 @@ final class NodeController extends BaseController
     private static array $update_field = [
         'name',
         'server',
+        'country_code',
         'traffic_rate',
         'node_group',
         'node_speedlimit',
@@ -113,6 +115,7 @@ final class NodeController extends BaseController
         return $response->write(
             $this->view()
                 ->assign('update_field', self::$update_field)
+                ->assign('country_options', NodeCountryService::commonOptions())
                 ->fetch('admin/node/create.tpl')
         );
     }
@@ -135,6 +138,14 @@ final class NodeController extends BaseController
         $node->name = $name;
         $node->node_group = $request->getParam('node_group');
         $node->server = trim($request->getParam('server'));
+        $countryCode = NodeCountryService::normalize($request->getParam('country_code') ?? '');
+        if ($countryCode === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '国家/地区代码无效，请使用 ISO 3166-1 两位代码，例如 SG',
+            ]);
+        }
+        $node->country_code = $countryCode;
         $node->traffic_rate = $request->getParam('traffic_rate') ?? 1;
         FixedNodeTrafficRatePolicy::apply($node);
 
@@ -250,6 +261,7 @@ final class NodeController extends BaseController
                 ->assign('xnode_summary', $this->buildXNodeEditSummary($runtime, (int) $node->id, $nodeBandwidth))
                 ->assign('xnode_probe_summary', NodeProbeService::summarizeNode((int) $node->id))
                 ->assign('update_field', self::$update_field)
+                ->assign('country_options', NodeCountryService::commonOptions())
                 ->fetch('admin/node/edit.tpl')
         );
     }
@@ -279,6 +291,14 @@ final class NodeController extends BaseController
         $node->name = $name;
         $node->node_group = $request->getParam('node_group') ?? 0;
         $node->server = trim($request->getParam('server'));
+        $countryCode = NodeCountryService::normalize($request->getParam('country_code') ?? '');
+        if ($countryCode === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '国家/地区代码无效，请使用 ISO 3166-1 两位代码，例如 SG',
+            ]);
+        }
+        $node->country_code = $countryCode;
         $node->traffic_rate = $request->getParam('traffic_rate') ?? 1;
         FixedNodeTrafficRatePolicy::apply($node);
 
