@@ -77,8 +77,21 @@
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">流量倍率</label>
                                 <div class="col">
-                                    <input id="traffic_rate" type="text" class="form-control"
+                                    <input id="traffic_rate" type="hidden"
                                            value="{$node->traffic_rate}">
+                                    <input id="standard_traffic_rate" type="text" class="form-control"
+                                           value="{$node->traffic_rate}">
+                                    <select id="xnode_traffic_rate" class="form-select d-none">
+                                        {foreach $xnode_traffic_rate_options as $traffic_rate_option}
+                                            <option value="{$traffic_rate_option}"
+                                                    {if $node->traffic_rate == $traffic_rate_option}selected{/if}>
+                                                {$traffic_rate_option} 倍
+                                            </option>
+                                        {/foreach}
+                                    </select>
+                                    <div id="xnode-traffic-rate-hint" class="form-hint d-none">
+                                        XNode 仅支持固定的 2、4、6、8、10 倍倍率。
+                                    </div>
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
@@ -387,15 +400,20 @@
 
     function applyXNodeManagedPolicy() {
         const isXNode = $('#sort').val() === '15';
-        const trafficRate = '2';
         const values = {
-            '#traffic_rate': trafficRate,
             '#node_class': '0',
             '#node_group': '0',
             '#node_speedlimit': '0',
             '#node_bandwidth_limit': '0',
             '#bandwidthlimit_resetday': '1'
         };
+
+        $('#standard_traffic_rate').toggleClass('d-none', isXNode).prop('disabled', isXNode);
+        $('#xnode_traffic_rate').toggleClass('d-none', !isXNode).prop('disabled', !isXNode);
+        $('#xnode-traffic-rate-hint').toggleClass('d-none', !isXNode);
+        $('#traffic_rate').val(
+            isXNode ? $('#xnode_traffic_rate').val() : $('#standard_traffic_rate').val()
+        );
 
         if (isXNode) {
             Object.entries(values).forEach(([selector, value]) => $(selector).val(value));
@@ -409,6 +427,16 @@
         editor.set(xnodeRealityTemplate);
     });
 
+    $('#standard_traffic_rate').on('input change', function () {
+        if ($('#sort').val() !== '15') {
+            $('#traffic_rate').val($(this).val());
+        }
+    });
+    $('#xnode_traffic_rate').on('change', function () {
+        if ($('#sort').val() === '15') {
+            $('#traffic_rate').val($(this).val());
+        }
+    });
     $('#sort').on('change', applyXNodeManagedPolicy);
     applyXNodeManagedPolicy();
 

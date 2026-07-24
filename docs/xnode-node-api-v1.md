@@ -136,12 +136,13 @@ The UUIDs in this response must match the UUIDs emitted in `/sub/{token}/v2ray` 
 XNode nodes (`sort = 15`) use one panel-managed policy. There is no server cost profile or node-tier choice:
 
 - `node_class = 0` and `node_group = 0`: available to every eligible paid user without node tiers.
-- `traffic_rate = 2` for every XNode node: reported upload and download bytes are each multiplied by two when charged to the user's monthly quota.
+- `traffic_rate` is selected by the administrator from `2`, `4`, `6`, `8`, or `10` when creating or editing an XNode node. The default is `2`.
+- Reported upload and download bytes are each multiplied by the selected fixed rate when charged to the user's monthly quota.
 - Dynamic traffic rate is disabled: a byte always consumes the same quota regardless of time.
 - `node_speedlimit = 0` and `node_bandwidth_limit = 0`: no panel-side speed or node quota limit.
 - `bandwidthlimit_resetday = 1`: the displayed node traffic counter resets on day 1 while remaining unlimited.
 
-The managed Unlimited plan remains disabled because it has no finite monthly quota. Existing XNode rows are migrated to the same two-times rate, stale cost-profile metadata is removed, and current `node_bandwidth` counters are preserved. Non-XNode node types retain the original configurable SSPanel-UIM behavior.
+The managed Unlimited plan remains disabled because it has no finite monthly quota. Existing XNode rows keep the valid default two-times rate unless an administrator changes it, stale cost-profile metadata is removed, and current `node_bandwidth` counters are preserved. Non-XNode node types retain the original configurable SSPanel-UIM behavior.
 
 Fetch detect rules:
 

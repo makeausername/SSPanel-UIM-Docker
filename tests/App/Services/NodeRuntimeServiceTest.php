@@ -130,6 +130,37 @@ final class NodeRuntimeServiceTest extends TestCase
         $this->assertSame(400, (int) $node->node_bandwidth);
     }
 
+    public function testSelectedTenTimesRateChargesUserQuotaAndKeepsRawNodeCounter(): void
+    {
+        $this->seedNode([
+            'id' => 4,
+            'traffic_rate' => 10,
+        ]);
+        $this->seedUser(['id' => 40]);
+
+        $result = (new NodeRuntimeService())->acceptTraffic([
+            'report_id' => 'selected-ten-times-report',
+            'period_start' => 100,
+            'period_end' => 200,
+            'data' => [
+                [
+                    'user_id' => 40,
+                    'u' => 10,
+                    'd' => 20,
+                ],
+            ],
+        ], 4);
+
+        $user = Capsule::table('user')->where('id', 40)->first();
+        $node = Capsule::table('node')->where('id', 4)->first();
+
+        $this->assertTrue($result['accepted']);
+        $this->assertSame(100, (int) $user->u);
+        $this->assertSame(200, (int) $user->d);
+        $this->assertSame(30, (int) $user->transfer_total);
+        $this->assertSame(30, (int) $node->node_bandwidth);
+    }
+
     public function testTrafficReportAggregatesDuplicateUsersBeforeUpdatingCounters(): void
     {
         $this->seedNode(['id' => 6, 'traffic_rate' => 1]);
