@@ -15,21 +15,31 @@ use Telegram\Bot\Exceptions\TelegramSDKException;
  */
 final class IM
 {
-    public static function getClient(int $type): Discord|Slack|Telegram
+    /**
+     * @return class-string<Discord|Slack|Telegram>
+     */
+    public static function clientClass(int $type): string
     {
         return match ($type) {
-            1 => new Discord(),
-            2 => new Slack(),
-            default => new Telegram(),
+            1 => Slack::class,
+            2 => Discord::class,
+            default => Telegram::class,
         };
+    }
+
+    public static function getClient(int $type): Discord|Slack|Telegram
+    {
+        $clientClass = self::clientClass($type);
+
+        return new $clientClass();
     }
 
     /**
      * @throws GuzzleException
      * @throws TelegramSDKException
      */
-    public static function send(int $to, string $msg, int $type): void
+    public static function send(string|int $to, string $msg, int $type): void
     {
-        self::getClient($type)->send($to, $msg);
+        self::getClient($type)->send((string) $to, $msg);
     }
 }

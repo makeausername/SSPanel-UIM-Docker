@@ -81,7 +81,7 @@
                                     {foreach $subs as $sub}
                                     <tr>
                                         <td>{$sub->type}</td>
-                                        <td>{$sub->request_user_agent}</td>
+                                        <td>{$sub->request_user_agent|escape:'html'}</td>
                                         <td>{$sub->request_ip}</td>
                                         <td>{$sub->location}</td>
                                         <td>{$sub->request_time}</td>

@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\Paylist;
+use App\Services\DataTableRequest;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -47,7 +48,28 @@ final class PaylistController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $paylists = (new Paylist())->orderBy('id', 'desc')->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'userid', 'total', 'status', 'gateway', 'tradeno', 'datetime', 'invoice_id'],
+            'id'
+        );
+        $query = Paylist::query();
+        $total = (new Paylist())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('userid', $table->search)
+                    ->orWhere('invoice_id', $table->search)
+                    ->orWhere('tradeno', 'LIKE', "%{$table->search}%")
+                    ->orWhere('gateway', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $paylists = $query->paginate($table->length, '*', '', $table->page);
 
         foreach ($paylists as $paylist) {
             $paylist->status = $paylist->status();
@@ -55,6 +77,9 @@ final class PaylistController extends BaseController
         }
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'paylists' => $paylists,
         ]);
     }

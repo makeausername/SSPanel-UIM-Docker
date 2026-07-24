@@ -8,6 +8,7 @@ use App\Controllers\BaseController;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Services\AdminPermissionService;
+use App\Services\DataTableRequest;
 use App\Services\LLM;
 use App\Services\Notification;
 use App\Services\TicketReplyService;
@@ -238,7 +239,27 @@ final class TicketController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $tickets = (new Ticket())->orderBy('id', 'desc')->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'title', 'type', 'status', 'userid', 'datetime'],
+            'id'
+        );
+        $query = Ticket::query();
+        $total = (new Ticket())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('userid', $table->search)
+                    ->orWhere('title', 'LIKE', "%{$table->search}%")
+                    ->orWhere('status', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $tickets = $query->paginate($table->length, '*', '', $table->page);
         $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/ticket/1');
 
         foreach ($tickets as $ticket) {
@@ -262,6 +283,9 @@ final class TicketController extends BaseController
         }
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'tickets' => $tickets,
         ]);
     }

@@ -40,10 +40,11 @@
     {include file='datatable.tpl'}
 
     <script>
+        tableConfig.serverSide = true;
         tableConfig.ajax = {
             url: '/admin/money/ajax',
             type: 'POST',
-            dataSrc: 'money_logs'
+            dataSrc: 'money_logs.data'
         };
         tableConfig.order = [
             [0, 'desc']

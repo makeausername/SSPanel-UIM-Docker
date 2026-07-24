@@ -12,7 +12,9 @@ use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use function file_get_contents;
+use function preg_match;
 use function stream_context_create;
+use function trim;
 use function version_compare;
 use const VERSION;
 
@@ -42,16 +44,43 @@ final class SystemController extends BaseController
      */
     public function checkUpdate(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $latest_version = file_get_contents('https://ota.sspanel.io/get-latest-version', false, stream_context_create([
+        $latestVersion = self::normalizeLatestVersion(@file_get_contents(
+            'https://ota.sspanel.io/get-latest-version',
+            false,
+            stream_context_create([
             'http' => [
                 'timeout' => 3,
             ],
-        ]));
-        $is_upto_date = version_compare($latest_version, VERSION, '<=');
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ])));
+        if ($latestVersion === null) {
+            return $response->withStatus(503)->withJson([
+                'ret' => 0,
+                'msg' => '版本服务暂时不可用',
+            ]);
+        }
+        $is_upto_date = version_compare($latestVersion, VERSION, '<=');
 
         return $response->withJson([
+            'ret' => 1,
             'is_upto_date' => $is_upto_date,
-            'latest_version' => $latest_version,
+            'latest_version' => $latestVersion,
         ]);
+    }
+
+    public static function normalizeLatestVersion(string|false $value): ?string
+    {
+        if ($value === false) {
+            return null;
+        }
+
+        $version = trim($value);
+
+        return preg_match('/^\d{2,4}\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/D', $version) === 1
+            ? $version
+            : null;
     }
 }

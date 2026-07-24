@@ -7,6 +7,7 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Models\Product;
 use App\Services\AdminPermissionService;
+use App\Services\DataTableRequest;
 use App\Services\MonthlyPlanService;
 use App\Utils\Tools;
 use Exception;
@@ -424,7 +425,26 @@ final class ProductController extends BaseController
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $products = (new Product())->orderBy('id', 'desc')->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'type', 'name', 'price', 'status', 'create_time', 'update_time', 'sale_count', 'stock'],
+            'id'
+        );
+        $query = Product::query();
+        $total = (new Product())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('name', 'LIKE', "%{$table->search}%")
+                    ->orWhere('type', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $products = $query->paginate($table->length, '*', '', $table->page);
         $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/product/1');
 
         foreach ($products as $product) {
@@ -442,6 +462,9 @@ final class ProductController extends BaseController
         }
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'products' => $products,
         ]);
     }

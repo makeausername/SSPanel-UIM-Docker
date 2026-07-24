@@ -6,6 +6,7 @@ namespace App\Services\Mail;
 
 use App\Models\Config;
 use GuzzleHttp\Client;
+use RuntimeException;
 
 final class Postmark extends Base
 {
@@ -25,10 +26,12 @@ final class Postmark extends Base
                 'HtmlBody' => $body,
                 'MessageStream' => $configs['postmark_stream'],
             ],
+            'connect_timeout' => 5,
+            'timeout' => 15,
         ]);
 
         if ($res->getStatusCode() !== 200) {
-            throw new Exception($msg_response->getBody()->getContents());
+            throw new RuntimeException((string) $res->getBody());
         }
     }
 }

@@ -325,7 +325,7 @@ final class User extends Model
             $text .= '今日使用：' . $lastday_traffic;
 
             try {
-                IM::send((int) $this->im_value, $text, $this->im_type);
+                IM::send((string) $this->im_value, $text, $this->im_type);
             } catch (GuzzleException|TelegramSDKException $e) {
                 echo $e->getMessage() . PHP_EOL;
             }

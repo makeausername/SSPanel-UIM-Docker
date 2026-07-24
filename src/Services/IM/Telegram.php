@@ -25,7 +25,7 @@ final class Telegram extends Base
     /**
      * @throws TelegramSDKException
      */
-    public function send($to, $msg = ''): void
+    public function send(string|int $to, string $msg = ''): void
     {
         $msg = str_replace(
             [

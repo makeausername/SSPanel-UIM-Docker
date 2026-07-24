@@ -47,6 +47,10 @@ final class RequestBuilder
                 CURLOPT_POST => 1,
                 CURLOPT_POSTFIELDS => $body,
                 CURLOPT_RETURNTRANSFER => 1,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
             ],
         );
 

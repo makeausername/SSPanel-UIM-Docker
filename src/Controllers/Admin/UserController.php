@@ -12,8 +12,10 @@ use App\Models\UserMoneyLog;
 use App\Services\AdminPermissionService;
 use App\Services\ClientSessionService;
 use App\Services\DB;
+use App\Services\DataTableRequest;
 use App\Services\I18n;
 use App\Services\InvoiceAccountingService;
+use App\Services\UserPortService;
 use App\Utils\Hash;
 use App\Utils\Tools;
 use Exception;
@@ -277,6 +279,11 @@ final class UserController extends BaseController
                 return ['ret' => 0, 'msg' => '只有所有者可以修改其他管理员账号'];
             }
 
+            $requestedPort = filter_var($request->getParam('port'), FILTER_VALIDATE_INT);
+            if ($requestedPort === false || ! UserPortService::isAvailableForUser($requestedPort, $id)) {
+                return ['ret' => 0, 'msg' => '端口必须位于配置范围内且未被其他用户占用'];
+            }
+
             $passwordChanged = $request->getParam('pass') !== '' && $request->getParam('pass') !== null;
             if ($passwordChanged) {
                 $user->pass = Hash::passwordHash($request->getParam('pass'));
@@ -329,7 +336,7 @@ final class UserController extends BaseController
             $user->email = $request->getParam('email');
             $user->user_name = $request->getParam('user_name');
             $user->ref_by = $request->getParam('ref_by');
-            $user->port = $request->getParam('port');
+            $user->port = $requestedPort;
             $user->method = $request->getParam('method');
             $user->transfer_enable = Tools::autoBytesR($request->getParam('transfer_enable'));
             $user->node_group = $request->getParam('node_group');
@@ -419,11 +426,31 @@ final class UserController extends BaseController
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $users = (new User())->orderBy('id', 'desc')->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'user_name', 'email', 'money', 'ref_by', 'class', 'is_admin', 'is_banned', 'is_inactive', 'reg_date', 'class_expire'],
+            'id'
+        );
+        $query = User::query();
+        $total = (new User())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('user_name', 'LIKE', "%{$table->search}%")
+                    ->orWhere('email', 'LIKE', "%{$table->search}%")
+                    ->orWhere('remark', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $users = $query->paginate($table->length, '*', '', $table->page);
 
         $canMutate = AdminPermissionService::allows($this->user, 'PUT', '/admin/user/1');
 
-        $users = $users->map(static function (User $user) use ($canMutate): array {
+        $users->getCollection()->transform(static function (User $user) use ($canMutate): array {
             $user->op = $canMutate ? '<button class="btn btn-red" id="delete-user-' . $user->id . '"
             onclick="deleteUser(' . $user->id . ')">删除</button>
             <a class="btn btn-primary" href="/admin/user/' . $user->id . '/edit">编辑</a>' : '';
@@ -455,9 +482,12 @@ final class UserController extends BaseController
                 'reg_date',
                 'class_expire',
             ]);
-        })->values();
+        });
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'users' => $users,
         ]);
     }

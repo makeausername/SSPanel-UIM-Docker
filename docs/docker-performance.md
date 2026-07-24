@@ -7,7 +7,7 @@
 ## 已内置的优化
 
 - PHP-FPM 使用可通过环境变量调整的进程池配置。
-- PHP 运行时默认限制为 `memory_limit=256M`、上传和 POST 限制为 `50M`、最长执行时间为 `300` 秒。
+- PHP 运行时默认限制为 `memory_limit=256M`、上传和 POST 限制为 `2M`、最长执行时间为 `300` 秒。
 - OPcache 已启用，默认按生产环境优化。
 - MariaDB 使用 UTF-8、较高连接数和较短空闲超时。
 - Redis 启用 RDB 快照和 AOF everysec 持久化。
@@ -54,8 +54,8 @@ docker compose up -d app scheduler
 
 ```ini
 memory_limit = 256M
-upload_max_filesize = 50M
-post_max_size = 50M
+upload_max_filesize = 2M
+post_max_size = 2M
 max_execution_time = 300
 max_input_time = 300
 ```

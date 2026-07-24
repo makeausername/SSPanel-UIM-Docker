@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\InviteSubscriptionReward;
+use App\Services\DataTableRequest;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -52,7 +53,28 @@ final class PaybackController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $paybacks = (new InviteSubscriptionReward())->orderBy('id', 'desc')->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'inviter_user_id', 'invited_user_id', 'qualifying_order_id', 'invoice_id', 'applied_order_id', 'reward_days', 'status', 'create_time', 'apply_time'],
+            'id'
+        );
+        $query = InviteSubscriptionReward::query();
+        $total = (new InviteSubscriptionReward())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('inviter_user_id', $table->search)
+                    ->orWhere('invited_user_id', $table->search)
+                    ->orWhere('invoice_id', $table->search)
+                    ->orWhere('status', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $paybacks = $query->paginate($table->length, '*', '', $table->page);
 
         foreach ($paybacks as $payback) {
             $payback->status_text = match ((string) $payback->status) {
@@ -68,6 +90,9 @@ final class PaybackController extends BaseController
         }
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'paybacks' => $paybacks,
         ]);
     }

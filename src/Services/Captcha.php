@@ -37,7 +37,7 @@ final class Captcha
     public static function verify($param): bool
     {
         $result = false;
-        $client = new Client();
+        $client = new Client(['connect_timeout' => 3, 'timeout' => 10]);
 
         switch (Config::obtain('captcha_provider')) {
             case 'turnstile':

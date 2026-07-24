@@ -26,7 +26,12 @@ final class DetectLogController extends BaseController
             return $response->withRedirect('/user');
         }
 
-        $logs = (new DetectLog())->orderBy('id', 'desc')->where('user_id', $this->user->id)->get();
+        $page = max(1, (int) $request->getQueryParam('page', 1));
+        $logPage = (new DetectLog())
+            ->orderBy('id', 'desc')
+            ->where('user_id', $this->user->id)
+            ->paginate(50, '*', 'page', $page);
+        $logs = $logPage->items();
 
         foreach ($logs as $log) {
             $log->node_name = $log->nodeName();
@@ -40,6 +45,8 @@ final class DetectLogController extends BaseController
 
         return $response->write($this->view()
             ->assign('logs', $logs)
+            ->assign('current_page', $logPage->currentPage())
+            ->assign('last_page', $logPage->lastPage())
             ->fetch('user/detect/log.tpl'));
     }
 }

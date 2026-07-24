@@ -841,10 +841,28 @@ create_admin() {
     printf '%s\n' "$output" | grep -Fq '创建成功' \
         || die "管理员创建命令未返回成功结果，首次安装不能继续。"
 
+    ensure_admin_owner
+
     admin_count="$(run_mariadb_root_sql "SELECT COUNT(*) FROM \`user\` WHERE email = '${ADMIN_EMAIL}' AND is_admin = 1;" | tr -d '[:space:]')" \
         || die "无法验证管理员数据库记录。"
     [ "$admin_count" = "1" ] || die "管理员数据库记录验证失败，匹配数量为 ${admin_count:-0}。"
     success "管理员账号已创建。"
+}
+
+ensure_admin_owner() {
+    local output
+    local owner_count
+
+    if ! output="$(run_init_command Tool ensureAdminOwner 2>&1)"; then
+        printf '%s\n' "$output" >&2
+        die "无法确保至少存在一个有效的 owner 管理员。"
+    fi
+    printf '%s\n' "$output"
+
+    owner_count="$(run_mariadb_root_sql "SELECT COUNT(*) FROM \`user\` WHERE is_admin = 1 AND is_banned = 0 AND admin_role = 'owner';" | tr -d '[:space:]')" \
+        || die "无法验证 owner 管理员账号。"
+    [[ "$owner_count" =~ ^[0-9]+$ ]] && [ "$owner_count" -gt 0 ] \
+        || die "owner 管理员账号验证失败。"
 }
 
 ensure_admin_for_resume() {
@@ -860,6 +878,7 @@ ensure_admin_for_resume() {
             || die "无法读取现有管理员账号。"
         valid_email "$ADMIN_EMAIL" || ADMIN_EMAIL="$existing_admin_email"
         success "检测到现有管理员账号，跳过重复创建。"
+        ensure_admin_owner
         write_recovery_credentials_file
         return 0
     fi
@@ -973,7 +992,7 @@ latest_migration_version() {
 verify_production_readiness() {
     local latest_db_version
     local current_db_version
-    local admin_count
+    local owner_count
     local internal_health
     local service
 
@@ -1012,10 +1031,10 @@ verify_production_readiness() {
     [ "$current_db_version" = "$latest_db_version" ] \
         || die "生产就绪检查失败：数据库版本 ${current_db_version:-unknown}，预期 ${latest_db_version}。"
 
-    admin_count="$(run_mariadb_root_sql "SELECT COUNT(*) FROM \`user\` WHERE is_admin = 1;" | tr -d '[:space:]')" \
+    owner_count="$(run_mariadb_root_sql "SELECT COUNT(*) FROM \`user\` WHERE is_admin = 1 AND is_banned = 0 AND admin_role = 'owner';" | tr -d '[:space:]')" \
         || die "生产就绪检查失败：无法检查管理员账号。"
-    [[ "$admin_count" =~ ^[0-9]+$ ]] && [ "$admin_count" -gt 0 ] \
-        || die "生产就绪检查失败：没有可用的管理员账号。"
+    [[ "$owner_count" =~ ^[0-9]+$ ]] && [ "$owner_count" -gt 0 ] \
+        || die "生产就绪检查失败：没有可用的 owner 管理员账号。"
 
     internal_health="$(docker compose exec -T nginx wget -q -O - http://127.0.0.1/healthz | tr -d '\r\n')" \
         || die "生产就绪检查失败：应用内部健康检查无法访问。"
@@ -1213,6 +1232,7 @@ resume_installation() {
 
     show_step 5 "更新数据库结构"
     run_init_command Migration latest
+    run_init_command Tool importSetting
     update_geoip_database
 
     show_step 6 "确认管理员账号"

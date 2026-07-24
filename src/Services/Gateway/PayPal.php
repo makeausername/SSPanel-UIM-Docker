@@ -16,6 +16,7 @@ use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use Srmklive\PayPal\Services\PayPal as PayPalClient;
 use Throwable;
+use UnexpectedValueException;
 
 final class PayPal extends Base
 {
@@ -91,7 +92,7 @@ final class PayPal extends Base
                 'CNY',
                 Config::obtain('paypal_currency')
             );
-        } catch (GuzzleException|RedisException) {
+        } catch (GuzzleException|RedisException|UnexpectedValueException) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '汇率获取失败',

@@ -9,8 +9,10 @@ use App\Models\Link;
 use App\Models\Node;
 use App\Models\NodeToken;
 use App\Models\User as ModelsUser;
+use App\Services\AdminPermissionService;
 use App\Services\GeoIP2;
 use App\Services\NodeEnrollmentService;
+use App\Services\UserPortService;
 use App\Utils\Hash;
 use App\Utils\Tools;
 use danielsreichenbach\GeoIP2Update\Client;
@@ -77,7 +79,7 @@ EOL;
 
     public function resetSetting(): void
     {
-        $settings = Config::all();
+        $settings = (new Config())->lazyById(500);
 
         foreach ($settings as $setting) {
             $setting->value = $setting->default;
@@ -134,7 +136,7 @@ EOL;
             }
         }
         // 检查移除
-        $db_settings = Config::all();
+        $db_settings = (new Config())->lazyById(500);
 
         foreach ($db_settings as $db_setting) {
             if (! in_array($db_setting->item, $config)) {
@@ -158,7 +160,7 @@ EOL;
 
     public function resetNodePassword(): void
     {
-        $nodes = Node::all();
+        $nodes = (new Node())->lazyById(500);
 
         foreach ($nodes as $node) {
             $node->password = Tools::genRandomChar(32);
@@ -170,7 +172,7 @@ EOL;
 
     public function resetNodeBandwidth(): void
     {
-        $nodes = Node::all();
+        $nodes = (new Node())->lazyById(500);
 
         foreach ($nodes as $node) {
             $node->node_bandwidth = 0;
@@ -185,23 +187,8 @@ EOL;
      */
     public function resetPort(): void
     {
-        $users = ModelsUser::all();
-
-        if (count($users) === 0 || count($users) >= 65535) {
-            echo '无效的用户数量' . PHP_EOL;
-            return;
-        }
-
-        (new ModelsUser())->update([
-            'port' => 0,
-        ]);
-
-        foreach ($users as $user) {
-            $user->port = Tools::getSsPort();
-            $user->save();
-        }
-
-        echo '已重置所有用户端口' . PHP_EOL;
+        $updated = UserPortService::reassignAll();
+        echo '已重置用户端口：' . $updated . PHP_EOL;
     }
 
     /**
@@ -233,7 +220,7 @@ EOL;
      */
     public function resetPassword(): void
     {
-        $users = ModelsUser::all();
+        $users = (new ModelsUser())->lazyById(500);
 
         foreach ($users as $user) {
             $user->pass = Hash::passwordHash(Tools::genRandomChar(32));
@@ -248,7 +235,7 @@ EOL;
      */
     public function resetPasswd(): void
     {
-        $users = ModelsUser::all();
+        $users = (new ModelsUser())->lazyById(500);
 
         foreach ($users as $user) {
             $user->passwd = Tools::genRandomChar(16);
@@ -273,7 +260,7 @@ EOL;
      */
     public function generateUUID(): void
     {
-        $users = ModelsUser::all();
+        $users = (new ModelsUser())->lazyById(500);
 
         foreach ($users as $user) {
             $user->uuid = Uuid::uuid4();
@@ -288,7 +275,7 @@ EOL;
      */
     public function generateApiToken(): void
     {
-        $users = ModelsUser::all();
+        $users = (new ModelsUser())->lazyById(500);
 
         foreach ($users as $user) {
             $user->api_token = Tools::genRandomChar(32);
@@ -305,7 +292,7 @@ EOL;
     {
         fwrite(STDOUT, '请输入要设置的主题名称: ');
         $theme = trim(fgets(STDIN));
-        $users = ModelsUser::all();
+        $users = (new ModelsUser())->lazyById(500);
 
         foreach ($users as $user) {
             $user->theme = $theme;
@@ -322,7 +309,7 @@ EOL;
     {
         fwrite(STDOUT, 'Please input the new locale: ');
         $locale = trim(fgets(STDIN));
-        $users = ModelsUser::all();
+        $users = (new ModelsUser())->lazyById(500);
 
         foreach ($users as $user) {
             $user->locale = $locale;
@@ -368,12 +355,12 @@ EOL;
             $user->passwd = Tools::genRandomChar(16);
             $user->uuid = Uuid::uuid4();
             $user->api_token = Tools::genRandomChar(32);
-            $user->port = Tools::getSsPort();
             $user->u = 0;
             $user->d = 0;
             $user->transfer_enable = 0;
             $user->ref_by = 0;
             $user->is_admin = 1;
+            $user->admin_role = 'administrator';
             $user->reg_date = date('Y-m-d H:i:s');
             $user->money = 0;
             $user->im_type = 0;
@@ -384,7 +371,8 @@ EOL;
             $user->theme = $_ENV['theme'];
             $user->locale = $_ENV['locale'];
 
-            if ($user->save()) {
+            if (UserPortService::assignAndSave($user)) {
+                AdminPermissionService::ensureActiveOwner();
                 echo '创建成功，请在主页登录' . PHP_EOL;
             } else {
                 echo '创建失败，请检查数据库配置' . PHP_EOL;
@@ -392,6 +380,20 @@ EOL;
         } else {
             echo '已取消创建' . PHP_EOL;
         }
+    }
+
+    /**
+     * Ensure a fresh or resumed installation always has an active owner.
+     */
+    public function ensureAdminOwner(): void
+    {
+        $owner = AdminPermissionService::ensureActiveOwner();
+
+        if ($owner === null) {
+            throw new Exception('No active administrator is available to promote to owner.');
+        }
+
+        echo 'Active owner is ready: user #' . $owner->id . PHP_EOL;
     }
 
     public function generateXNodeEnrollToken(): void

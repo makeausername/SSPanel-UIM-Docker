@@ -7,6 +7,7 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Models\Docs;
 use App\Services\AdminPermissionService;
+use App\Services\DataTableRequest;
 use App\Services\LLM;
 use App\Utils\Tools;
 use Exception;
@@ -214,7 +215,18 @@ final class DocsController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $docs = (new Docs())->orderBy('id')->get();
+        $table = DataTableRequest::from($request, ['id', 'status', 'sort', 'date', 'title'], 'id');
+        $query = Docs::query();
+        $total = (new Docs())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('title', 'LIKE', "%{$table->search}%")
+                    ->orWhere('content', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        $docs = $query->paginate($table->length, '*', '', $table->page);
         $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/docs/1');
 
         foreach ($docs as $doc) {
@@ -226,6 +238,9 @@ final class DocsController extends BaseController
         }
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'docs' => $docs,
         ]);
     }

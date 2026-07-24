@@ -74,7 +74,8 @@ final class Cron
             ->where('is_admin', 0)
             ->whereNotNull('unpaid_delete_at')
             ->where('unpaid_delete_at', '<=', date('Y-m-d H:i:s'))
-            ->get(['id']);
+            ->select('id')
+            ->lazyById(500);
         $deleted = 0;
         $protected = 0;
         $failed = 0;
@@ -224,7 +225,10 @@ final class Cron
 
     public static function expirePaidUserAccount(): void
     {
-        $paidUsers = (new User())->where('class', '>', 0)->get();
+        $paidUsers = (new User())
+            ->where('class', '>', 0)
+            ->where('class_expire', '<', date('Y-m-d H:i:s'))
+            ->lazyById(500);
 
         foreach ($paidUsers as $user) {
             if (strtotime($user->class_expire) < time()) {
@@ -303,7 +307,7 @@ final class Cron
 
     public static function removeInactiveUserLinkAndInvite(): void
     {
-        $inactive_users = (new User())->where('is_inactive', 1)->get();
+        $inactive_users = (new User())->where('is_inactive', 1)->lazyById(500);
 
         foreach ($inactive_users as $user) {
             $user->removeLink();
@@ -331,7 +335,7 @@ final class Cron
     {
         $users = (new User())->where('auto_reset_day', (int) date('d'))
             ->where('auto_reset_bandwidth', '>', 0)
-            ->get();
+            ->lazyById(500);
 
         foreach ($users as $user) {
             $quotaText = (float) $user->auto_reset_bandwidth >= MonthlyPlanService::UNLIMITED_BANDWIDTH_GB
@@ -364,10 +368,13 @@ final class Cron
     public static function sendDailyFinanceMail(): void
     {
         $today = strtotime('00:00:00');
-        $paylists = (new Paylist())->where('status', 1)
-            ->whereBetween('datetime', [strtotime('-1 day', $today), $today])->get();
+        $query = (new Paylist())->where('status', 1)
+            ->whereBetween('datetime', [strtotime('-1 day', $today), $today]);
+        $paymentCount = (clone $query)->count();
+        $paymentTotal = (clone $query)->sum('total');
+        $paylists = $query->orderBy('id')->limit(1000)->get();
 
-        if (count($paylists) > 0) {
+        if ($paymentCount > 0) {
             $text_html = '<table><tr><td>金额</td><td>用户ID</td><td>用户名</td><td>充值时间</td></tr>';
 
             foreach ($paylists as $paylist) {
@@ -381,7 +388,10 @@ final class Cron
             }
 
             $text_html .= '</table>';
-            $text_html .= '<br>昨日总收入笔数：' . count($paylists) . '<br>昨日总收入金额：' . $paylists->sum('total');
+            if ($paymentCount > count($paylists)) {
+                $text_html .= '<br>明细仅显示前 1000 笔。';
+            }
+            $text_html .= '<br>昨日总收入笔数：' . $paymentCount . '<br>昨日总收入金额：' . $paymentTotal;
 
             $text_html = str_replace([
                 '<table>',
@@ -414,11 +424,10 @@ final class Cron
     public static function sendWeeklyFinanceMail(): void
     {
         $today = strtotime('00:00:00');
-        $paylists = (new Paylist())->where('status', 1)
-            ->whereBetween('datetime', [strtotime('-1 week', $today), $today])
-            ->get();
-
-        $text_html = '<br>上周总收入笔数：' . count($paylists) . '<br>上周总收入金额：' . $paylists->sum('total');
+        $query = (new Paylist())->where('status', 1)
+            ->whereBetween('datetime', [strtotime('-1 week', $today), $today]);
+        $text_html = '<br>上周总收入笔数：' . (clone $query)->count()
+            . '<br>上周总收入金额：' . $query->sum('total');
         echo 'Sending weekly finance email to admin user' . PHP_EOL;
 
         try {
@@ -437,11 +446,10 @@ final class Cron
     public static function sendMonthlyFinanceMail(): void
     {
         $today = strtotime('00:00:00');
-        $paylists = (new Paylist())->where('status', 1)
-            ->whereBetween('datetime', [strtotime('-1 month', $today), $today])
-            ->get();
-
-        $text_html = '<br>上月总收入笔数：' . count($paylists) . '<br>上月总收入金额：' . $paylists->sum('total');
+        $query = (new Paylist())->where('status', 1)
+            ->whereBetween('datetime', [strtotime('-1 month', $today), $today]);
+        $text_html = '<br>上月总收入笔数：' . (clone $query)->count()
+            . '<br>上月总收入金额：' . $query->sum('total');
         echo 'Sending monthly finance email to admin user' . PHP_EOL;
 
         try {
@@ -459,7 +467,7 @@ final class Cron
 
     public static function sendPaidUserUsageLimitNotification(): void
     {
-        $paidUsers = (new User())->where('class', '>', 0)->get();
+        $paidUsers = (new User())->where('class', '>', 0)->lazyById(500);
 
         foreach ($paidUsers as $user) {
             $user_traffic_left = $user->transfer_enable - $user->u - $user->d;
@@ -505,7 +513,7 @@ final class Cron
 
     public static function sendDailyTrafficReport(): void
     {
-        $users = (new User())->whereIn('daily_mail_enable', [1, 2])->get();
+        $users = (new User())->whereIn('daily_mail_enable', [1, 2])->lazyById(500);
         $ann_latest_raw = (new Ann())->where('status', '>', 0)
             ->orderBy('status', 'desc')
             ->orderBy('sort')

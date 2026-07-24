@@ -122,10 +122,11 @@
             locale: "zh"
         });
 
+        tableConfig.serverSide = true;
         tableConfig.ajax = {
             url: '/admin/coupon/ajax',
             type: 'POST',
-            dataSrc: 'coupons'
+            dataSrc: 'coupons.data'
         };
         tableConfig.order = [
             [1, 'desc']

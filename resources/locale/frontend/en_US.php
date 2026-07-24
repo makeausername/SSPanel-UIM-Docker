@@ -141,6 +141,7 @@ return [
             'mfa_rate_limited' => 'Too many multi-factor authentication attempts. Try again later',
             'oauth_failed' => 'OAuth request failed',
             'password_reset_email' => 'If the account exists, a password reset link will be sent to its email address',
+            'port_pool_exhausted' => 'Registration is temporarily unavailable because the user port pool is full',
             'registration_closed' => 'Registration is currently closed',
             'reset_link_invalid' => 'The reset link is invalid or expired',
             'terms_required' => 'Accept the terms of service to continue',

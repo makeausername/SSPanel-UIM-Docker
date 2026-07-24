@@ -42,7 +42,12 @@ final class TicketController extends BaseController
             return $response->withRedirect('/user');
         }
 
-        $tickets = (new Ticket())->where('userid', $this->user->id)->orderBy('datetime', 'desc')->get();
+        $page = max(1, (int) $request->getQueryParam('page', 1));
+        $ticketPage = (new Ticket())
+            ->where('userid', $this->user->id)
+            ->orderBy('datetime', 'desc')
+            ->paginate(30, '*', 'page', $page);
+        $tickets = $ticketPage->items();
 
         foreach ($tickets as $ticket) {
             $ticket->status = self::ticketStatus((string) $ticket->status);
@@ -53,6 +58,8 @@ final class TicketController extends BaseController
         return $response->write(
             $this->view()
                 ->assign('tickets', $tickets)
+                ->assign('current_page', $ticketPage->currentPage())
+                ->assign('last_page', $ticketPage->lastPage())
                 ->fetch('user/ticket/index.tpl')
         );
     }

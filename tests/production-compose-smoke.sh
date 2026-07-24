@@ -90,6 +90,7 @@ docker compose exec -T mariadb sh -c \
         ADD COLUMN IF NOT EXISTS \`ga_enable\` tinyint(1) unsigned NOT NULL DEFAULT 0;
     "'
 docker compose exec -T app php xcat Tool createAdmin smoke-admin@example.invalid SmokeAdminPass1234
+docker compose exec -T app php xcat Tool ensureAdminOwner
 docker compose exec -T app sh -c 'date +%s > storage/framework/geoip.last_success'
 docker compose up -d scheduler
 
@@ -147,15 +148,16 @@ database_version="$(
     exit 1
 }
 
-admin_count="$(
+owner_count="$(
     docker compose exec -T mariadb sh -c \
         'exec mariadb --batch --raw --skip-column-names -u root --password="$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE" -e "
-            SELECT COUNT(*) FROM \`user\` WHERE is_admin = 1;
+            SELECT COUNT(*) FROM \`user\`
+            WHERE is_admin = 1 AND is_banned = 0 AND admin_role = '\''owner'\'';
         "' \
         | tr -d '[:space:]'
 )"
-[ "$admin_count" -gt 0 ] || {
-    printf 'ERROR: no administrator was created.\n' >&2
+[ "$owner_count" -gt 0 ] || {
+    printf 'ERROR: no active owner administrator was created.\n' >&2
     exit 1
 }
 

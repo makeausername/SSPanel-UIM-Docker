@@ -49,7 +49,7 @@ final class AdminSecurityRegressionTest extends TestCase
 
         $response = (new UserController())->ajax($this->request('POST'), $this->response(), []);
         $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
-        $row = $payload['users'][0];
+        $row = $payload['users']['data'][0];
 
         $this->assertSame([
             'op', 'id', 'user_name', 'email', 'money', 'ref_by', 'transfer_enable',
@@ -112,9 +112,20 @@ final class AdminSecurityRegressionTest extends TestCase
         ]);
 
         $giftResponse = (new GiftCardController())->ajax($this->request('POST'), $this->response(), []);
-        $gift = json_decode((string) $giftResponse->getBody(), true, 512, JSON_THROW_ON_ERROR)['giftcards'][0];
+        $gift = json_decode((string) $giftResponse->getBody(), true, 512, JSON_THROW_ON_ERROR)['giftcards']['data'][0];
         $couponResponse = (new CouponController())->ajax($this->request('POST'), $this->response(), []);
-        $coupon = json_decode((string) $couponResponse->getBody(), true, 512, JSON_THROW_ON_ERROR)['coupons'][0];
+        $coupon = json_decode((string) $couponResponse->getBody(), true, 512, JSON_THROW_ON_ERROR)['coupons']['data'][0];
+        $couponSearchResponse = (new CouponController())->ajax(
+            $this->request('POST', ['search' => ['value' => 'fixed']]),
+            $this->response(),
+            []
+        );
+        $couponSearch = json_decode(
+            (string) $couponSearchResponse->getBody(),
+            true,
+            512,
+            JSON_THROW_ON_ERROR
+        );
 
         $this->assertSame('••••••••', $gift['card']);
         $this->assertSame('', $gift['op']);
@@ -122,6 +133,7 @@ final class AdminSecurityRegressionTest extends TestCase
         $this->assertSame('', $coupon['op']);
         $this->assertArrayNotHasKey('content', $coupon);
         $this->assertArrayNotHasKey('limit', $coupon);
+        $this->assertSame(1, $couponSearch['recordsFiltered']);
     }
 
     public function testSensitiveModelsHideCredentialsByDefault(): void

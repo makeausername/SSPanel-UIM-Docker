@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Paylist;
 use App\Services\BalancePaymentService;
 use App\Services\FrontendI18n;
+use App\Services\DataTableRequest;
 use App\Services\Payment;
 use App\Utils\Tools;
 use Exception;
@@ -106,7 +107,26 @@ final class InvoiceController extends BaseController
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $invoices = (new Invoice())->orderBy('id', 'desc')->where('user_id', $this->user->id)->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'order_id', 'price', 'status', 'create_time', 'update_time', 'pay_time'],
+            'id'
+        );
+        $query = (new Invoice())->where('user_id', $this->user->id);
+        $total = (clone $query)->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('order_id', $table->search)
+                    ->orWhere('status', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $invoices = $query->paginate($table->length, '*', '', $table->page);
 
         foreach ($invoices as $invoice) {
             $invoice->op = '<a class="btn btn-primary" href="/user/invoice/' . $invoice->id . '/view">'
@@ -118,6 +138,9 @@ final class InvoiceController extends BaseController
         }
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'invoices' => $invoices,
         ]);
     }

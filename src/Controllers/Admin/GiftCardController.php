@@ -7,13 +7,21 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Models\GiftCard;
 use App\Services\AdminPermissionService;
+use App\Services\DataTableRequest;
+use App\Services\GiftCardService;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
-use function time;
+use function filter_var;
+use function htmlspecialchars;
+use function implode;
+use function in_array;
 use const PHP_EOL;
+use const FILTER_VALIDATE_INT;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 
 final class GiftCardController extends BaseController
 {
@@ -70,49 +78,47 @@ final class GiftCardController extends BaseController
 
     public function add(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $card_number = $request->getParam('card_number') ?? 0;
-        $card_value = $request->getParam('card_value') ?? 0;
-        $card_length = $request->getParam('card_length') ?? 0;
-        $card_added = '';
+        $cardNumber = filter_var($request->getParam('card_number'), FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1, 'max_range' => GiftCardService::MAX_BATCH_SIZE],
+        ]);
+        $cardValue = filter_var($request->getParam('card_value'), FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1, 'max_range' => GiftCardService::MAX_VALUE],
+        ]);
+        $cardLength = filter_var($request->getParam('card_length'), FILTER_VALIDATE_INT);
 
-        if ($card_number === '' || $card_number <= 0) {
+        if ($cardNumber === false) {
             return $response->withJson([
                 'ret' => 0,
-                'msg' => '生成数量不能为空或小于0',
+                'msg' => '单次生成数量必须为 1-' . GiftCardService::MAX_BATCH_SIZE . ' 的整数',
             ]);
         }
 
-        if ($card_value === '' || $card_value <= 0) {
+        if ($cardValue === false) {
             return $response->withJson([
                 'ret' => 0,
-                'msg' => '礼品卡面值不能为空或小于0',
+                'msg' => '礼品卡面值必须为 1-' . GiftCardService::MAX_VALUE . ' 的整数',
             ]);
         }
 
-        if ($card_length === '' || $card_length <= 0) {
+        if ($cardLength === false || ! in_array($cardLength, GiftCardService::ALLOWED_LENGTHS, true)) {
             return $response->withJson([
                 'ret' => 0,
-                'msg' => '礼品卡长度不能为空或小于0',
+                'msg' => '礼品卡长度无效',
             ]);
         }
 
-        for ($i = 0; $i < $card_number; $i++) {
-            $card = Tools::genRandomChar((int) $card_length);
-            // save to database
-            $giftcard = new GiftCard();
-            $giftcard->card = $card;
-            $giftcard->balance = $card_value;
-            $giftcard->create_time = time();
-            $giftcard->status = 0;
-            $giftcard->use_time = 0;
-            $giftcard->use_user = 0;
-            $giftcard->save();
-            $card_added .= $card . PHP_EOL;
+        try {
+            $codes = GiftCardService::createBatch($cardNumber, $cardValue, $cardLength);
+        } catch (\Throwable) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '礼品卡生成失败，请稍后重试',
+            ]);
         }
 
         return $response->withJson([
             'ret' => 1,
-            'msg' => '添加成功' . PHP_EOL . $card_added,
+            'msg' => '添加成功' . PHP_EOL . implode(PHP_EOL, $codes),
         ]);
     }
 
@@ -138,14 +144,35 @@ final class GiftCardController extends BaseController
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $giftcards = (new GiftCard())->orderBy('id', 'desc')->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'card', 'balance', 'create_time', 'status', 'use_time', 'use_user'],
+            'id'
+        );
+        $query = GiftCard::query();
+        $total = (new GiftCard())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('card', 'LIKE', "%{$table->search}%")
+                    ->orWhere('use_user', $table->search);
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $giftcards = $query->paginate($table->length, '*', '', $table->page);
         $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/giftcard/1');
         $canViewCodes = AdminPermissionService::role($this->user) !== 'read_only';
 
-        $giftcards = $giftcards->map(static function (GiftCard $giftcard) use ($canMutate, $canViewCodes): array {
+        $giftcards->getCollection()->transform(static function (GiftCard $giftcard) use ($canMutate, $canViewCodes): array {
             $giftcard->op = $canMutate ? '<button class="btn btn-red" id="delete-gift-card-' . $giftcard->id . '"
         onclick="deleteGiftCard(' . $giftcard->id . ')">删除</button>' : '';
-            $giftcard->card = $canViewCodes ? $giftcard->card : '••••••••';
+            $giftcard->card = $canViewCodes
+                ? htmlspecialchars((string) $giftcard->card, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                : '••••••••';
             $giftcard->status = $giftcard->status();
             $giftcard->create_time = Tools::toDateTime((int) $giftcard->create_time);
             $giftcard->use_time = Tools::toDateTime((int) $giftcard->use_time);
@@ -160,9 +187,12 @@ final class GiftCardController extends BaseController
                 'use_time',
                 'use_user',
             ]);
-        })->values();
+        });
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'giftcards' => $giftcards,
         ]);
     }

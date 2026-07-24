@@ -82,14 +82,18 @@ final class UserController extends BaseController
      */
     public function announcement(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $anns = (new Ann())->where('status', '>', 0)
+        $page = max(1, (int) $request->getQueryParam('page', 1));
+        $annPage = (new Ann())->where('status', '>', 0)
             ->orderBy('status', 'desc')
             ->orderBy('sort')
-            ->orderBy('date', 'desc')->get();
+            ->orderBy('date', 'desc')
+            ->paginate(30, '*', 'page', $page);
 
         return $response->write(
             $this->view()
-                ->assign('anns', $anns)
+                ->assign('anns', $annPage->items())
+                ->assign('current_page', $annPage->currentPage())
+                ->assign('last_page', $annPage->lastPage())
                 ->fetch('user/announcement.tpl')
         );
     }

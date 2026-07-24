@@ -11,6 +11,7 @@ use App\Models\Paylist;
 use App\Models\User;
 use App\Services\AdminPermissionService;
 use App\Services\DB;
+use App\Services\DataTableRequest;
 use App\Services\InvoiceRefundService;
 use App\Services\OrderReservationService;
 use App\Utils\Tools;
@@ -189,7 +190,28 @@ final class OrderController extends BaseController
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $orders = (new Order())->orderBy('id', 'desc')->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'user_id', 'product_id', 'product_type', 'product_name', 'coupon', 'price', 'status', 'create_time', 'update_time'],
+            'id'
+        );
+        $query = Order::query();
+        $total = (new Order())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('user_id', $table->search)
+                    ->orWhere('product_name', 'LIKE', "%{$table->search}%")
+                    ->orWhere('coupon', 'LIKE', "%{$table->search}%")
+                    ->orWhere('status', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $orders = $query->paginate($table->length, '*', '', $table->page);
         $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/order/1');
 
         foreach ($orders as $order) {
@@ -212,12 +234,20 @@ final class OrderController extends BaseController
                 ENT_QUOTES | ENT_SUBSTITUTE,
                 'UTF-8'
             );
+            $order->coupon = htmlspecialchars(
+                (string) $order->coupon,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
             $order->status = $order->status();
             $order->create_time = Tools::toDateTime($order->create_time);
             $order->update_time = Tools::toDateTime($order->update_time);
         }
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'orders' => $orders,
         ]);
     }
