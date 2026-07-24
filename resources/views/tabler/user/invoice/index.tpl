@@ -42,10 +42,11 @@
     {include file='datatable_frontend.tpl'}
 
     <script>
+        tableConfig.serverSide = true;
         tableConfig.ajax = {
             url: '/user/invoice/ajax',
             type: 'POST',
-            dataSrc: 'invoices'
+            dataSrc: 'invoices.data'
         };
         tableConfig.order = [
             [1, 'desc']

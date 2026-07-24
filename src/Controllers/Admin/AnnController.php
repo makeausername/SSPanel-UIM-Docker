@@ -10,6 +10,7 @@ use App\Models\Config;
 use App\Models\EmailQueue;
 use App\Models\User;
 use App\Services\AdminPermissionService;
+use App\Services\DataTableRequest;
 use App\Services\Notification;
 use App\Utils\Tools;
 use Exception;
@@ -109,7 +110,7 @@ final class AnnController extends BaseController
         if ($email_notify) {
             $users = (new User())->where('class', '>=', $email_notify_class)
                 ->where('is_banned', '=', 0)
-                ->get();
+                ->lazyById(500);
             $subject = $_ENV['appName'] . ' - 新公告发布';
 
             foreach ($users as $user) {
@@ -248,7 +249,15 @@ final class AnnController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $anns = (new Ann())->orderBy('id')->get();
+        $table = DataTableRequest::from($request, ['id', 'status', 'sort', 'date'], 'id');
+        $query = Ann::query();
+        $total = (new Ann())->count();
+        if ($table->search !== '') {
+            $query->where('content', 'LIKE', "%{$table->search}%");
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        $anns = $query->paginate($table->length, '*', '', $table->page);
         $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/announcement/1');
 
         foreach ($anns as $ann) {
@@ -264,6 +273,9 @@ final class AnnController extends BaseController
         }
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'anns' => $anns,
         ]);
     }

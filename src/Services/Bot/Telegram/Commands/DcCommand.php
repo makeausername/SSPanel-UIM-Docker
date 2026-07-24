@@ -52,23 +52,25 @@ final class DcCommand extends Command
                 $profile_photos['total_count'] > 0 &&
                 $message->from->username !== null
             ) {
-                $client = new Client();
+                $client = new Client(['connect_timeout' => 5, 'timeout' => 10]);
 
                 $t_me_data = $client->get('https://t.me/' . $message->from->username)->getBody()->getContents();
-                preg_match(
+                $hasPhoto = preg_match(
                     '/<img class="tgme_page_photo_image" src="([^<>]+)">/',
                     $t_me_data,
                     $profile_photo_url
                 );
-                preg_match(
+                $hasDc = $hasPhoto === 1 && preg_match(
                     '/https:\/\/cdn([1-5])\.cdn-telegram\.org\//',
-                    $profile_photo_url[1],
+                    $profile_photo_url[1] ?? '',
                     $dc
-                );
+                ) === 1;
 
-                $text = [
-                    'Your account is located in DC' . $dc[1],
-                ];
+                if ($hasDc) {
+                    $text = [
+                        'Your account is located in DC' . $dc[1],
+                    ];
+                }
             }
             // 回送信息
             $this->replyWithMessage(

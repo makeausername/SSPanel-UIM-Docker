@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\UserCoupon;
 use App\Services\CouponService;
 use App\Services\DB;
+use App\Services\DataTableRequest;
 use App\Services\FrontendI18n;
 use App\Services\InvoiceAccountingService;
 use App\Services\MonthlyPlanService;
@@ -427,7 +428,26 @@ final class OrderController extends BaseController
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $orders = (new Order())->orderBy('id', 'desc')->where('user_id', $this->user->id)->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'product_id', 'product_type', 'product_name', 'coupon', 'price', 'status', 'create_time', 'update_time'],
+            'id'
+        );
+        $query = (new Order())->where('user_id', $this->user->id);
+        $total = (clone $query)->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('product_name', 'LIKE', "%{$table->search}%")
+                    ->orWhere('status', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $orders = $query->paginate($table->length, '*', '', $table->page);
 
         foreach ($orders as $order) {
             $order->op = '<a class="btn btn-primary" href="/user/order/' . $order->id . '/view">'
@@ -449,12 +469,20 @@ final class OrderController extends BaseController
                 ENT_QUOTES | ENT_SUBSTITUTE,
                 'UTF-8'
             );
+            $order->coupon = htmlspecialchars(
+                (string) $order->coupon,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
             $order->status = self::orderStatus((string) $order->status);
             $order->create_time = Tools::toDateTime($order->create_time);
             $order->update_time = Tools::toDateTime($order->update_time);
         }
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'orders' => $orders,
         ]);
     }

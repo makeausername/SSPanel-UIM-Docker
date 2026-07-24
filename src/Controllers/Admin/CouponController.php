@@ -7,6 +7,7 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Models\UserCoupon;
 use App\Services\AdminPermissionService;
+use App\Services\DataTableRequest;
 use App\Services\InvoiceAccountingService;
 use App\Utils\Tools;
 use Exception;
@@ -14,12 +15,15 @@ use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use function in_array;
+use function htmlspecialchars;
 use function is_numeric;
 use function json_decode;
 use function json_encode;
 use function property_exists;
 use function time;
 use function trim;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 
 final class CouponController extends BaseController
 {
@@ -270,11 +274,30 @@ final class CouponController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $coupons = (new UserCoupon())->orderBy('id', 'desc')->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'code', 'use_count', 'create_time', 'expire_time'],
+            'id'
+        );
+        $query = UserCoupon::query();
+        $total = (new UserCoupon())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('code', 'LIKE', "%{$table->search}%")
+                    ->orWhere('content', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $coupons = $query->paginate($table->length, '*', '', $table->page);
         $canMutate = AdminPermissionService::allows($this->user, 'DELETE', '/admin/coupon/1');
         $canViewCodes = AdminPermissionService::role($this->user) !== 'read_only';
 
-        $coupons = $coupons->map(static function (UserCoupon $coupon) use ($canMutate, $canViewCodes): array {
+        $coupons->getCollection()->transform(static function (UserCoupon $coupon) use ($canMutate, $canViewCodes): array {
             $content = json_decode($coupon->content);
             $limit = json_decode($coupon->limit);
 
@@ -284,10 +307,16 @@ final class CouponController extends BaseController
                 <button class="btn btn-orange" id="disable-coupon-' .
                     $coupon->id . '" onclick="disableCoupon(' . $coupon->id . ')">禁用</button>' : '') : '';
 
-            $coupon->code = $canViewCodes ? $coupon->code : '••••••••';
+            $coupon->code = $canViewCodes
+                ? htmlspecialchars((string) $coupon->code, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                : '••••••••';
             $coupon->type = $coupon->type();
             $coupon->value = $content->value;
-            $coupon->product_id = $limit->product_id;
+            $coupon->product_id = htmlspecialchars(
+                (string) ($limit->product_id ?? ''),
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
             $coupon->use_time = (int) $limit->use_time < 0 ? '不限次数' : $limit->use_time;
             $coupon->total_use_time = ! property_exists($limit, 'total_use_time') ||
             (int) $limit->total_use_time < 0 ? '不限次数' : $limit->total_use_time;
@@ -311,9 +340,12 @@ final class CouponController extends BaseController
                 'create_time',
                 'expire_time',
             ]);
-        })->values();
+        });
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'coupons' => $coupons,
         ]);
     }

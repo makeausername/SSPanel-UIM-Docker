@@ -12,6 +12,7 @@ use App\Models\NodeRuntime;
 use App\Models\NodeToken;
 use App\Models\OnlineLog;
 use App\Services\AdminPermissionService;
+use App\Services\DataTableRequest;
 use App\Services\FixedNodeTrafficRatePolicy;
 use App\Services\I18n;
 use App\Services\NodeEnrollmentService;
@@ -538,7 +539,26 @@ final class NodeController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $nodes = (new Node())->orderBy('id', 'desc')->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'name', 'server', 'type', 'sort', 'traffic_rate', 'node_class', 'node_group', 'node_bandwidth_limit', 'node_bandwidth', 'bandwidthlimit_resetday'],
+            'id'
+        );
+        $query = Node::query();
+        $total = (new Node())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('name', 'LIKE', "%{$table->search}%")
+                    ->orWhere('server', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $nodes = $query->paginate($table->length, '*', '', $table->page);
         $canMutate = AdminPermissionService::allows($this->user, 'PUT', '/admin/node/1');
         $runtimeByNodeId = [];
         $nodeIds = $nodes->pluck('id')->toArray();
@@ -576,7 +596,7 @@ final class NodeController extends BaseController
             $node->node_bandwidth_limit = Tools::bToGB($node->node_bandwidth_limit);
         }
 
-        $nodes = $nodes->map(static fn (Node $node): array => $node->only([
+        $nodes->getCollection()->transform(static fn (Node $node): array => $node->only([
             'op',
             'id',
             'name',
@@ -596,9 +616,12 @@ final class NodeController extends BaseController
             'node_bandwidth_limit',
             'node_bandwidth',
             'bandwidthlimit_resetday',
-        ]))->values();
+        ]));
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'nodes' => $nodes,
         ]);
     }

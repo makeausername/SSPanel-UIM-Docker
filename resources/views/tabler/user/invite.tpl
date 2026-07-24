@@ -104,6 +104,17 @@
                                 </tbody>
                             </table>
                         </div>
+                        {if $last_page > 1}
+                            <div class="card-footer d-flex justify-content-end gap-2">
+                                {if $current_page > 1}
+                                    <a class="btn btn-outline-primary" href="?page={$current_page - 1}">&larr;</a>
+                                {/if}
+                                <span class="btn disabled">{$current_page} / {$last_page}</span>
+                                {if $current_page < $last_page}
+                                    <a class="btn btn-outline-primary" href="?page={$current_page + 1}">&rarr;</a>
+                                {/if}
+                            </div>
+                        {/if}
                     </div>
                 </div>
             </div>

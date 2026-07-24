@@ -27,9 +27,11 @@ final class InviteController extends BaseController
             $code = (new InviteCode())->add($this->user->id);
         }
 
-        $rewards = (new InviteSubscriptionReward())->where('inviter_user_id', $this->user->id)
+        $page = max(1, (int) $request->getQueryParam('page', 1));
+        $rewardPage = (new InviteSubscriptionReward())->where('inviter_user_id', $this->user->id)
             ->orderBy('id', 'desc')
-            ->get();
+            ->paginate(50, '*', 'page', $page);
+        $rewards = $rewardPage->items();
 
         foreach ($rewards as $reward) {
             $reward->created_at = Tools::toDateTime($reward->create_time);
@@ -52,6 +54,8 @@ final class InviteController extends BaseController
                 ->assign('invite_url', $invite_url)
                 ->assign('applied_days', $appliedDays)
                 ->assign('pending_days', $pendingDays)
+                ->assign('current_page', $rewardPage->currentPage())
+                ->assign('last_page', $rewardPage->lastPage())
                 ->fetch('user/invite.tpl')
         );
     }

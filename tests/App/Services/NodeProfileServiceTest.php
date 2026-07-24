@@ -216,6 +216,8 @@ final class NodeProfileServiceTest extends TestCase
 
         $executedSql = implode("\n", array_column(Capsule::connection()->getQueryLog(), 'query'));
         $this->assertSame(0, preg_match('/["`]uuid["`]\s*(?:<>|!=)\s*\?/', $executedSql), $executedSql);
+        $this->assertStringContainsString('"is_banned" = ?', $executedSql);
+        $this->assertStringContainsString('"is_admin" = ?', $executedSql);
         $this->assertStringContainsString('transfer_enable', $executedSql);
         $this->assertStringContainsString('class_expire', $executedSql);
     }

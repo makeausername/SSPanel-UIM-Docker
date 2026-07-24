@@ -54,6 +54,39 @@ final class AdminPermissionService
         return self::role($user) === 'owner';
     }
 
+    public static function ensureActiveOwner(): ?User
+    {
+        return DB::connection()->transaction(static function (): ?User {
+            $owner = (new User())
+                ->where('is_admin', 1)
+                ->where('is_banned', 0)
+                ->where('admin_role', 'owner')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+
+            if ($owner !== null) {
+                return $owner;
+            }
+
+            $admin = (new User())
+                ->where('is_admin', 1)
+                ->where('is_banned', 0)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+
+            if ($admin === null) {
+                return null;
+            }
+
+            $admin->admin_role = 'owner';
+            $admin->save();
+
+            return $admin;
+        });
+    }
+
     public static function canUpdateUser(User $actor, User $target): bool
     {
         if ((int) $target->is_admin !== 1) {

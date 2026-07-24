@@ -40,10 +40,11 @@
     {include file='datatable.tpl'}
 
     <script>
+        tableConfig.serverSide = true;
         tableConfig.ajax = {
             url: '/admin/ticket/ajax',
             type: 'POST',
-            dataSrc: 'tickets'
+            dataSrc: 'tickets.data'
         };
         tableConfig.order = [
             [1, 'desc']

@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\UserMoneyLog;
+use App\Services\DataTableRequest;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -46,13 +47,35 @@ final class MoneyLogController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $money_logs = (new UserMoneyLog())->orderBy('id', 'desc')->get();
+        $table = DataTableRequest::from(
+            $request,
+            ['id', 'user_id', 'before', 'after', 'amount', 'remark', 'create_time'],
+            'id'
+        );
+        $query = UserMoneyLog::query();
+        $total = (new UserMoneyLog())->count();
+        if ($table->search !== '') {
+            $query->where(static function ($query) use ($table): void {
+                $query->where('id', $table->search)
+                    ->orWhere('user_id', $table->search)
+                    ->orWhere('remark', 'LIKE', "%{$table->search}%");
+            });
+        }
+        $filtered = $query->count();
+        $query->orderBy($table->orderBy, $table->orderDirection);
+        if ($table->orderBy !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+        $money_logs = $query->paginate($table->length, '*', '', $table->page);
 
         foreach ($money_logs as $money_log) {
             $money_log->create_time = Tools::toDateTime((int) $money_log->create_time);
         }
 
         return $response->withJson([
+            'draw' => $table->draw,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $filtered,
             'money_logs' => $money_logs,
         ]);
     }

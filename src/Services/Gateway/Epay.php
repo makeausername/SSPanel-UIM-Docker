@@ -105,7 +105,7 @@ final class Epay extends Base
         $epaySubmit = new EpaySubmit($this->epay);
         $data['sign'] = $epaySubmit->buildRequestMysign(EpayTool::argSort($data));
         $data['sign_type'] = $this->epay['sign_type'];
-        $client = new Client();
+        $client = new Client(['connect_timeout' => 5, 'timeout' => 15]);
 
         try {
             $res = json_decode(

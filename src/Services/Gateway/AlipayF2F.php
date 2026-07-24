@@ -141,7 +141,10 @@ final class AlipayF2F extends Base
 
     private function createApi(): AlipayTradeApi
     {
-        $alipayTradeApi = new AlipayTradeApi(new Client());
+        $alipayTradeApi = new AlipayTradeApi(new Client([
+            'connect_timeout' => 5,
+            'timeout' => 15,
+        ]));
         $alipayConfigUtil = new AlipayConfigUtil($this->alipayConfig);
         $alipayTradeApi->setAlipayConfigUtil($alipayConfigUtil);
 

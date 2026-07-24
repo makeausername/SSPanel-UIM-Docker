@@ -100,10 +100,11 @@
     {include file='datatable.tpl'}
 
     <script>
+        tableConfig.serverSide = true;
         tableConfig.ajax = {
             url: '/admin/giftcard/ajax',
             type: 'POST',
-            dataSrc: 'giftcards'
+            dataSrc: 'giftcards.data'
         };
         tableConfig.order = [
             [1, 'desc']

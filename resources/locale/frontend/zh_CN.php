@@ -141,6 +141,7 @@ return [
             'mfa_rate_limited' => '多因素认证请求过于频繁，请稍后重试',
             'oauth_failed' => 'OAuth 请求失败',
             'password_reset_email' => '如果账户存在，重置密码链接将发送到该账户对应的邮箱',
+            'port_pool_exhausted' => '用户端口池已满，暂时无法注册，请联系站点管理员',
             'registration_closed' => '未开放注册',
             'reset_link_invalid' => '重置链接无效或已过期',
             'terms_required' => '请同意服务条款',

@@ -28,7 +28,7 @@
             <div class="row row-deck row-cards">
                 <div class="col-12">
                     <div class="row row-cards row-deck">
-                        {if $tickets !== 0}
+                        {if $tickets|count > 0}
                             {foreach $tickets as $ticket}
                             <div class="col-md-4 col-sm-12">
                                 <div class="card">
@@ -71,6 +71,17 @@
                         </div>
                         {/if}
                     </div>
+                    {if $last_page > 1}
+                        <div class="d-flex justify-content-end gap-2 mt-3">
+                            {if $current_page > 1}
+                                <a class="btn btn-outline-primary" href="?page={$current_page - 1}">&larr;</a>
+                            {/if}
+                            <span class="btn disabled">{$current_page} / {$last_page}</span>
+                            {if $current_page < $last_page}
+                                <a class="btn btn-outline-primary" href="?page={$current_page + 1}">&rarr;</a>
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
             </div>
         </div>

@@ -4,19 +4,16 @@ declare(strict_types=1);
 
 namespace App\Utils;
 
-use App\Models\Config;
-use App\Models\User;
 use App\Services\GeoIP2;
+use App\Services\UserPortService;
 use GeoIp2\Exception\AddressNotFoundException;
 use MaxMind\Db\Reader\InvalidDatabaseException;
 use Random\RandomException;
-use function array_diff;
 use function array_flip;
 use function base64_encode;
 use function bin2hex;
 use function ceil;
 use function closedir;
-use function count;
 use function date;
 use function filter_var;
 use function floor;
@@ -30,10 +27,8 @@ use function mb_strcut;
 use function opendir;
 use function pow;
 use function random_bytes;
-use function range;
 use function readdir;
 use function round;
-use function shuffle;
 use function strlen;
 use function strpos;
 use function substr;
@@ -238,24 +233,7 @@ final class Tools
 
     public static function getSsPort(): int
     {
-        $max_port = Config::obtain('max_port');
-        $min_port = Config::obtain('min_port');
-
-        if ($min_port >= 65535
-            || $min_port <= 0
-            || $max_port > 65535
-            || $max_port <= 0
-            || $min_port > $max_port
-            || count(User::all()) >= $max_port - $min_port + 1
-        ) {
-            return 0;
-        }
-
-        $det = (new User())->pluck('port')->toArray();
-        $port = array_diff(range($min_port, $max_port), $det);
-        shuffle($port);
-
-        return $port[0];
+        return UserPortService::nextAvailable();
     }
 
     /**

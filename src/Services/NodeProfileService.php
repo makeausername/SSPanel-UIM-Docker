@@ -10,6 +10,7 @@ use App\Models\NodeProfile;
 use App\Models\User;
 use InvalidArgumentException;
 use JsonException;
+use function date;
 use function hash;
 use function in_array;
 use function is_array;
@@ -132,8 +133,33 @@ final class NodeProfileService
             return [];
         }
 
-        return (new User())
-            ->orderBy('id')
+        $query = (new User())
+            ->whereNotNull('uuid')
+            ->where('is_banned', 0)
+            ->where(static function ($query): void {
+                $query->where('is_admin', 1)
+                    ->orWhere(static function ($query): void {
+                        $query->whereNull('unpaid_delete_at')
+                            ->where('class', '>', 0)
+                            ->where('class_expire', '>', date('Y-m-d H:i:s'));
+                    });
+            })
+            ->where(static function ($query): void {
+                $query->where('is_admin', 1)
+                    ->orWhereRaw('`transfer_enable` > (`u` + `d`)');
+            })
+            ->where(static function ($query) use ($node): void {
+                $query->where('is_admin', 1)
+                    ->orWhere(static function ($query) use ($node): void {
+                        $query->where('class', '>=', (int) $node->node_class);
+                        if ((int) $node->node_group !== 0) {
+                            $query->where('node_group', (int) $node->node_group);
+                        }
+                    });
+            })
+            ->orderBy('id');
+
+        return $query
             ->get([
                 'id',
                 'uuid',

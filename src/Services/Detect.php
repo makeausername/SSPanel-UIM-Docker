@@ -172,7 +172,7 @@ final class Detect
 
     public static function ban(): void
     {
-        $new_logs = (new DetectLog())->where('status', '=', 0)->orderBy('id')->get();
+        $new_logs = (new DetectLog())->where('status', '=', 0)->lazyById(500);
         $user_logs = [];
 
         foreach ($new_logs as $log) {
@@ -182,7 +182,7 @@ final class Detect
             $log->save();
         }
 
-        $auditEvents = (new XNodeAuditEvent())->where('processed', 0)->orderBy('id')->get();
+        $auditEvents = (new XNodeAuditEvent())->where('processed', 0)->lazyById(500);
         foreach ($auditEvents as $event) {
             if ((string) $event->action === 'block') {
                 $user_logs[$event->user_id] = ($user_logs[$event->user_id] ?? 0) + 1;
@@ -232,7 +232,10 @@ final class Detect
         echo Tools::toDateTime(time()) . ' 审计封禁检查结束' . PHP_EOL;
 
         // 审计封禁解封
-        $banned_users = (new User())->where('is_banned', 1)->where('banned_reason', 'DetectBan')->get();
+        $banned_users = (new User())
+            ->where('is_banned', 1)
+            ->where('banned_reason', 'DetectBan')
+            ->lazyById(500);
 
         foreach ($banned_users as $user) {
             $logs = (new DetectBanLog())->where('user_id', $user->id)->orderBy('id', 'desc')->first();

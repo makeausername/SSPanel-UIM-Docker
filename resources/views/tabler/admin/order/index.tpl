@@ -81,10 +81,11 @@
     {include file='datatable.tpl'}
 
     <script>
+        tableConfig.serverSide = true;
         tableConfig.ajax = {
             url: '/admin/order/ajax',
             type: 'POST',
-            dataSrc: 'orders'
+            dataSrc: 'orders.data'
         };
         tableConfig.order = [
             [1, 'desc']

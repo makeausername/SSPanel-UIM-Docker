@@ -69,7 +69,7 @@ final class Stripe extends Base
 
         try {
             $exchangeAmount = (new Exchange())->exchange((float) $price, 'CNY', $stripeCurrency);
-        } catch (GuzzleException|RedisException) {
+        } catch (GuzzleException|RedisException|UnexpectedValueException) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '汇率获取失败',

@@ -12,7 +12,10 @@ abstract class Base
 
     public function __construct()
     {
-        $this->client = new Client();
+        $this->client = new Client([
+            'connect_timeout' => 5,
+            'timeout' => 30,
+        ]);
     }
 
     abstract public function textPrompt(string $q): string;

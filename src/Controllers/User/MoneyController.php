@@ -26,18 +26,25 @@ final class MoneyController extends BaseController
     public function index(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $user = $this->user;
-        $moneylogs = (new UserMoneyLog())->where('user_id', $user->id)->orderBy('id', 'desc')->get();
+        $page = max(1, (int) $request->getQueryParam('page', 1));
+        $moneylogPage = (new UserMoneyLog())
+            ->where('user_id', $user->id)
+            ->orderBy('id', 'desc')
+            ->paginate(50, '*', 'page', $page);
+        $moneylogs = $moneylogPage->items();
 
         foreach ($moneylogs as $moneylog) {
             $moneylog->create_time = Tools::toDateTime($moneylog->create_time);
         }
 
-        $moneylog_count = $moneylogs->count();
+        $moneylog_count = count($moneylogs);
 
         return $response->write(
             $this->view()
                 ->assign('moneylogs', $moneylogs)
                 ->assign('moneylog_count', $moneylog_count)
+                ->assign('current_page', $moneylogPage->currentPage())
+                ->assign('last_page', $moneylogPage->lastPage())
                 ->fetch('user/money.tpl')
         );
     }

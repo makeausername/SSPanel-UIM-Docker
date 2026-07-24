@@ -69,7 +69,7 @@ final class Notification
      */
     public static function notifyAllUser($title = '', $msg = '', $template = 'warn.tpl'): void
     {
-        $users = User::all();
+        $users = (new User())->lazyById(500);
 
         foreach ($users as $user) {
             if ($user->contact_method === 1 || $user->im_type === 0) {
@@ -84,7 +84,7 @@ final class Notification
                     ]
                 );
             } else {
-                IM::send((int) $user->im_value, $msg, $user->im_type);
+                IM::send((string) $user->im_value, $msg, $user->im_type);
             }
         }
     }
@@ -96,15 +96,15 @@ final class Notification
     public static function notifyUserGroup(string $msg = ''): void
     {
         if (Config::obtain('enable_telegram_group_notify')) {
-            IM::send((int) Config::obtain('telegram_chatid'), $msg, 0);
+            IM::send((string) Config::obtain('telegram_chatid'), $msg, 0);
         }
 
         if (Config::obtain('enable_discord_channel_notify')) {
-            IM::send((int) Config::obtain('discord_channel_id'), $msg, 1);
+            IM::send((string) Config::obtain('discord_channel_id'), $msg, 2);
         }
 
         if (Config::obtain('enable_slack_channel_notify')) {
-            IM::send((int) Config::obtain('slack_channel_id'), $msg, 2);
+            IM::send((string) Config::obtain('slack_channel_id'), $msg, 1);
         }
     }
 }

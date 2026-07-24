@@ -13,6 +13,9 @@ use MaxMind\Db\Reader\InvalidDatabaseException;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function htmlspecialchars;
+use const ENT_QUOTES;
+use const ENT_SUBSTITUTE;
 
 final class SubLogController extends BaseController
 {
@@ -77,7 +80,16 @@ final class SubLogController extends BaseController
 
         foreach ($subscribes as $subscribe) {
             $subscribe->request_time = Tools::toDateTime($subscribe->request_time);
-            $subscribe->location = $subscribe->getAttributes();
+            $subscribe->location = htmlspecialchars(
+                (string) $subscribe->location,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
+            $subscribe->request_user_agent = htmlspecialchars(
+                (string) $subscribe->request_user_agent,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
         }
 
         return $response->withJson([

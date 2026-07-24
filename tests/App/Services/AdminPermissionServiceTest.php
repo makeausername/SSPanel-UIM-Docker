@@ -5,11 +5,31 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\User;
+use Illuminate\Database\Capsule\Manager as Capsule;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class AdminPermissionServiceTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $capsule = new Capsule();
+        $capsule->addConnection([
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+        ]);
+        $capsule->setAsGlobal();
+        $capsule->bootEloquent();
+        $capsule->schema()->create('user', static function ($table): void {
+            $table->increments('id');
+            $table->boolean('is_admin')->default(false);
+            $table->boolean('is_banned')->default(false);
+            $table->string('admin_role')->nullable();
+        });
+    }
+
     #[DataProvider('permissionCases')]
     public function testRolePermissionMatrix(string $role, string $method, string $path, bool $expected): void
     {
@@ -75,5 +95,40 @@ final class AdminPermissionServiceTest extends TestCase
         $this->assertFalse(AdminPermissionService::canUpdateUser($administrator, $otherAdministrator));
         $this->assertTrue(AdminPermissionService::canUpdateUser($administrator, $administrator));
         $this->assertTrue(AdminPermissionService::canUpdateUser($administrator, $ordinaryUser));
+    }
+
+    public function testEnsureActiveOwnerPromotesTheFirstActiveAdministratorAndIsIdempotent(): void
+    {
+        User::query()->insert([
+            ['id' => 1, 'is_admin' => 1, 'is_banned' => 1, 'admin_role' => 'administrator'],
+            ['id' => 2, 'is_admin' => 1, 'is_banned' => 0, 'admin_role' => 'administrator'],
+            ['id' => 3, 'is_admin' => 1, 'is_banned' => 0, 'admin_role' => null],
+        ]);
+
+        $owner = AdminPermissionService::ensureActiveOwner();
+        $sameOwner = AdminPermissionService::ensureActiveOwner();
+
+        $this->assertSame(2, (int) $owner?->id);
+        $this->assertSame(2, (int) $sameOwner?->id);
+        $this->assertSame(
+            1,
+            User::query()
+                ->where('is_admin', 1)
+                ->where('is_banned', 0)
+                ->where('admin_role', 'owner')
+                ->count()
+        );
+    }
+
+    public function testEnsureActiveOwnerReturnsNullWhenNoActiveAdministratorExists(): void
+    {
+        User::query()->insert([
+            'id' => 1,
+            'is_admin' => 1,
+            'is_banned' => 1,
+            'admin_role' => 'administrator',
+        ]);
+
+        $this->assertNull(AdminPermissionService::ensureActiveOwner());
     }
 }

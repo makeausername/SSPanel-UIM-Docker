@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Exceptions\UserPortExhaustedException;
 use App\Models\Config;
 use App\Models\InviteCode;
 use App\Models\LoginIp;
@@ -23,6 +24,7 @@ use App\Services\OneTimeTokenService;
 use App\Services\RateLimit;
 use App\Services\RegistrationGroupSelector;
 use App\Services\UserAccessPolicy;
+use App\Services\UserPortService;
 use App\Utils\Cookie;
 use App\Utils\Hash;
 use App\Utils\ResponseHelper;
@@ -263,7 +265,6 @@ final class AuthController extends BaseController
         $user->passwd = Tools::genRandomChar(16);
         $user->uuid = Uuid::uuid4();
         $user->api_token = Tools::genRandomChar(32);
-        $user->port = Tools::getSsPort();
         $user->u = 0;
         $user->d = 0;
         $user->method = $configs['reg_method'];
@@ -303,8 +304,12 @@ final class AuthController extends BaseController
 
         $user->last_login_time = time();
 
-        if (! $user->save()) {
-            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.unknown_error'));
+        try {
+            if (! UserPortService::assignAndSave($user)) {
+                return ResponseHelper::error($response, FrontendI18n::trans('response.auth.unknown_error'));
+            }
+        } catch (UserPortExhaustedException) {
+            return ResponseHelper::error($response, FrontendI18n::trans('response.auth.port_pool_exhausted'));
         }
 
         if ($is_admin_reg) {
