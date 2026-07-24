@@ -14,7 +14,7 @@ final class Json extends Base
 
         return json_encode([
             'version' => 4,
-            'sub_name' => $_ENV['appName'],
+            'sub_name' => Subscribe::PROFILE_NAME,
             'email' => $user->email,
             'user_name' => $user->user_name,
             'class' => $user->class,
