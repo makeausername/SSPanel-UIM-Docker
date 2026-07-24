@@ -150,6 +150,16 @@
                             <p class="text-secondary mb-0">{trans key='docs.shadowrocket.copy_body'}</p>
                         </div>
                     </div>
+                    <div class="d-grid d-sm-flex mb-3">
+                        <a class="btn btn-primary btn-lg"
+                           href="{$shadowrocketImportUrl|escape:'html'}">
+                            <i class="ti ti-device-mobile-down me-1"></i>
+                            {trans key='docs.shadowrocket.one_click_button'}
+                        </a>
+                    </div>
+                    <div class="small text-secondary mb-4">
+                        <i class="ti ti-tag me-1"></i>{trans key='docs.shadowrocket.one_click_note'}
+                    </div>
                     <div class="input-group">
                         <input type="text" class="form-control subscription-input"
                                value="{$subscriptionUrl|escape:'html'}" readonly

@@ -249,6 +249,11 @@
                                                     <small class="text-muted d-block">{trans key='user.dashboard.shadowrocket_description_3'}</small>
                                                 </div>
                                                 <div class="d-flex flex-column flex-sm-row gap-2">
+                                                    <a class="btn btn-primary"
+                                                       href="{$ShadowrocketImportUrl|escape:'html'}">
+                                                        <i class="ti ti-device-mobile-down"></i>
+                                                        {trans key='user.dashboard.shadowrocket_import'}
+                                                    </a>
                                                     <a class="btn btn-outline-primary" href="{$eziplcAppleGuideUrl}">
                                                         <i class="ti ti-book"></i> {trans key='user.dashboard.setup_guide'}
                                                     </a>

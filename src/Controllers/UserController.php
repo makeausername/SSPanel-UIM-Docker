@@ -53,6 +53,7 @@ final class UserController extends BaseController
         }
 
         $universalSub = Subscribe::getUniversalSubLink($this->user);
+        $shadowrocketImportUrl = Subscribe::shadowrocketImportUrl($universalSub . '/v2ray');
         $r2Enabled = filter_var($_ENV['enable_r2_client_download'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
         $clientData = ClientConfig::getClients(
             $universalSub,
@@ -67,6 +68,7 @@ final class UserController extends BaseController
                 ->assign('traffic_logs', json_encode($traffic_logs))
                 ->assign('class_expire_days', $class_expire_days)
                 ->assign('UniversalSub', $universalSub)
+                ->assign('ShadowrocketImportUrl', $shadowrocketImportUrl)
                 ->assign('clientData', json_encode($clientData['clients']))
                 ->assign('platformIcons', json_encode($clientData['icons']))
                 ->assign('user_class', $this->user->class)

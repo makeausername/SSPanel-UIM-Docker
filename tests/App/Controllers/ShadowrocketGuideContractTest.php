@@ -53,6 +53,12 @@ final class ShadowrocketGuideContractTest extends TestCase
         $controller = file_get_contents(
             dirname(__DIR__, 3) . '/src/Controllers/User/DocsController.php'
         );
+        $dashboardController = file_get_contents(
+            dirname(__DIR__, 3) . '/src/Controllers/UserController.php'
+        );
+        $dashboard = file_get_contents(
+            dirname(__DIR__, 3) . '/resources/views/tabler/user/index.tpl'
+        );
         $template = file_get_contents(
             dirname(__DIR__, 3) . '/resources/views/tabler/user/docs/shadowrocket.tpl'
         );
@@ -64,6 +70,8 @@ final class ShadowrocketGuideContractTest extends TestCase
         );
 
         self::assertIsString($controller);
+        self::assertIsString($dashboardController);
+        self::assertIsString($dashboard);
         self::assertIsString($template);
         self::assertIsString($zhLocale);
         self::assertIsString($enLocale);
@@ -72,8 +80,24 @@ final class ShadowrocketGuideContractTest extends TestCase
             $controller
         );
         self::assertStringContainsString(
+            "Subscribe::shadowrocketImportUrl(\$subscriptionUrl)",
+            $controller
+        );
+        self::assertStringContainsString(
+            "Subscribe::shadowrocketImportUrl(\$universalSub . '/v2ray')",
+            $dashboardController
+        );
+        self::assertStringContainsString(
+            'href="{$ShadowrocketImportUrl|escape:\'html\'}"',
+            $dashboard
+        );
+        self::assertStringContainsString(
             "fetch('user/docs/shadowrocket.tpl')",
             $controller
+        );
+        self::assertStringContainsString(
+            'href="{$shadowrocketImportUrl|escape:\'html\'}"',
+            $template
         );
         self::assertStringContainsString(
             'data-clipboard-text="{$subscriptionUrl|escape:\'html\'}"',
