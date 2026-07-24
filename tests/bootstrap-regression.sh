@@ -329,6 +329,7 @@ assert_file_contains docker/nginx/default.conf 'location = /locale'
 assert_file_contains docker/nginx/default.conf 'client_max_body_size 16k;'
 assert_file_contains docker/php/php.ini 'post_max_size = 2M'
 assert_file_contains .dockerignore 'public/downloads/eziplc-windows.exe'
+assert_file_contains .dockerignore 'public/downloads/eziplc-android.apk'
 assert_file_contains app/routes.php "\$app->get('/healthz', App\\Controllers\\HealthController::class . ':index');"
 assert_file_contains docker/cron/scheduler 'HEARTBEAT_FILE='
 assert_file_contains docker/cron/scheduler 'php xcat Cron'

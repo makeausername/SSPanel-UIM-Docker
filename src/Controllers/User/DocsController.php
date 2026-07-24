@@ -15,12 +15,30 @@ use Slim\Http\ServerRequest;
 
 final class DocsController extends BaseController
 {
+    public function androidRedirect(
+        ServerRequest $request,
+        Response $response,
+        array $args
+    ): ResponseInterface {
+        return $response->withRedirect('/user/docs/android');
+    }
+
     public function shadowrocketRedirect(
         ServerRequest $request,
         Response $response,
         array $args
     ): ResponseInterface {
         return $response->withRedirect('/user/docs/shadowrocket');
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function android(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        return $response->write(
+            $this->view()->fetch('user/docs/android.tpl')
+        );
     }
 
     /**

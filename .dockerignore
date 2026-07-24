@@ -21,6 +21,7 @@ storage/.install_lock
 storage/.install_in_progress
 storage/.install_in_progress.d/
 
-# Served by the host-mounted nginx public directory; exclude the 100 MB binary
-# from the PHP/scheduler image build context.
+# Served by the host-mounted nginx public directory; exclude large client
+# binaries from the PHP/scheduler image build context.
+public/downloads/eziplc-android.apk
 public/downloads/eziplc-windows.exe

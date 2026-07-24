@@ -22,6 +22,7 @@ return static function (Slim\App $app): void {
     $app->get('/', App\Controllers\HomeController::class . ':index');
     $app->get('/tos', App\Controllers\HomeController::class . ':tos');
     $app->get('/staff', App\Controllers\HomeController::class . ':staff');
+    $app->get('/docs/android', App\Controllers\User\DocsController::class . ':androidRedirect');
     $app->get('/docs/shadowrocket', App\Controllers\User\DocsController::class . ':shadowrocketRedirect');
     // Frontend locale switch
     $app->post('/locale', App\Controllers\LocaleController::class . ':switchLocale');
@@ -56,6 +57,7 @@ return static function (Slim\App $app): void {
         $group->get('/announcement', App\Controllers\UserController::class . ':announcement');
         // 文档
         $group->get('/docs', App\Controllers\User\DocsController::class . ':index');
+        $group->get('/docs/android', App\Controllers\User\DocsController::class . ':android');
         $group->get('/docs/windows', App\Controllers\User\DocsController::class . ':windows');
         $group->get('/docs/shadowrocket', App\Controllers\User\DocsController::class . ':shadowrocket');
         $group->get('/docs/{id:[0-9]+}/view', App\Controllers\User\DocsController::class . ':detail');
