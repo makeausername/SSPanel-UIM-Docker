@@ -116,6 +116,7 @@ final class NodeController extends BaseController
             $this->view()
                 ->assign('update_field', self::$update_field)
                 ->assign('country_options', NodeCountryService::commonOptions())
+                ->assign('xnode_traffic_rate_options', XNodeNodePolicy::trafficRateOptions())
                 ->fetch('admin/node/create.tpl')
         );
     }
@@ -146,8 +147,14 @@ final class NodeController extends BaseController
             ]);
         }
         $node->country_code = $countryCode;
-        $node->traffic_rate = $request->getParam('traffic_rate') ?? 1;
-        FixedNodeTrafficRatePolicy::apply($node);
+        $node->sort = (int) $request->getParam('sort');
+
+        if (! self::setTrafficRate($node, $request->getParam('traffic_rate'))) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => 'XNode 流量倍率无效，请选择 2、4、6、8 或 10 倍',
+            ]);
+        }
 
         $custom_config = $request->getParam('custom_config') ?? '{}';
 
@@ -159,7 +166,6 @@ final class NodeController extends BaseController
 
         $node->node_speedlimit = $request->getParam('node_speedlimit');
         $node->type = $request->getParam('type') === 'true' ? 1 : 0;
-        $node->sort = (int) $request->getParam('sort');
         $node->node_class = $request->getParam('node_class');
         $node->node_bandwidth_limit = Tools::gbToB($request->getParam('node_bandwidth_limit'));
         $node->bandwidthlimit_resetday = $request->getParam('bandwidthlimit_resetday');
@@ -262,6 +268,7 @@ final class NodeController extends BaseController
                 ->assign('xnode_probe_summary', NodeProbeService::summarizeNode((int) $node->id))
                 ->assign('update_field', self::$update_field)
                 ->assign('country_options', NodeCountryService::commonOptions())
+                ->assign('xnode_traffic_rate_options', XNodeNodePolicy::trafficRateOptions())
                 ->fetch('admin/node/edit.tpl')
         );
     }
@@ -299,8 +306,14 @@ final class NodeController extends BaseController
             ]);
         }
         $node->country_code = $countryCode;
-        $node->traffic_rate = $request->getParam('traffic_rate') ?? 1;
-        FixedNodeTrafficRatePolicy::apply($node);
+        $node->sort = (int) $request->getParam('sort');
+
+        if (! self::setTrafficRate($node, $request->getParam('traffic_rate'))) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => 'XNode 流量倍率无效，请选择 2、4、6、8 或 10 倍',
+            ]);
+        }
 
         $custom_config = $request->getParam('custom_config') ?? '{}';
 
@@ -312,7 +325,6 @@ final class NodeController extends BaseController
 
         $node->node_speedlimit = $request->getParam('node_speedlimit');
         $node->type = $request->getParam('type') === 'true' ? 1 : 0;
-        $node->sort = (int) $request->getParam('sort');
         $node->node_class = $request->getParam('node_class');
         $node->node_bandwidth_limit = Tools::gbToB($request->getParam('node_bandwidth_limit'));
         $node->bandwidthlimit_resetday = $request->getParam('bandwidthlimit_resetday');
@@ -811,6 +823,28 @@ final class NodeController extends BaseController
         }
 
         return $value;
+    }
+
+    private static function setTrafficRate(Node $node, mixed $trafficRate): bool
+    {
+        if (XNodeNodePolicy::appliesTo((int) $node->sort)) {
+            $trafficRate = XNodeNodePolicy::normalizeTrafficRate(
+                $trafficRate ?? XNodeNodePolicy::DEFAULT_TRAFFIC_RATE
+            );
+
+            if ($trafficRate === null) {
+                return false;
+            }
+
+            $node->traffic_rate = $trafficRate;
+
+            return true;
+        }
+
+        $node->traffic_rate = $trafficRate ?? 1;
+        FixedNodeTrafficRatePolicy::apply($node);
+
+        return true;
     }
 
     private function buildXNodeRuntimeListFields(?NodeRuntime $runtime): array
