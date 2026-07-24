@@ -3,7 +3,7 @@
 {assign var=eziplcAndroidDownloadUrl value='/downloads/eziplc-android.apk'}
 {assign var=eziplcWindowsGuideUrl value='/user/docs/windows'}
 {assign var=eziplcAndroidGuideUrl value='/docs/android'}
-{assign var=eziplcAppleGuideUrl value='/docs/shadowrocket'}
+{assign var=eziplcAppleGuideUrl value='/user/docs/shadowrocket'}
 
 <style>
 /* Animation classes for collapsible sections */

@@ -7,6 +7,7 @@ namespace App\Controllers\User;
 use App\Controllers\BaseController;
 use App\Models\Config;
 use App\Models\Docs;
+use App\Services\Subscribe;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
@@ -14,6 +15,14 @@ use Slim\Http\ServerRequest;
 
 final class DocsController extends BaseController
 {
+    public function shadowrocketRedirect(
+        ServerRequest $request,
+        Response $response,
+        array $args
+    ): ResponseInterface {
+        return $response->withRedirect('/user/docs/shadowrocket');
+    }
+
     /**
      * @throws Exception
      */
@@ -21,6 +30,18 @@ final class DocsController extends BaseController
     {
         return $response->write(
             $this->view()->fetch('user/docs/windows.tpl')
+        );
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function shadowrocket(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        return $response->write(
+            $this->view()
+                ->assign('subscriptionUrl', Subscribe::getUniversalSubLink($this->user) . '/v2ray')
+                ->fetch('user/docs/shadowrocket.tpl')
         );
     }
 
