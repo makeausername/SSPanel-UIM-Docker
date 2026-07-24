@@ -40,9 +40,7 @@
                                     {foreach $servers as $server}
                                         <div class="col-lg-4 col-md-6 col-sm-12">
                                             <div class="card">
-                                                {if $server['class'] === 0}
-                                                    <div class="ribbon bg-blue">{trans key='node.free'}</div>
-                                                {else}
+                                                {if $server['class'] > 0}
                                                     <div class="ribbon bg-blue">LV. {$server['class']}</div>
                                                 {/if}
                                                 <div class="card-body">
