@@ -40,6 +40,12 @@
             display: flex;
             gap: .25rem;
         }
+
+        @media (min-width: 992px) {
+            :root {
+                margin-left: 0;
+            }
+        }
     </style>
     <!-- JS files -->
     <script src="/assets/js/fuck.min.js"></script>

@@ -34,6 +34,12 @@
         .home-title {
             font-size: 36px;
         }
+
+        @media (min-width: 992px) {
+            :root {
+                margin-left: 0;
+            }
+        }
     </style>
 </head>
 
