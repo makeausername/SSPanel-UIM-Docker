@@ -48,6 +48,20 @@
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
+                                <label class="form-label col-3 col-form-label">国家/地区</label>
+                                <div class="col">
+                                    <input id="country_code" type="text" class="form-control text-uppercase"
+                                           list="node-country-options" maxlength="2" autocomplete="off"
+                                           placeholder="例如 SG">
+                                    <datalist id="node-country-options">
+                                        {foreach $country_options as $code => $name}
+                                            <option value="{$code|escape:'html'}">{$name|escape:'html'}</option>
+                                        {/foreach}
+                                    </datalist>
+                                    <div class="form-hint">使用 ISO 3166-1 两位代码；留空则不显示旗帜。</div>
+                                </div>
+                            </div>
+                            <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label required">流量倍率</label>
                                 <div class="col">
                                     <input id="traffic_rate" type="text" class="form-control"

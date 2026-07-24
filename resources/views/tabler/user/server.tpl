@@ -1,5 +1,19 @@
 {include file="user/header.tpl"}
 
+<style>
+    .node-name-row {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+
+    .node-country-flag {
+        flex: 0 0 auto;
+        height: 2rem;
+    }
+</style>
+
 <div class="page-wrapper">
     <div class="container-xl">
         <div class="page-header d-print-none text-white">
@@ -42,8 +56,14 @@
                                                             </span>
                                                         </div>
                                                         <div class="col">
-                                                            <h2 class="page-title" style="font-size: 16px;">
-                                                                {$server['name']|escape:'html'}&nbsp;
+                                                            <h2 class="page-title node-name-row" style="font-size: 16px;">
+                                                                {if $server['country_code'] !== ''}
+                                                                    <span class="flag node-country-flag flag-country-{$server['country_code']}"
+                                                                          role="img"
+                                                                          aria-label="{$server['country_code']|escape:'html'}"
+                                                                          title="{$server['country_code']|escape:'html'}"></span>
+                                                                {/if}
+                                                                <span>{$server['name']|escape:'html'}</span>
                                                                 <span class="card-subtitle my-2"
                                                                       style="font-size: 10px;">  {$server['node_bandwidth']} /
                                                                     {$server['node_bandwidth_limit']}

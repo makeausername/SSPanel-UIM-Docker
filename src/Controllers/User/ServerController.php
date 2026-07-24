@@ -6,6 +6,7 @@ namespace App\Controllers\User;
 
 use App\Controllers\BaseController;
 use App\Services\FrontendI18n;
+use App\Services\NodeCountryService;
 use App\Services\Subscribe;
 use App\Utils\Tools;
 use Exception;
@@ -27,6 +28,7 @@ final class ServerController extends BaseController
             $node_list[] = [
                 'id' => $node->id,
                 'name' => $node->name,
+                'country_code' => NodeCountryService::flagCode($node->country_code ?? ''),
                 'class' => (int) $node->node_class,
                 'color' => $node->color,
                 'connection_type' => $node->connection_type,
