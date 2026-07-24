@@ -67,8 +67,10 @@ final class SubController extends BaseController
         . '; download=' . $user->d
         . '; total=' . $user->transfer_enable
         . '; expire=' . strtotime($user->class_expire);
+        // Subscription profile metadata
+        $sub_profile_title = Subscribe::profileTitleHeader();
+        $sub_content_disposition = Subscribe::contentDispositionHeader();
         // Clash specific
-        $sub_content_disposition = 'attachment; filename=' . $_ENV['appName'];
         $sub_profile_update_interval = 6;
         $sub_profile_web_page_url = $_ENV['baseUrl'];
 
@@ -80,17 +82,17 @@ final class SubController extends BaseController
             );
         }
 
+        $response = $response->withHeader('Subscription-Userinfo', $sub_details)
+            ->withHeader('Profile-Title', $sub_profile_title)
+            ->withHeader('Content-Disposition', $sub_content_disposition)
+            ->withHeader('Content-Type', $content_type);
+
         if ($subtype === 'clash') {
-            return $response->withHeader('Subscription-Userinfo', $sub_details)
-                ->withHeader('Content-Disposition', $sub_content_disposition)
+            $response = $response
                 ->withHeader('Profile-Update-Interval', $sub_profile_update_interval)
-                ->withHeader('Profile-Web-Page-Url', $sub_profile_web_page_url)
-                ->withHeader('Content-Type', $content_type)
-                ->write($sub_info);
+                ->withHeader('Profile-Web-Page-Url', $sub_profile_web_page_url);
         }
 
-        return $response->withHeader('Subscription-Userinfo', $sub_details)
-            ->withHeader('Content-Type', $content_type)
-            ->write($sub_info);
+        return $response->write($sub_info);
     }
 }

@@ -17,9 +17,22 @@ use App\Services\Subscribe\V2Ray;
 use App\Services\Subscribe\V2RayJson;
 use App\Utils\Tools;
 use Illuminate\Support\Collection;
+use function base64_encode;
 
 final class Subscribe
 {
+    public const PROFILE_NAME = 'EzIPLC';
+
+    public static function profileTitleHeader(): string
+    {
+        return 'base64:' . base64_encode(self::PROFILE_NAME);
+    }
+
+    public static function contentDispositionHeader(): string
+    {
+        return 'attachment; filename=' . self::PROFILE_NAME;
+    }
+
     public static function getUniversalSubLink($user): string
     {
         $userid = $user->id;
