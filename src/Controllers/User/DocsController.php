@@ -38,9 +38,12 @@ final class DocsController extends BaseController
      */
     public function shadowrocket(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
+        $subscriptionUrl = Subscribe::getUniversalSubLink($this->user) . '/v2ray';
+
         return $response->write(
             $this->view()
-                ->assign('subscriptionUrl', Subscribe::getUniversalSubLink($this->user) . '/v2ray')
+                ->assign('subscriptionUrl', $subscriptionUrl)
+                ->assign('shadowrocketImportUrl', Subscribe::shadowrocketImportUrl($subscriptionUrl))
                 ->fetch('user/docs/shadowrocket.tpl')
         );
     }

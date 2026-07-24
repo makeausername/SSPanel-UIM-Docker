@@ -18,6 +18,37 @@ final class SubscriptionProfileMetadataTest extends TestCase
         );
     }
 
+    public function testShadowrocketImportUrlCarriesExplicitEziplcRemark(): void
+    {
+        $subscriptionUrl = 'https://example.com/sub/private-token/v2ray';
+        $importUrl = Subscribe::shadowrocketImportUrl($subscriptionUrl);
+        $prefix = 'shadowrocket://add/sub://';
+        $suffix = '?remark=EzIPLC';
+
+        self::assertStringStartsWith($prefix, $importUrl);
+        self::assertStringEndsWith($suffix, $importUrl);
+
+        $payload = substr($importUrl, strlen($prefix), -strlen($suffix));
+        self::assertSame(
+            $subscriptionUrl . '?flag=shadowrocket',
+            base64_decode($payload, true)
+        );
+    }
+
+    public function testShadowrocketImportUrlPreservesAnExistingQueryString(): void
+    {
+        $subscriptionUrl = 'https://example.com/sub/private-token/v2ray?source=panel';
+        $importUrl = Subscribe::shadowrocketImportUrl($subscriptionUrl);
+        $prefix = 'shadowrocket://add/sub://';
+        $suffix = '?remark=EzIPLC';
+        $payload = substr($importUrl, strlen($prefix), -strlen($suffix));
+
+        self::assertSame(
+            $subscriptionUrl . '&flag=shadowrocket',
+            base64_decode($payload, true)
+        );
+    }
+
     public function testProfileMetadataIsAppliedBeforeSubtypeSpecificHeaders(): void
     {
         $controller = file_get_contents(

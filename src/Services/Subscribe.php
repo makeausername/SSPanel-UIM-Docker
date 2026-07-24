@@ -18,6 +18,8 @@ use App\Services\Subscribe\V2RayJson;
 use App\Utils\Tools;
 use Illuminate\Support\Collection;
 use function base64_encode;
+use function rawurlencode;
+use function str_contains;
 
 final class Subscribe
 {
@@ -31,6 +33,14 @@ final class Subscribe
     public static function contentDispositionHeader(): string
     {
         return 'attachment; filename=' . self::PROFILE_NAME;
+    }
+
+    public static function shadowrocketImportUrl(string $subscriptionUrl): string
+    {
+        $separator = str_contains($subscriptionUrl, '?') ? '&' : '?';
+        $payload = base64_encode($subscriptionUrl . $separator . 'flag=shadowrocket');
+
+        return 'shadowrocket://add/sub://' . $payload . '?remark=' . rawurlencode(self::PROFILE_NAME);
     }
 
     public static function getUniversalSubLink($user): string
